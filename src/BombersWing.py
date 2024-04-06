@@ -3,6 +3,7 @@
 from collections import namedtuple
 import math
 import AnimationSequence
+import helpers
 from helpers.CallbackDelayer import CallbackDelayer
 from debug_utils import LOG_CURRENT_EXCEPTION, LOG_ERROR
 from items import vehicles
@@ -61,6 +62,10 @@ class Bomber(object):
             self.__sound.setRTPC('RTPC_ext_plane_bombing', 1 if isAttacking else 0)
             return
 
+    def setVisible(self, newVisible):
+        if self.model:
+            self.model.visible = newVisible
+
     def addControlPoint(self, position, velocity, time, attackEnded=False):
         callback = None
         if attackEnded:
@@ -90,6 +95,7 @@ class Bomber(object):
             return
         if self._desc.modelName not in resourceRefs.failedIDs:
             self._model = resourceRefs[self._desc.modelName]
+            self._model.visible = not helpers.isShowingKillCam()
             self.__onFlightStarted()
         else:
             LOG_ERROR('Could not load model %s' % self._desc.modelName)
@@ -112,7 +118,7 @@ class CompoundBomber(Bomber):
     def destroy(self):
         self.__flyAnimation = None
         player = BigWorld.player()
-        if player is not None and self._model is not None:
+        if player is not None and self._model is not None and self._model in player.models:
             player.delModel(self._model)
         self._model = None
         super(CompoundBomber, self).destroy()
@@ -149,13 +155,15 @@ class CompoundBomber(Bomber):
             LOG_ERROR('Could not load model %s' % self._desc.modelName)
 
     def __onFlightStarted(self):
-        if self._model:
-            BigWorld.player().addModel(self._model)
+        player = BigWorld.player()
+        if self._model and player is not None:
+            player.addModel(self._model)
             self.__flyAnimation.bindTo(AnimationSequence.CompoundWrapperContainer(self._model))
             self.__flyAnimation.start()
             if self.motor:
                 self._model.matrix = self.motor.getMatrix()
             self._playSound()
+        return
 
 
 class BombersWing(CallbackDelayer):
@@ -185,6 +193,10 @@ class BombersWing(CallbackDelayer):
         CallbackDelayer.destroy(self)
         for bomber in self.__bombers:
             bomber.destroy()
+
+    def setVisible(self, newVisible):
+        for bomber in self.__bombers:
+            bomber.setVisible(newVisible)
 
     def __convertTime(self, time):
         diff = BigWorld.serverTime() - BigWorld.time()

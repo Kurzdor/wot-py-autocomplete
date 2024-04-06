@@ -5,10 +5,13 @@ import logging
 from itertools import chain
 import typing
 import BigWorld
+import CGF
 import Windowing
 import Event
 import adisp
 from CurrentVehicle import g_currentVehicle, g_currentPreviewVehicle
+from ClientSelectableCameraObject import ClientSelectableCameraObject
+from gui.Scaleform.framework.entities.View import ViewKey
 from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
 from gui.server_events.events_helpers import getC11nQuestsConfig, isC11nQuest
 from gui.shared.event_dispatcher import hideVehiclePreview
@@ -23,6 +26,7 @@ from gui.shared.gui_items.customization.c11n_items import Customization
 from items import vehicles
 from items.customizations import createNationalEmblemComponents
 from serializable_types.customizations import CustomizationOutfit
+from skeletons.gui.app_loader import IAppLoader
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.server_events import IEventsCache
 from vehicle_outfit.outfit import Outfit, Area
@@ -39,6 +43,7 @@ from items.components.c11n_constants import SeasonType, ApplyArea, CUSTOM_STYLE_
 from vehicle_systems.stricted_loading import makeCallbackWeak
 from vehicle_systems.camouflages import getStyleProgressionOutfit
 from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
+from cgf_components.hangar_camera_manager import HangarCameraManager
 if typing.TYPE_CHECKING:
     from gui.customization.constants import CustomizationModeSource
     from gui.Scaleform.daapi.view.lobby.customization.shared import CustomizationModes, CustomizationTabs
@@ -235,6 +240,10 @@ class CustomizationService(_ServiceItemShopMixin, _ServiceHelpersMixin, ICustomi
             lobbyHeaderNavigationPossible = yield self.__lobbyContext.isHeaderNavigationPossible()
             if not lobbyHeaderNavigationPossible:
                 return
+        elif self.__customizationCtx.isOutfitsModified() and g_currentVehicle.invID != vehInvID:
+            result = yield self.__confirmClose()
+            if not result:
+                return
         self.__showCustomizationKwargs = {'vehInvID': vehInvID,
          'callback': callback,
          'season': season,
@@ -270,6 +279,18 @@ class CustomizationService(_ServiceItemShopMixin, _ServiceHelpersMixin, ICustomi
             self.__delayedShowCustomization()
             return
 
+    @adisp.adisp_async
+    @adisp.adisp_process
+    @dependency.replace_none_kwargs(appLoader=IAppLoader)
+    def __confirmClose(self, appLoader=None, callback=None):
+        result = True
+        app = appLoader.getApp()
+        customizationView = app.containerManager.getViewByKey(ViewKey(VIEW_ALIAS.LOBBY_CUSTOMIZATION))
+        if customizationView is not None:
+            result = yield customizationView.showCloseConfirmator()
+        callback(result)
+        return
+
     def __delayedShowCustomization(self):
         self.hangarSpace.onVehicleChanged -= self.__delayedShowCustomization
         self.hangarSpace.onSpaceChanged -= self.__delayedShowCustomization
@@ -280,6 +301,11 @@ class CustomizationService(_ServiceItemShopMixin, _ServiceHelpersMixin, ICustomi
         callback = self.__showCustomizationKwargs.get('callback', None)
         loadCallback = lambda : self.__loadCustomization(vehInvID, callback, season, modeId, tabId)
         if self.__showCustomizationCallbackId is None:
+            cameraManager = CGF.getManager(self.hangarSpace.spaceID, HangarCameraManager)
+            if cameraManager:
+                cameraManager.switchByCameraName('Customization')
+            ClientSelectableCameraObject.deselectAll()
+            self.hangarSpace.space.getVehicleEntity().onSelect()
             self.__moveHangarVehicleToCustomizationRoom()
             self.__showCustomizationCallbackId = BigWorld.callback(0.0, lambda : self.__showCustomization(loadCallback))
         self.onVisibilityChanged(True)
@@ -288,6 +314,9 @@ class CustomizationService(_ServiceItemShopMixin, _ServiceHelpersMixin, ICustomi
     def closeCustomization(self):
         if self.hangarSpace.space is not None:
             self.hangarSpace.space.turretAndGunAngles.reset()
+            cameraManager = CGF.getManager(self.hangarSpace.spaceID, HangarCameraManager)
+            if cameraManager:
+                cameraManager.switchToTank()
         self.__destroyCtx()
         self.onVisibilityChanged(False)
         return

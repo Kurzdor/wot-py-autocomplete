@@ -154,6 +154,14 @@ def demountKit():
     return _getIcon('demountKit')
 
 
+def wotPlus(vspace=-3):
+    return _getIcon('wotPlus', vspace=vspace)
+
+
+def divisor(vspace=-7):
+    return _getIcon('divisor', vspace=vspace)
+
+
 def nut():
     return _getIcon('nut')
 

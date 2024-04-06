@@ -3,13 +3,9 @@
 import json
 from collections import defaultdict
 import BigWorld
-import WWISE
-import constants
 from PlayerEvents import g_playerEvents
 from adisp import adisp_process
-from wg_async import wg_async, wg_await
 from connection_mgr import LOGIN_STATUS
-from external_strings_utils import isAccountLoginValid, isPasswordValid
 from frameworks.wulf import WindowFlags, WindowStatus
 from gui import DialogsInterface, GUI_SETTINGS
 from gui import makeHtmlString
@@ -26,7 +22,7 @@ from gui.impl.dialogs.dialogs import showSimple
 from gui.impl.gen import R
 from gui.shared import events, g_eventBus
 from gui.shared.event_bus import EVENT_BUS_SCOPE
-from gui.shared.events import OpenLinkEvent, LoginEventEx, ArgsEvent, LoginEvent, LoadViewEvent, ViewEventType
+from gui.shared.events import OpenLinkEvent, LoginEventEx, ArgsEvent, LoginEvent, LoadViewEvent
 from helpers import getFullClientVersion, dependency, uniprof
 from helpers.i18n import makeString as _ms
 from helpers.statistics import HANGAR_LOADING_STATE
@@ -40,6 +36,7 @@ from skeletons.gui.battle_session import IBattleSessionProvider
 from skeletons.gui.impl import IGuiLoader
 from skeletons.gui.login_manager import ILoginManager
 from skeletons.helpers.statistics import IStatisticsCollector
+from wg_async import wg_async, wg_await
 _STATUS_TO_INVALID_FIELDS_MAPPING = defaultdict(lambda : INVALID_FIELDS.ALL_VALID, {LOGIN_STATUS.LOGIN_REJECTED_INVALID_PASSWORD: INVALID_FIELDS.LOGIN_PWD_INVALID,
  LOGIN_STATUS.LOGIN_REJECTED_ILLEGAL_CHARACTERS: INVALID_FIELDS.LOGIN_PWD_INVALID,
  LOGIN_STATUS.LOGIN_REJECTED_SERVER_NOT_READY: INVALID_FIELDS.SERVER_INVALID,
@@ -74,7 +71,6 @@ class LoginView(LoginPageMeta):
         self.__capsLockCallbackID = None
         self.__customLoginStatus = None
         self._autoSearchVisited = False
-        self._entityEnqueueCancelCallback = None
         self._servers = self.loginManager.servers
         self.loginManager.servers.updateServerList()
         self._loginMode = createLoginMode(self)
@@ -111,18 +107,6 @@ class LoginView(LoginPageMeta):
     def showLegal(self):
         self.fireEvent(events.LoadViewEvent(SFViewLoadParams(VIEW_ALIAS.LEGAL_INFO_WINDOW)), EVENT_BUS_SCOPE.LOBBY)
 
-    def isPwdInvalid(self, password):
-        isInvalid = False
-        if not constants.IS_DEVELOPMENT and not self._loginMode.isToken2():
-            isInvalid = not isPasswordValid(password)
-        return isInvalid
-
-    def isLoginInvalid(self, login):
-        isInvalid = False
-        if not constants.IS_DEVELOPMENT and not self._loginMode.isToken2():
-            isInvalid = not isAccountLoginValid(login)
-        return isInvalid
-
     def onRecovery(self):
         self.fireEvent(OpenLinkEvent(OpenLinkEvent.RECOVERY_PASSWORD))
 
@@ -139,21 +123,6 @@ class LoginView(LoginPageMeta):
     def changeAccount(self):
         self.__clearPeripheryRouting()
         self._loginMode.changeAccount()
-
-    def musicFadeOut(self):
-        self._loginMode.musicFadeOut()
-
-    def videoLoadingFailed(self):
-        self._loginMode.videoLoadingFailed()
-
-    def setMute(self, value):
-        self._loginMode.setMute(value)
-
-    def onVideoLoaded(self):
-        self._loginMode.onVideoLoaded()
-
-    def switchBgMode(self):
-        self._loginMode.switchBgMode()
 
     def startListenCsisUpdate(self, startListenCsis):
         self.loginManager.servers.startListenCsisQuery(startListenCsis)
@@ -174,9 +143,6 @@ class LoginView(LoginPageMeta):
         self.connectionMgr.onLoggedOn += self._onLoggedOn
         self.connectionMgr.onPeripheryRoutingGroupUpdated += self.__updateServersList
         g_playerEvents.onAccountShowGUI += self._clearLoginView
-        g_playerEvents.onEntityCheckOutEnqueued += self._onEntityCheckoutEnqueued
-        g_playerEvents.onAccountBecomeNonPlayer += self._onAccountBecomeNonPlayer
-        g_playerEvents.onBootcampStartChoice += self.__onBootcampStartChoice
         self.as_setVersionS(getFullClientVersion())
         self.as_setCopyrightS(backport.text(R.strings.menu.copy()), backport.text(R.strings.menu.legal()))
         self.sessionProvider.getCtx().lastArenaUniqueID = None
@@ -185,6 +151,7 @@ class LoginView(LoginPageMeta):
         self.update()
         if self.__capsLockCallbackID is None:
             self.__capsLockCallbackID = BigWorld.callback(0.0, self.__checkUserInputState)
+        self.fireEvent(LoginEvent(LoginEvent.LOGIN_VIEW_READY))
         return
 
     @uniprof.regionDecorator(label='offline.login', scope='exit')
@@ -201,14 +168,8 @@ class LoginView(LoginPageMeta):
         self.connectionMgr.onLoggedOn -= self._onLoggedOn
         self._servers.onServersStatusChanged -= self.__updateServersList
         g_playerEvents.onAccountShowGUI -= self._clearLoginView
-        g_playerEvents.onEntityCheckOutEnqueued -= self._onEntityCheckoutEnqueued
-        g_playerEvents.onAccountBecomeNonPlayer -= self._onAccountBecomeNonPlayer
-        g_playerEvents.onBootcampStartChoice -= self.__onBootcampStartChoice
-        if self._entityEnqueueCancelCallback:
-            g_eventBus.removeListener(ViewEventType.LOAD_VIEW, self._onEntityCheckoutCanceled, EVENT_BUS_SCOPE.LOBBY)
         self._serversDP.fini()
         self._serversDP = None
-        self._entityEnqueueCancelCallback = None
         super(LoginView, self)._dispose()
         return
 
@@ -218,7 +179,9 @@ class LoginView(LoginPageMeta):
          'memberMe': self._loginMode.rememberUser,
          'memberMeVisible': self._loginMode.rememberPassVisible,
          'isIgrCredentialsReset': GUI_SETTINGS.igrCredentialsReset,
-         'showRecoveryLink': not GUI_SETTINGS.isEmpty('recoveryPswdURL')})
+         'showRecoveryLink': not GUI_SETTINGS.isEmpty('recoveryPswdURL'),
+         'keyboardLang': self.__lang,
+         'capsLockState': self.__capsLockState})
         self._loginMode.updateForm()
         self.__updateServersList()
 
@@ -270,26 +233,6 @@ class LoginView(LoginPageMeta):
 
     def _onLoginQueueClosed(self, event):
         self.__closeLoginQueueDialog()
-
-    def _onEntityCheckoutEnqueued(self, cancelCallback):
-        g_eventBus.addListener(ViewEventType.LOAD_VIEW, self._onEntityCheckoutCanceled, EVENT_BUS_SCOPE.LOBBY)
-        g_eventBus.handleEvent(LoadViewEvent(SFViewLoadParams(VIEW_ALIAS.BOOTCAMP_QUEUE_DIALOG_SHOW)), EVENT_BUS_SCOPE.LOBBY)
-        self._entityEnqueueCancelCallback = cancelCallback
-
-    def _onAccountBecomeNonPlayer(self):
-        if self._entityEnqueueCancelCallback:
-            self._entityEnqueueCancelCallback = None
-            g_eventBus.removeListener(ViewEventType.LOAD_VIEW, self._onEntityCheckoutCanceled, EVENT_BUS_SCOPE.LOBBY)
-        return
-
-    def _onEntityCheckoutCanceled(self, event):
-        if event.alias == VIEW_ALIAS.BOOTCAMP_QUEUE_DIALOG_CANCEL:
-            Waiting.show('login')
-            g_eventBus.removeListener(ViewEventType.LOAD_VIEW, self._onEntityCheckoutCanceled, EVENT_BUS_SCOPE.LOBBY)
-            if self._entityEnqueueCancelCallback:
-                self._entityEnqueueCancelCallback()
-            self._entityEnqueueCancelCallback = None
-        return
 
     def _onLoginQueueSwitched(self, event):
         self.__closeLoginQueueDialog()
@@ -419,9 +362,6 @@ class LoginView(LoginPageMeta):
 
     def __getServerText(self, key, serverName):
         return makeHtmlString('html_templates:login/server-state', key, {'message': backport.text(R.strings.waiting.message.server.dyn(key)(), server=serverName)})
-
-    def __onBootcampStartChoice(self, _):
-        WWISE.WW_eventGlobal('loginscreen_mute')
 
     def __clearPeripheryRouting(self):
         if self.connectionMgr.peripheryRoutingGroup is not None:

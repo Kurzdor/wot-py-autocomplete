@@ -1,10 +1,11 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/common/visual_script/qa_blocks.py
 import BigWorld
-from block import Block, Meta, InitParam, buildStrKeysValue, EDITOR_TYPE, makeResEditorData
+from block import Block, Meta, InitParam, buildStrKeysValue, makeResEditorData
 from slot_types import SLOT_TYPE, arrayOf
-from misc import ASPECT, BLOCK_MODE
-from constants import IS_DEVELOPMENT
+from misc import ASPECT, BLOCK_MODE, EDITOR_TYPE
+from constants import IS_DEVELOPMENT, IS_CELLAPP
+from wg_async import wg_async
 
 class QAMeta(Meta):
 
@@ -85,11 +86,19 @@ class AddTestResult(Block, QAMeta):
         runnerID = arena.ai.gameMode.arenaInfo.runnerID
         return 'runnerID_%d' % runnerID
 
+    @wg_async
     def _execute(self):
-        if not IS_DEVELOPMENT:
+        if not (IS_DEVELOPMENT and IS_CELLAPP):
             return
+        from ai.aicore.AIComponents.subcomponents.Stats.components import ArenaTestResultStats
         BigWorld.globalData[self._storageKey]['results'].append(dict(success=self._success.getValue(), message=self._msg.getValue()))
         BigWorld.globalData[self._storageKey] = BigWorld.globalData[self._storageKey]
+        arena = self._arena.getValue()
+        arenaInfo = arena.ai.gameMode.arenaInfo
+        stats = ArenaTestResultStats.get(arena.ai.aiArena)
+        stats.setTestResult(arenaInfo.aiScenario, ', '.join(arenaInfo.vsePlanNames), self._success.getValue(), self._msg.getValue())
+        yield stats.publishToInsights()
+        stats.reset()
         self._out.call()
 
     def onStartScript(self):

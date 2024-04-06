@@ -359,7 +359,10 @@ CHAT_COMMANDS = Enumeration('chatCommands', [('initAck', {'chnlCmd': 0}),
  (BATTLE_CHAT_COMMAND_NAMES.DEFENDING_OBJECTIVE, {'battleCmd': 1}),
  (BATTLE_CHAT_COMMAND_NAMES.VEHICLE_SPOTPOINT, {'battleCmd': 1}),
  (BATTLE_CHAT_COMMAND_NAMES.SHOOTING_POINT, {'battleCmd': 1}),
- (BATTLE_CHAT_COMMAND_NAMES.NAVIGATION_POINT, {'battleCmd': 1})], instance=AttributeEnumItem)
+ (BATTLE_CHAT_COMMAND_NAMES.NAVIGATION_POINT, {'battleCmd': 1}),
+ (BATTLE_CHAT_COMMAND_NAMES.FLAG_POINT, {'battleCmd': 1}),
+ (BATTLE_CHAT_COMMAND_NAMES.MOVE_TO_TARGET_POINT, {'battleCmd': 1}),
+ (BATTLE_CHAT_COMMAND_NAMES.MOVING_TO_TARGET_POINT, {'battleCmd': 1})], instance=AttributeEnumItem)
 CHAT_MEMBER_STATUSES = Enumeration('chatMemberStatuses', ['available', 'inBattle'])
 CHAT_MEMBER_BAN_TYPE = Enumeration('chatMemberBanType', ['none', 'readonly', 'full'])
 CHAT_MEMBER_ROLE = Enumeration('chatMemberRole', ['member', 'visitor', 'moderator'])
@@ -1261,12 +1264,17 @@ SYS_MESSAGE_TYPE = Enumeration('systemMessageType', ['serverReboot',
  'battlePassStyleRecieved',
  'battlePassSeasonEnd',
  'wotPlusUnlocked',
+ 'bonusExcludedMap',
  'wotPlusRenewed',
+ 'wotPlusFreeDemountExpired',
  'wotPlusExpired',
  'goldReserveIsFull',
  'passiveXPNoTank',
  'passiveXPIncompatibleCrew',
- 'wotPlusRentEnd',
+ 'passiveXPIncompatibleCrewNewDay',
+ 'passiveXPActivated',
+ 'passiveXPDeactivated',
+ 'passiveXPSwitched',
  'wotPlusNoRentSelected',
  'giftSystemMessage',
  'telecomMergeResults',
@@ -1284,7 +1292,14 @@ SYS_MESSAGE_TYPE = Enumeration('systemMessageType', ['serverReboot',
  'prbVehicleMaxScoutKick',
  'personalReservesHaveBeenConverted',
  'changeSquadSize',
- 'fairplay'])
+ 'fairplay',
+ 'wotPlusExcludedVehicleExpired',
+ 'wotPlusExcludedVehicleEnabled',
+ 'collectionsItems',
+ 'collectionsReward',
+ 'collectionEntitlementReceived',
+ 'prestigeLevelChanged',
+ 'goodiesExpired'])
 SYS_MESSAGE_IMPORTANCE = Enumeration('systemMessageImportance', ['normal', 'high'])
 SM_REQUEST_PERSONAL_MESSAGES_FLAG = 1
 SM_REQUEST_SYSTEM_MESSAGES_FLAG = 2

@@ -7,7 +7,7 @@ import nations
 from soft_exception import SoftException
 from copy import deepcopy
 from pprint import pformat
-from bonus_readers import readBonusSection, readUTC, timeDataToUTC
+from bonus_readers import readBonusSection, readUTC, timeDataToUTC, checkLogExtInfoLen
 from constants import VEHICLE_CLASS_INDICES, ARENA_BONUS_TYPE, EVENT_TYPE, IGR_TYPE, ATTACK_REASONS, QUEST_RUN_FLAGS, DEFAULT_QUEST_START_TIME, DEFAULT_QUEST_FINISH_TIME, ROLE_LABEL_TO_TYPE, ACCOUNT_ATTR, QUESTS_SUPPORTED_EXCLUDE_TAGS
 from debug_utils import LOG_WARNING
 from dossiers2.custom.layouts import accountDossierLayout, vehicleDossierLayout, StaticSizeBlockBuilder, BinarySetDossierBlockBuilder
@@ -15,6 +15,7 @@ from dossiers2.custom.records import RECORD_DB_IDS
 from items import vehicles
 from optional_bonuses import StripVisitor
 from battle_results import getBattleResultsNames
+from realm_utils import isFileWithRealm, getRealmFilePath, isFileWithCurrentRealm
 _WEEKDAYS = {'Mon': 1,
  'Tue': 2,
  'Wed': 3,
@@ -221,6 +222,7 @@ class Source(object):
             return testTime
 
         id = questSection.readString('id', '')
+        checkLogExtInfoLen(id, 'quests')
         if not id:
             raise SoftException('Quest id must be specified.')
         if questSection.has_key('name'):
@@ -342,6 +344,7 @@ class Source(object):
          'consume': self.__readCondition_consume,
          'inClan': self.__readListOfInts,
          'vehiclesUnlocked': self.__readBattleResultsConditionList,
+         'vehiclesLocked': self.__readBattleResultsConditionList,
          'vehiclesOwned': self.__readBattleResultsConditionList,
          'vehiclesUnlockedAndOwned': self.__readBattleResultsConditionList,
          'classes': self.__readVehicleFilter_classes,
@@ -361,15 +364,16 @@ class Source(object):
          'premiumVip': self.__readCondition_bool,
          'isPremiumQuestsEnabled': self.__readCondition_bool,
          'wotPlus': self.__readCondition_bool,
-         'isFreeDirectivesEnabled': self.__readCondition_bool,
+         'wotPlusDailyAttendance': self.__readCondition_bool,
          'daily': self.__readCondition_true,
          'weekly': self.__readCondition_true,
          'bonusLimit': self.__readCondition_int,
-         'isTutorialCompleted': self.__readCondition_bool,
          'isBattleMattersEnabled': self.__readCondition_bool,
+         'isWinbackQuestsEnabled': self.__readCondition_bool,
          'isSteamAllowed': self.__readCondition_bool,
          'totalBattles': self.__readBattleResultsConditionList,
          'lastLogout': self.__readBattleResultsConditionList,
+         'noviceType': self.__readBattleResultsConditionList,
          'relativeToUTC': self.__readBattleResultsConditionList,
          'accountPrimaryTypes': self.__readListOfInts,
          'accountSecondaryTypes': self.__readListOfInts,
@@ -529,7 +533,9 @@ class Source(object):
          'battlePassPoints',
          'currency',
          'freePremiumCrew',
-         'entitlementList'}
+         'entitlementList',
+         'dailyQuestReroll',
+         'noviceReset'}
         if eventType in (EVENT_TYPE.BATTLE_QUEST, EVENT_TYPE.PERSONAL_QUEST, EVENT_TYPE.NT_QUEST):
             bonusTypes.update(('xp', 'tankmenXP', 'xpFactor', 'creditsFactor', 'freeXPFactor', 'tankmenXPFactor'))
         if eventType in (EVENT_TYPE.NT_QUEST,):
@@ -879,7 +885,8 @@ def collectSections(root):
         for k, s in pqSection.items():
             sectionPath = root + '/' + k
             if k.endswith('.xml'):
-                sections.append(sectionPath)
+                if isFileWithCurrentRealm(k) or not isFileWithRealm(k) and not pqSection.has_key(getRealmFilePath(k)):
+                    sections.append(sectionPath)
             if s is not None:
                 sections.extend(collectSections(sectionPath))
 

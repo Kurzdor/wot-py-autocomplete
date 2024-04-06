@@ -8,14 +8,18 @@ from items import vehicles
 from skeletons.gui.battle_session import IBattleSessionProvider
 from visual_script.misc import ASPECT
 from visual_script_client.contexts.ability_context import AbilityContextClient
+from script_component.DynamicScriptComponent import DynamicScriptComponent
 
-class VisualScriptEquipment(BigWorld.DynamicScriptComponent):
+class VisualScriptEquipment(DynamicScriptComponent):
     __sessionProvider = dependency.descriptor(IBattleSessionProvider)
 
     def __init__(self):
         super(VisualScriptEquipment, self).__init__()
         self._vsPlan = None
         self._context = None
+        return
+
+    def _onAvatarReady(self):
         player = BigWorld.player()
         descriptor = vehicles.getItemByCompactDescr(self.compactDescr)
         arenaInfo = player.arena.arenaInfo
@@ -25,11 +29,13 @@ class VisualScriptEquipment(BigWorld.DynamicScriptComponent):
         self._vsPlan.start()
         self.set_errorState()
         self.set_equipmentState()
-        return
 
     def canActivate(self):
-        self._context.canActive()
-        return (self._context.canActivate, self._context.errorKey)
+        if self._context is None:
+            return (False, None)
+        else:
+            self._context.canActive()
+            return (self._context.canActivate, self._context.errorKey)
 
     def onDestroy(self):
         if self._context is not None:

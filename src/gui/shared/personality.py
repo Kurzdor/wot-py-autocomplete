@@ -19,11 +19,12 @@ from gui.Scaleform.Waiting import Waiting
 from gui.Scaleform.daapi.view.login.EULADispatcher import EULADispatcher
 from gui.Scaleform.locale.MENU import MENU
 from gui.Scaleform.locale.SYSTEM_MESSAGES import SYSTEM_MESSAGES
+from gui.game_loading.resources.consts import Milestones
 from gui.impl import backport
 from gui.impl.auxiliary.crew_books_helper import crewBooksViewedCache
 from gui.prb_control.dispatcher import g_prbLoader
 from gui.shared import g_eventBus, events, EVENT_BUS_SCOPE
-from gui.shared.ClanCache import g_clanCache
+from gui.clans.clan_cache import g_clanCache
 from gui.shared.gui_items import GUI_ITEM_TYPE
 from gui.shared.items_cache import CACHE_SYNC_REASON
 from gui.shared.items_parameters.params_cache import g_paramsCache
@@ -39,7 +40,7 @@ from skeletons.gameplay import IGameplayLogic, PlayerEventID
 from skeletons.gui.app_loader import IAppLoader
 from skeletons.gui.battle_results import IBattleResultsService
 from skeletons.gui.event_boards_controllers import IEventBoardController
-from skeletons.gui.game_control import IGameStateTracker, IBootcampController
+from skeletons.gui.game_control import IGameStateTracker
 from skeletons.gui.goodies import IGoodiesCache, IBoostersStateProvider
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.login_manager import ILoginManager
@@ -49,7 +50,9 @@ from skeletons.gui.shared import IItemsCache
 from skeletons.gui.shared.utils import IHangarSpace, IRaresCache
 from skeletons.gui.sounds import ISoundsController
 from skeletons.gui.web import IWebController
+from skeletons.ui_logging import IUILoggingCore
 from skeletons.helpers.statistics import IStatisticsCollector
+from uilogging.mods_statistic.logger import ModsStatisticLogger
 if typing.TYPE_CHECKING:
     from gui.goodies.booster_state_provider import BoosterStateProvider
 _logger = logging.getLogger(__name__)
@@ -83,7 +86,7 @@ class ServicesLocator(object):
     rareAchievesCache = dependency.descriptor(IRaresCache)
     appLoader = dependency.descriptor(IAppLoader)
     offersProvider = dependency.descriptor(IOffersDataProvider)
-    bootcamp = dependency.descriptor(IBootcampController)
+    uiLoggingCore = dependency.descriptor(IUILoggingCore)
 
     @classmethod
     def clear(cls):
@@ -102,10 +105,12 @@ class ServicesLocator(object):
 
 @future_async.wg_async
 def onAccountShowGUI(ctx):
+    g_playerEvents.onLoadingMilestoneReached(Milestones.ENTER)
     Waiting.show('enter')
     ServicesLocator.statsCollector.noteHangarLoadingState(HANGAR_LOADING_STATE.SHOW_GUI)
     ServicesLocator.lobbyContext.onAccountShowGUI(ctx)
-    for func in [__runItemsCacheSync,
+    for func in [__runUiLogging,
+     __runItemsCacheSync,
      __validateInventoryVehicles,
      __validateInventoryOutfit,
      __validateInventoryTankmen,
@@ -220,6 +225,8 @@ def onShopResync():
 
 
 def onCenterIsLongDisconnected(isLongDisconnected):
+    if not BigWorld.player():
+        return
     isAvailable = not BigWorld.player().isLongDisconnectedFromCenter
     if isAvailable and not isLongDisconnected:
         SystemMessages.pushI18nMessage(MENU.CENTERISAVAILABLE, type=SystemMessages.SM_TYPE.Information)
@@ -232,7 +239,7 @@ def onIGRTypeChanged(roomType, xpFactor):
                  'igrXPFactor': xpFactor}})
 
 
-def init(loadingScreenGUI=None):
+def init():
     global onCenterIsLongDisconnected
     global onShopResyncStarted
     global onAccountShowGUI
@@ -262,8 +269,6 @@ def init(loadingScreenGUI=None):
     from gui.Scaleform.app_factory import createAppFactory
     ServicesLocator.appLoader.init(createAppFactory())
     g_paramsCache.init()
-    if loadingScreenGUI and loadingScreenGUI.script:
-        loadingScreenGUI.script.active(False)
     g_prbLoader.init()
     g_clanCache.init()
     BigWorld.wg_setScreenshotNotifyCallback(onScreenShotMade)
@@ -477,8 +482,16 @@ def __initializeHangar(ctx=None, callback=None):
 def __processWebCtrl(_, callback=None):
     serverSettings = ServicesLocator.lobbyContext.getServerSettings()
     ServicesLocator.webCtrl.start()
-    if serverSettings.wgcg.getLoginOnStart() and not ServicesLocator.bootcamp.isInBootcamp():
+    if serverSettings.wgcg.getLoginOnStart():
         yield ServicesLocator.webCtrl.login()
+    callback(True)
+
+
+def __runUiLogging(_, callback=None):
+    ServicesLocator.uiLoggingCore.start()
+    ServicesLocator.uiLoggingCore.send()
+    modsStatisticLogger = ModsStatisticLogger()
+    modsStatisticLogger.log()
     callback(True)
 
 

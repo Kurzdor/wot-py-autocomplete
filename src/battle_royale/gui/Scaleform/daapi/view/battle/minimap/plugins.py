@@ -3,31 +3,30 @@
 import logging
 from collections import namedtuple
 from functools import partial
-import typing
 import BigWorld
 import Math
-import Placement
+import typing
+from death_zones_helpers import ZONES_SIZE, idxFrom
 import ArenaInfo
+import Placement
 import math_utils
-from account_helpers.settings_core import settings_constants
 from Avatar import PlayerAvatar
+from account_helpers.settings_core import settings_constants
+from battle_royale.gui.Scaleform.daapi.view.battle.minimap.settings import DeathZonesAs3Descr, ViewRangeSectorAs3Descr, BattleRoyaleEntries, MarkersAs3Descr
+from battle_royale.gui.shared.events import DeathZoneEvent
+from battleground.location_point_manager import g_locationPointManager
 from chat_commands_consts import LocationMarkerSubType
 from constants import LOOT_TYPE, ARENA_BONUS_TYPE
-from battleground.location_point_manager import g_locationPointManager
-from battle_royale.gui.Scaleform.daapi.view.battle.minimap.settings import DeathZonesAs3Descr, BattleRoyaleEntries, ViewRangeSectorAs3Descr, MarkersAs3Descr
 from gui.Scaleform.daapi.view.battle.epic.minimap import CenteredPersonalEntriesPlugin, MINIMAP_SCALE_TYPES, makeMousePositionToEpicWorldPosition
 from gui.Scaleform.daapi.view.battle.shared.minimap import settings
 from gui.Scaleform.daapi.view.battle.shared.minimap.common import SimplePlugin, EntriesPlugin, IntervalPlugin
-from gui.Scaleform.daapi.view.battle.shared.minimap.plugins import RadarPlugin, RadarEntryParams, RadarPluginParams, ArenaVehiclesPlugin, SimpleMinimapPingPlugin, _RadarEntryData
-from gui.Scaleform.daapi.view.battle.shared.minimap.settings import ENTRY_SYMBOL_NAME
+from gui.Scaleform.daapi.view.battle.shared.minimap.plugins import RadarPlugin, RadarEntryParams, RadarPluginParams, ArenaVehiclesPlugin, _RadarEntryData, MinimapPingPlugin, _LOCATION_PING_RANGE
+from gui.Scaleform.daapi.view.common.battle_royale.br_helpers import getCircularVisionAngle
 from gui.battle_control import matrix_factory, minimap_utils, avatar_getter
 from gui.battle_control.battle_constants import FEEDBACK_EVENT_ID
-from gui.Scaleform.daapi.view.common.battle_royale.br_helpers import getCircularVisionAngle
-from gui.shared.events import AirDropEvent
-from battle_royale.gui.shared.events import DeathZoneEvent
-from death_zones_helpers import ZONES_X, ZONES_Y, idxFrom
-from gui.shared import g_eventBus, EVENT_BUS_SCOPE
 from gui.doc_loaders.battle_royale_settings_loader import getBattleRoyaleSettings
+from gui.shared import g_eventBus, EVENT_BUS_SCOPE
+from gui.shared.events import AirDropEvent
 from helpers import dependency
 from items.battle_royale import isSpawnedBot
 from skeletons.gui.battle_session import IBattleSessionProvider
@@ -36,6 +35,22 @@ _S_NAME = settings.ENTRY_SYMBOL_NAME
 _FIRTS_CELL_INDEX = 0
 _ARENA_SIZE_DEATH_ZONE_MULTIPLIER = 0.5
 _MARKER_SIZE_INDEX_BREAKPOINT = 3
+_SQUAD_COLOR_MAP = [1,
+ 2,
+ 4,
+ 5,
+ 7,
+ 8,
+ 9,
+ 11,
+ 13,
+ 14]
+_MINIMAP_MIN_SCALE_INDEX = 0
+_MINIMAP_MAX_SCALE_INDEX = 5
+_MINIMAP_LOCATION_MARKER_MIN_SCALE = 1.0
+_MINIMAP_LOCATION_MARKER_MAX_SCALE = 2.33
+RADAR_PLUGIN = 'radar'
+VEHICLES_PLUGIN = 'vehicles'
 _logger = logging.getLogger(__name__)
 
 class BattleRoyalePersonalEntriesPlugin(CenteredPersonalEntriesPlugin):
@@ -93,9 +108,13 @@ class BattleRoyalePersonalEntriesPlugin(CenteredPersonalEntriesPlugin):
         super(BattleRoyalePersonalEntriesPlugin, self).updateControlMode(mode, vehicleID)
         self.__updateViewSector()
 
+    def _invalidateMarkup(self, forceInvalidate=False):
+        super(BattleRoyalePersonalEntriesPlugin, self)._invalidateMarkup(forceInvalidate)
+        self.__updateViewSector()
+
     def _onVehicleFeedbackReceived(self, eventID, _, __):
         vInfo = self._arenaDP.getVehicleInfo()
-        if not vInfo.isObserver() and vInfo.isAlive() and eventID == FEEDBACK_EVENT_ID.VEHICLE_ATTRS_CHANGED:
+        if not vInfo.isObserver() and eventID == FEEDBACK_EVENT_ID.VEHICLE_ATTRS_CHANGED:
             self.__updateViewSectorRadius()
 
     def _updateDeadPointEntry(self, active=True):
@@ -191,7 +210,7 @@ class BattleRoyalePersonalEntriesPlugin(CenteredPersonalEntriesPlugin):
 
     def __getDirectionLineEntryID(self):
         cameraIDs = self._getCameraIDs()
-        return cameraIDs[ENTRY_SYMBOL_NAME.ARCADE_CAMERA] if ENTRY_SYMBOL_NAME.ARCADE_CAMERA in cameraIDs else None
+        return cameraIDs[_S_NAME.ARCADE_CAMERA] if _S_NAME.ARCADE_CAMERA in cameraIDs else None
 
 
 class DeathZonesPlugin(SimplePlugin):
@@ -216,7 +235,7 @@ class DeathZonesPlugin(SimplePlugin):
 
     def __initDeathZones(self, bottomLeft, upperRight):
         mapWidthPx, _ = minimap_utils.metersToMinimapPixels(bottomLeft, upperRight)
-        self._invoke(self.__deathZonesEntryID, DeathZonesAs3Descr.AS_INIT_DEATH_ZONE_SIZE, mapWidthPx / ZONES_X)
+        self._invoke(self.__deathZonesEntryID, DeathZonesAs3Descr.AS_INIT_DEATH_ZONE_SIZE, mapWidthPx / ZONES_SIZE)
         g_eventBus.addListener(DeathZoneEvent.UPDATE_DEATH_ZONE, self.__onDeathZoneUpdated, scope=EVENT_BUS_SCOPE.BATTLE)
 
     def __clearDeathZones(self):
@@ -236,7 +255,7 @@ class DeathZonesPlugin(SimplePlugin):
             self._invoke(self.__deathZonesEntryID, DeathZonesAs3Descr.AS_UPDATE_DEATH_ZONES, targetList)
 
     def __updateZonesData(self, x, y, state, targetList):
-        targetList.extend([x, ZONES_Y - 1 - y, state])
+        targetList.extend([x, ZONES_SIZE - 1 - y, state])
 
 
 _TimeParamsForAs = namedtuple('_TimeParamsForAs', 'fadeIn fadeOut lifetime')
@@ -323,8 +342,11 @@ class BattleRoyaleRadarPlugin(RadarPlugin):
             if vEntryId is not None:
                 entryName = 'enemy'
                 vInfo = self._arenaDP.getVehicleInfo(vehicleId)
+                isBot = vInfo.team == 21
                 if avatar_getter.isVehiclesColorized():
                     entryName = 'team{}'.format(vInfo.team)
+                elif isBot:
+                    entryName = 'br_enemy_bot'
                 self._parentObj.setEntryParameters(vEntryId, doClip=False, scaleType=MINIMAP_SCALE_TYPES.NO_SCALE)
                 self._invoke(vEntryId, MarkersAs3Descr.AS_ADD_MARKER, self.__getVehicleMarker(vInfo), self.__timeParamsForAS.fadeIn, entryName)
             return vEntryId
@@ -348,8 +370,9 @@ class BattleRoyaleRadarPlugin(RadarPlugin):
             self._destroyVehicleEntry(self._vehicleEntries[vehId].entryId, vehId)
 
     def __updateVehicleEntries(self):
-        for entry in self._vehicleEntries.itervalues():
-            markerType = self.__getVehicleMarker()
+        for vehicleId, entry in self._vehicleEntries.iteritems():
+            vInfo = self._arenaDP.getVehicleInfo(vehicleId)
+            markerType = self.__getVehicleMarker(vInfo)
             self._invoke(entry.entryId, MarkersAs3Descr.AS_UPDATE_MARKER, markerType)
 
     def __updateLootEntries(self):
@@ -360,6 +383,10 @@ class BattleRoyaleRadarPlugin(RadarPlugin):
     def __getVehicleMarker(self, vInfo=None):
         if vInfo and isSpawnedBot(vInfo.vehicleType.tags):
             return MarkersAs3Descr.AS_ADD_MARKER_BOT_VEHICLE
+        if vInfo and vInfo.team == 21:
+            if self.__isMinimapSmall:
+                return MarkersAs3Descr.AS_ADD_MARKER_ENEMY_BOT_VEHICLE
+            return MarkersAs3Descr.AS_ADD_MARKER_ENEMY_BOT_VEHICLE_BIG
         return MarkersAs3Descr.AS_ADD_MARKER_ENEMY_VEHICLE if self.__isMinimapSmall else MarkersAs3Descr.AS_ADD_MARKER_ENEMY_VEHICLE_BIG
 
     def __getLootMarkerByTypeId(self, typeId):
@@ -470,7 +497,7 @@ class BattleRoyalStaticMarkerPlugin(IntervalPlugin):
             self._playSound2D(settings.MINIMAP_ATTENTION_SOUND_ID)
 
 
-class BattleRoyalMinimapPingPlugin(SimpleMinimapPingPlugin):
+class BattleRoyalMinimapPingPlugin(MinimapPingPlugin):
 
     def __init__(self, parentObj):
         super(BattleRoyalMinimapPingPlugin, self).__init__(parentObj)
@@ -480,7 +507,13 @@ class BattleRoyalMinimapPingPlugin(SimpleMinimapPingPlugin):
         return makeMousePositionToEpicWorldPosition(x, y, self._parentObj.getVisualBounds(), self._hitAreaSize)
 
     def _processCommandByPosition(self, commands, locationCommand, position, minimapScaleIndex):
-        commands.sendAttentionToPosition3D(position, locationCommand)
+        locationID = self._getNearestLocationIDForPosition(position, _LOCATION_PING_RANGE)
+        if locationID is not None:
+            self._replyPing3DMarker(commands, locationID)
+            return
+        else:
+            commands.sendAttentionToPosition3D(position, locationCommand)
+            return
 
 
 class BattleRoyaleVehiclePlugin(ArenaVehiclesPlugin):
@@ -493,23 +526,26 @@ class BattleRoyaleVehiclePlugin(ArenaVehiclesPlugin):
         self.__radarSpottedVehiclesPlugin = None
         return
 
+    def init(self, arenaVisitor, arenaDP):
+        super(BattleRoyaleVehiclePlugin, self).init(arenaVisitor, arenaDP)
+        radarPlugin = self.parentObj.getPlugin(RADAR_PLUGIN)
+        if radarPlugin:
+            self.__radarSpottedVehiclesPlugin = radarPlugin
+        else:
+            _logger.error('Radar plugin has not been found!')
+
     def fini(self):
         self.__radarSpottedVehiclesPlugin = None
         super(BattleRoyaleVehiclePlugin, self).fini()
         return
 
-    def setRadarPlugin(self, plugin):
-        self.__radarSpottedVehiclesPlugin = plugin
-
     def setSettings(self):
-        super(BattleRoyaleVehiclePlugin, self).setSettings()
         isColorBlind = self.settingsCore.getSetting(settings_constants.GRAPHICS.COLOR_BLIND)
         if isColorBlind != self.__isColorBlind:
             self.__isColorBlind = isColorBlind
             self.invalidateVehiclesInfo(self._arenaDP)
 
     def updateSettings(self, diff):
-        super(BattleRoyaleVehiclePlugin, self).updateSettings(diff)
         if settings_constants.GRAPHICS.COLOR_BLIND in diff:
             newColorBlind = diff[settings_constants.GRAPHICS.COLOR_BLIND]
             if self.__isColorBlind != newColorBlind:
@@ -519,6 +555,10 @@ class BattleRoyaleVehiclePlugin(ArenaVehiclesPlugin):
     def applyNewSize(self, sizeIndex):
         super(BattleRoyaleVehiclePlugin, self).applyNewSize(sizeIndex)
         newValue = sizeIndex < _MARKER_SIZE_INDEX_BREAKPOINT
+        curScale = self.__calculateMarkerScale(sizeIndex)
+        for entryID in self._entries:
+            self.parentObj.invoke(self._entries[entryID].getID(), 'setTopAnimationScale', curScale)
+
         if self.__isMinimapSmall is None or newValue != self.__isMinimapSmall:
             self.__isMinimapSmall = newValue
             self.invalidateVehiclesInfo(self._arenaDP)
@@ -541,8 +581,14 @@ class BattleRoyaleVehiclePlugin(ArenaVehiclesPlugin):
             _logger.warning("Couldn't update radar plugin. The reference is None!")
         return
 
-    def _invoke(self, entryID, name, *args):
-        pass
+    def _onMinimapFeedbackReceived(self, eventID, entityID, value):
+        if eventID == FEEDBACK_EVENT_ID.MINIMAP_SHOW_MARKER and entityID != self._getPlayerVehicleID():
+            if entityID in self._entries:
+                entry = self._entries[entityID]
+                if (self._getIsObserver() or not avatar_getter.isVehicleAlive()) and avatar_getter.getVehicleIDAttached() == entityID:
+                    return
+                marker, _ = entry.isInAoI() and value
+                self._parentObj.invoke(entry.getID(), 'setAnimation', marker)
 
     def _addEntry(self, symbol, container, matrix=None, active=False, transformProps=settings.TRANSFORM_FLAG.DEFAULT):
         entryId = super(BattleRoyaleVehiclePlugin, self)._addEntry(BattleRoyaleEntries.BATTLE_ROYALE_MARKER, container, matrix, active, transformProps)
@@ -556,8 +602,11 @@ class BattleRoyaleVehiclePlugin(ArenaVehiclesPlugin):
         playerClan = ''
         playerInfoVO = vInfo.player
         isSpawnedBotVehicle = isSpawnedBot(vInfo.vehicleType.tags)
+        isBot = vInfo.team == 21
         if guiProps.isFriend:
             if isSpawnedBotVehicle:
+                marker = self.__getSpawnedBotVehMarker()
+            elif isBot:
                 marker = self.__getBotVehMarker()
             else:
                 marker = self.__getSquadVehMarker()
@@ -566,17 +615,24 @@ class BattleRoyaleVehiclePlugin(ArenaVehiclesPlugin):
                 playerClan = playerInfoVO.clanAbbrev
             entryName = 'squadman'
         else:
+            entryName = 'enemy'
             if isSpawnedBotVehicle:
+                marker = self.__getSpawnedBotVehMarker()
+            elif isBot:
                 marker = self.__getBotVehMarker()
+                entryName = 'br_enemy_bot'
             else:
                 marker = self.__getEnemyVehMarker()
-            entryName = 'enemy'
         if not self.__isMinimapSmall and not isSpawnedBotVehicle:
             marker = '_'.join((marker, 'big'))
         if avatar_getter.isVehiclesColorized():
-            if self.__sessionProvider.arenaVisitor.getArenaBonusType() == ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SOLO:
+            arenaBonusType = self.__sessionProvider.arenaVisitor.getArenaBonusType()
+            if arenaBonusType == ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SOLO:
                 playerName = ''
-            entryName = 'team{}'.format(vInfo.team)
+            if not isBot:
+                isSquadMode = arenaBonusType == ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SQUAD
+                team = _SQUAD_COLOR_MAP[vInfo.team - 1] if isSquadMode and len(_SQUAD_COLOR_MAP) >= vInfo.team else vInfo.team
+                entryName = 'team{}'.format(team)
         self.parentObj.invoke(entry.getID(), 'show', marker, playerName, playerFakeName, playerClan, entryName)
 
     def _hideVehicle(self, entry):
@@ -590,5 +646,12 @@ class BattleRoyaleVehiclePlugin(ArenaVehiclesPlugin):
     def __getSquadVehMarker(self):
         return MarkersAs3Descr.AS_ADD_MARKER_SQUAD_VEHICLE
 
-    def __getBotVehMarker(self):
+    def __getSpawnedBotVehMarker(self):
         return MarkersAs3Descr.AS_ADD_MARKER_BOT_VEHICLE
+
+    def __getBotVehMarker(self):
+        return MarkersAs3Descr.AS_ADD_MARKER_ENEMY_BOT_VEHICLE
+
+    def __calculateMarkerScale(self, minimapSizeIndex):
+        p = float(minimapSizeIndex - _MINIMAP_MIN_SCALE_INDEX) / float(_MINIMAP_MAX_SCALE_INDEX - _MINIMAP_MIN_SCALE_INDEX)
+        return (1 - p) * _MINIMAP_LOCATION_MARKER_MIN_SCALE + p * _MINIMAP_LOCATION_MARKER_MAX_SCALE

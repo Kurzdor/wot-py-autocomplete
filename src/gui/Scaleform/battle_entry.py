@@ -15,14 +15,13 @@ from gui.Scaleform.framework.managers import LoaderManager, ContainerManager
 from gui.Scaleform.framework.managers.containers import DefaultContainer
 from gui.Scaleform.framework.managers.containers import PopUpContainer
 from gui.Scaleform.framework.managers.context_menu import ContextMenuManager
-from gui.Scaleform.framework.managers.optimization_manager import GraphicsOptimizationManager, OptimizationSetting
-from gui.Scaleform.genConsts.BATTLE_VIEW_ALIASES import BATTLE_VIEW_ALIASES
+from gui.Scaleform.framework.managers.optimization_manager import GraphicsOptimizationManager
 from gui.Scaleform.managers.ColorSchemeManager import BattleColorSchemeManager
 from gui.Scaleform.managers.cursor_mgr import CursorManager
 from gui.Scaleform.managers.GlobalVarsManager import GlobalVarsManager
 from gui.Scaleform.managers.PopoverManager import PopoverManager
 from gui.Scaleform.framework.managers.ImageManager import ImageManager
-from gui.Scaleform.required_libraries_config import BATTLE_REQUIRED_LIBRARIES
+from gui.Scaleform.required_libraries_config import BATTLE_REQUIRED_LIBRARIES, ADDITIONAL_BATTLE_REQUIRED_LIBRARIES
 from gui.sounds.SoundManager import SoundManager
 from gui.Scaleform.managers.TweenSystem import TweenManager
 from gui.Scaleform.managers.UtilsManager import UtilsManager
@@ -57,13 +56,11 @@ class TopWindowContainer(PopUpContainer):
         return result
 
 
-BATTLE_OPTIMIZATION_CONFIG = {BATTLE_VIEW_ALIASES.MINIMAP: OptimizationSetting('minimapAlphaEnabled', True),
- BATTLE_VIEW_ALIASES.DAMAGE_PANEL: OptimizationSetting()}
-
 class BattleEntry(AppEntry):
 
-    def __init__(self, appNS, ctrlModeFlags):
+    def __init__(self, appNS, ctrlModeFlags, arenaGuiType):
         super(BattleEntry, self).__init__(R.entries.battle(), appNS, ctrlModeFlags, daapiBridge=DAAPIRootBridge(initCallback='registerBattleTest'))
+        self._arenaGuiType = arenaGuiType
         self.__input = None
         return
 
@@ -84,9 +81,9 @@ class BattleEntry(AppEntry):
     def handleKey(self, isDown, key, mods):
         return self.__input.handleKey(isDown, key, mods) if self.__input is not None else False
 
-    def enterGuiControlMode(self, consumerID, cursorVisible=True, enableAiming=True):
+    def enterGuiControlMode(self, consumerID, cursorVisible=True, enableAiming=True, stopVehicle=False):
         if self.__input is not None:
-            self.__input.enterGuiControlMode(consumerID, cursorVisible=cursorVisible, enableAiming=enableAiming)
+            self.__input.enterGuiControlMode(consumerID, cursorVisible=cursorVisible, enableAiming=enableAiming, stopVehicle=stopVehicle)
         return
 
     def leaveGuiControlMode(self, consumerID):
@@ -158,7 +155,7 @@ class BattleEntry(AppEntry):
         return TweenManager()
 
     def _createGraphicsOptimizationManager(self):
-        return GraphicsOptimizationManager(config=BATTLE_OPTIMIZATION_CONFIG)
+        return GraphicsOptimizationManager()
 
     def _setup(self):
         self.component.wg_inputKeyMode = InputKeyMode.IGNORE_RESULT
@@ -171,7 +168,7 @@ class BattleEntry(AppEntry):
         pass
 
     def _getRequiredLibraries(self):
-        return BATTLE_REQUIRED_LIBRARIES
+        return BATTLE_REQUIRED_LIBRARIES + ADDITIONAL_BATTLE_REQUIRED_LIBRARIES.get(self._arenaGuiType, [])
 
     def __getCursorFromContainer(self):
         return self._containerMgr.getView(WindowLayer.CURSOR) if self._containerMgr is not None else None

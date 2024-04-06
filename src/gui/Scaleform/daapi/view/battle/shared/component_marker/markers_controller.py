@@ -4,6 +4,7 @@ import logging
 from functools import partial
 import BigWorld
 import Event
+from chat_commands_consts import INVALID_TARGET_ID
 from gui.battle_control.arena_info.interfaces import IArenaVehiclesController
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE, events
 from gui.shared.utils.TimeInterval import TimeInterval
@@ -41,18 +42,20 @@ class BaseMarkerController(IArenaVehiclesController):
     def getPluginID(self):
         raise NotImplementedError
 
-    def createMarker(self, matrix, markerType, clazz=AreaMarker, bitMask=0):
-        markerData = MarkerParamsFactory.getMarkerParams(matrix, markerType, bitMask)
-        return clazz(markerData)
+    def createMarker(self, matrix, markerType, targetID=INVALID_TARGET_ID, entity=None, clazz=AreaMarker, visible=None, bitMask=0):
+        config = MarkerParamsFactory.getMarkerParams(matrix, markerType, bitMask)
+        if visible is not None:
+            config.update({'visible': visible})
+        return clazz(config, entity, targetID)
 
-    def addMarker(self, marker):
+    def addMarker(self, marker, **kwargs):
         markerID = marker.markerID
         if markerID in self._markers:
             _logger.error('Marker with Id=%s exists already', markerID)
             marker.clear()
             return None
         else:
-            self._attachGUIToMarkersCallback[markerID] = BigWorld.callback(0, partial(self._attachGUIToMarkers, markerID))
+            self._attachGUIToMarkersCallback[markerID] = BigWorld.callback(0, partial(self._attachGUIToMarkers, markerID, **kwargs))
             self._checkGlobalVisibilityForMarker(marker)
             self._markers[markerID] = marker
             self.checkStartTimer()
@@ -107,7 +110,6 @@ class BaseMarkerController(IArenaVehiclesController):
         return
 
     def showMarkersById(self, markerID, unblock=True):
-        player = BigWorld.player()
         marker = self._markers.get(markerID, None)
         if marker:
             if unblock:
@@ -116,13 +118,9 @@ class BaseMarkerController(IArenaVehiclesController):
                 return
             if marker.isEmpty():
                 return
-            conditionDistance = marker.disappearingRadius
-            if conditionDistance > 0:
-                distanceToArea = BaseMarkerController.getDistanceToArea(marker, player)
-                hide = conditionDistance < distanceToArea if marker.reverseDisappearing else conditionDistance > distanceToArea
-                if hide:
-                    marker.setVisible(False)
-                    return
+            if not self.isMarkerActuallyVisible(marker):
+                marker.setVisible(False)
+                return
             marker.setVisible(True)
         self.checkStartTimer()
         return
@@ -137,11 +135,8 @@ class BaseMarkerController(IArenaVehiclesController):
     def getMarkerById(self, markerID):
         return self._markers.get(markerID)
 
-    @staticmethod
-    def getDistanceToArea(marker, player):
-        absDistance = (marker.getMarkerPosition() - player.getOwnVehiclePosition()).length
-        distanceToArea = max(0, absDistance - marker.areaRadius)
-        return distanceToArea
+    def isMarkerActuallyVisible(self, marker):
+        return True
 
     def start(self):
         if self._gui is None:
@@ -149,10 +144,6 @@ class BaseMarkerController(IArenaVehiclesController):
         else:
             if self._updateTI:
                 self._updateTI.stop()
-            for markerID in self._markers.iterkeys():
-                if markerID not in self._attachGUIToMarkersCallback:
-                    self._attachGUIToMarkersCallback[markerID] = BigWorld.callback(0.0, partial(self._attachGUIToMarkers, markerID=markerID))
-
             self._updateTI = TimeInterval(self._UPDATE_TICK_LENGTH, self, '_tickUpdate')
             self._updateTI.start()
             return
@@ -184,15 +175,15 @@ class BaseMarkerController(IArenaVehiclesController):
             self._gui = None
         return
 
-    def _attachGUIToMarkers(self, markerID):
+    def _attachGUIToMarkers(self, markerID, **kwargs):
         self._attachGUIToMarkersCallback[markerID] = None
         if self._gui and markerID in self._markers:
             marker = self._markers[markerID]
             if self._checkInitedPlugin(marker):
                 self._attachGUIToMarkersCallback.pop(markerID)
-                self._markers[markerID].attachGUI(self._gui)
+                self._markers[markerID].attachGUI(self._gui, **kwargs)
                 return
-        self._attachGUIToMarkersCallback[markerID] = BigWorld.callback(0, partial(self._attachGUIToMarkers, markerID))
+        self._attachGUIToMarkersCallback[markerID] = BigWorld.callback(0, partial(self._attachGUIToMarkers, markerID, **kwargs))
         return
 
     def _handleGUIVisibility(self, event):
@@ -205,8 +196,10 @@ class BaseMarkerController(IArenaVehiclesController):
     def _checkInitedPlugin(self, marker):
         if marker.hasMarker2D() and self._gui.getMarkers2DPlugin() is None:
             return False
+        elif marker.hasMinimap() and self._gui.getMinimapPlugin() is None:
+            return False
         else:
-            return False if marker.hasMinimap() and self._gui.getMinimapPlugin() is None else True
+            return False if marker.hasFullscreenMap() and self._gui.getFullscreenMapPlugin() is None else True
 
     def _checkGlobalVisibilityForMarker(self, marker):
         if not self._globalVisibility:

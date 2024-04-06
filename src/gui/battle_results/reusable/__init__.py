@@ -118,6 +118,10 @@ class _ReusableInfo(object):
         return self.__personal.hasAnyPremium
 
     @property
+    def isWotPlusInPostBattle(self):
+        return self.__personal.isWotPlus
+
+    @property
     def premiumState(self):
         return self.__premiumState
 
@@ -159,11 +163,11 @@ class _ReusableInfo(object):
 
     @property
     def canUpgradeToPremium(self):
-        return self.__premiumState & PREMIUM_STATE.BUY_ENABLED > 0 and self.__premiumState & PREMIUM_STATE.HAS_ALREADY == 0 and not self.isPostBattlePremium and self.__common.arenaBonusType in (ARENA_BONUS_TYPE.REGULAR, ARENA_BONUS_TYPE.EPIC_RANDOM, ARENA_BONUS_TYPE.EPIC_BATTLE)
+        return self.__premiumState & PREMIUM_STATE.BUY_ENABLED > 0 and self.__premiumState & PREMIUM_STATE.HAS_ALREADY == 0 and not self.isPostBattlePremium and self.__common.arenaBonusType in ARENA_BONUS_TYPE.RANDOM_RANGE + (ARENA_BONUS_TYPE.EPIC_BATTLE,)
 
     @property
     def canUpgradeToPremiumPlus(self):
-        return self.__premiumPlusState & PREMIUM_STATE.BUY_ENABLED > 0 and self.__premiumPlusState & PREMIUM_STATE.HAS_ALREADY == 0 and not self.isPostBattlePremiumPlus and self.__common.arenaBonusType in (ARENA_BONUS_TYPE.REGULAR, ARENA_BONUS_TYPE.EPIC_RANDOM, ARENA_BONUS_TYPE.EPIC_BATTLE)
+        return self.__premiumPlusState & PREMIUM_STATE.BUY_ENABLED > 0 and self.__premiumPlusState & PREMIUM_STATE.HAS_ALREADY == 0 and not self.isPostBattlePremiumPlus and self.__common.arenaBonusType in ARENA_BONUS_TYPE.RANDOM_RANGE + (ARENA_BONUS_TYPE.EPIC_BATTLE,)
 
     @property
     def canResourceBeFaded(self):

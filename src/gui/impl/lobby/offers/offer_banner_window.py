@@ -2,7 +2,7 @@
 # Embedded file name: scripts/client/gui/impl/lobby/offers/offer_banner_window.py
 import BigWorld
 from PlayerEvents import g_playerEvents
-from frameworks.wulf import ViewSettings, ViewFlags, WindowFlags
+from frameworks.wulf import ViewSettings, WindowFlags
 from gui.impl.gen import R
 from gui.impl.gen.view_models.views.lobby.offers.offer_banner_model import OfferBannerModel
 from gui.impl.lobby.offers import getGfImagePath
@@ -11,6 +11,7 @@ from helpers import dependency, getClientLanguage, isPlayerAccount
 import ResMgr
 from gui.impl.pub import ViewImpl, WindowImpl
 from skeletons.gui.app_loader import IAppLoader
+from skeletons.gui.impl import IGuiLoader
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.offers import IOffersDataProvider
 
@@ -18,7 +19,7 @@ class OfferBannerWindowView(ViewImpl):
     _offersProvider = dependency.descriptor(IOffersDataProvider)
 
     def __init__(self, offerID):
-        settings = ViewSettings(layoutID=R.views.lobby.offers.OfferBannerWindow(), flags=ViewFlags.WINDOW_DECORATOR, model=OfferBannerModel())
+        settings = ViewSettings(layoutID=R.views.lobby.offers.OfferBannerWindow(), model=OfferBannerModel())
         super(OfferBannerWindowView, self).__init__(settings)
         self._offerID = offerID
         self._langCode = getClientLanguage()
@@ -26,6 +27,15 @@ class OfferBannerWindowView(ViewImpl):
     @property
     def viewModel(self):
         return self.getViewModel()
+
+    @property
+    def offerID(self):
+        return self._offerID
+
+    def destroyAsSeen(self):
+        if isPlayerAccount():
+            BigWorld.player().setOfferBannerSeen(self._offerID)
+        self.destroyWindow()
 
     def _initialize(self, *args, **kwargs):
         super(OfferBannerWindowView, self)._initialize()
@@ -66,6 +76,7 @@ class OfferBannerWindowView(ViewImpl):
 
 class OfferBannerWindow(WindowImpl):
     _appLoader = dependency.descriptor(IAppLoader)
+    _uiLoader = dependency.descriptor(IGuiLoader)
     _offersProvider = dependency.descriptor(IOffersDataProvider)
     _lobbyContext = dependency.descriptor(ILobbyContext)
     _loaded = set()
@@ -91,6 +102,13 @@ class OfferBannerWindow(WindowImpl):
             window = cls(offerID, controller)
             window.load()
             window.center()
+
+    @classmethod
+    def destroyBannerWindow(cls, offerID):
+        offersViews = cls._uiLoader.windowsManager.getViewsByLayout(R.views.lobby.offers.OfferBannerWindow())
+        for offerView in offersViews:
+            if offerView and offerView.offerID == offerID:
+                offerView.destroyAsSeen()
 
     def _initialize(self):
         super(OfferBannerWindow, self)._initialize()

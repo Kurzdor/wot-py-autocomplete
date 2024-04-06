@@ -20,7 +20,6 @@ def getTooltipBuilders():
      DefaultFormatBuilder(TOOLTIPS_CONSTANTS.ACTION_SLOT_PRICE, TOOLTIPS_CONSTANTS.COMPLEX_UI, common.ActionSlotTooltipData(contexts.HangarContext())),
      DefaultFormatBuilder(TOOLTIPS_CONSTANTS.PRICE_DISCOUNT, TOOLTIPS_CONSTANTS.COMPLEX_UI, common.PriceDiscountTooltipData(contexts.HangarContext())),
      DefaultFormatBuilder(TOOLTIPS_CONSTANTS.FRONTLINE_PRICE_DISCOUNT, TOOLTIPS_CONSTANTS.COMPLEX_UI, common.FrontlineDiscountTooltipData(contexts.HangarContext())),
-     DefaultFormatBuilder(TOOLTIPS_CONSTANTS.ACTION_XP, TOOLTIPS_CONSTANTS.COMPLEX_UI, common.ActionXPTooltipData(contexts.HangarContext())),
      DataBuilder(TOOLTIPS_CONSTANTS.QUESTS_VEHICLE_BONUSES, TOOLTIPS_CONSTANTS.COLUMN_FIELDS_UI, common.QuestVehiclesBonusTooltipData(contexts.QuestContext())),
      DataBuilder(TOOLTIPS_CONSTANTS.ENVIRONMENT, TOOLTIPS_CONSTANTS.ENVIRONMENT_UI, common.EnvironmentTooltipData(contexts.HangarContext())),
      DataBuilder(TOOLTIPS_CONSTANTS.MISSIONS_TOKEN, TOOLTIPS_CONSTANTS.MISSIONS_TOKEN_UI, common.MissionsToken(contexts.QuestContext())),
@@ -52,8 +51,9 @@ def getTooltipBuilders():
      DataBuilder(TOOLTIPS_CONSTANTS.TECHTREE_NATION_DISCOUNT, TOOLTIPS_CONSTANTS.BLOCKS_DEFAULT_UI, common.TechTreeNationDiscountTooltip(contexts.TechTreeContext())),
      DataBuilder(TOOLTIPS_CONSTANTS.DOG_TAGS_INFO, TOOLTIPS_CONSTANTS.DOG_TAGS_INFO_UI, DogTagInfoTooltip(contexts.DogTagInfoContext())),
      TooltipWindowBuilder(TOOLTIPS_CONSTANTS.VEH_POST_PROGRESSION_ENTRY_POINT, None, common.VehPostProgressionEntryPointTooltipContentWindowData(contexts.ToolTipContext(None))),
-     TooltipWindowBuilder(TOOLTIPS_CONSTANTS.WOT_PLUS, None, common.WotPlusTooltipContentWindowData(contexts.ToolTipContext(None))),
-     TooltipWindowBuilder(TOOLTIPS_CONSTANTS.ADDITIONAL_REWARDS, None, common.AdditionalRewardsTooltipContentWindowData(contexts.ToolTipContext(None))))
+     TooltipWindowBuilder(TOOLTIPS_CONSTANTS.ADDITIONAL_REWARDS, None, common.AdditionalRewardsTooltipContentWindowData(contexts.ToolTipContext(None))),
+     DataBuilder(TOOLTIPS_CONSTANTS.RESEARCH_BUTTON, TOOLTIPS_CONSTANTS.BLOCKS_DEFAULT_UI, common.ResearchButtonTooltipData(contexts.ToolTipContext(None))),
+     TooltipWindowBuilder(TOOLTIPS_CONSTANTS.COLLECTION_ITEM, None, common.CollectionItemTooltipContentWindowData(contexts.ToolTipContext(None))))
 
 
 class HeaderMoneyAndXpBuilder(DataBuilder):

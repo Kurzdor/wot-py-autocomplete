@@ -91,6 +91,9 @@ def _getOrCreateStaticHavokFashion(spaceID, chunkID, destrIndex):
 
 class AreaDestructibles(BigWorld.Entity):
 
+    def __init__(self):
+        self.__isPaused = False
+
     def onEnterWorld(self, prereqs):
         if g_destructiblesManager.getSpaceID() != self.spaceID:
             g_destructiblesManager.startSpace(self.spaceID)
@@ -99,7 +102,7 @@ class AreaDestructibles(BigWorld.Entity):
         g_destructiblesManager._addController(chunkID, self)
         self.__prevFallenColumns = frozenset(self.fallenColumns)
         for fallData in self.fallenColumns:
-            g_destructiblesManager.orderDestructibleDestroy(chunkID, DestructiblesCache.DESTR_TYPE_FALLING_ATOM, fallData, False)
+            g_destructiblesManager.orderDestructibleDestroy(chunkID, DestructiblesCache.DESTR_TYPE_FALLING_ATOM, fallData, False, False, True)
 
         self.__prevFallenTrees = frozenset(self.fallenTrees)
         for fallData in self.fallenTrees:
@@ -115,6 +118,13 @@ class AreaDestructibles(BigWorld.Entity):
 
     def onLeaveWorld(self):
         g_destructiblesManager._delController(self.__chunkID)
+
+    def setPause(self, isPaused):
+        if isPaused == self.__isPaused:
+            return
+        self.__isPaused = isPaused
+        if not self.__isPaused:
+            self.__applyDestructibleDestroy()
 
     def isDestructibleBroken(self, itemIndex, matKind, destrType=None):
         if destrType is None:
@@ -153,35 +163,61 @@ class AreaDestructibles(BigWorld.Entity):
 
             return False
 
-    def set_fallenTrees(self, prev):
+    def set_fallenTrees(self, _):
+        if self.__isPaused:
+            return
+        self.__applyFallenTrees(isNeedAnimation=True)
+
+    def set_fallenColumns(self, _):
+        if self.__isPaused:
+            return
+        self.__applyFallenColumns(isNeedAnimation=True)
+
+    def set_destroyedFragiles(self, _):
+        if self.__isPaused:
+            return
+        self.__applyDestroyedFragiles(isNeedAnimation=True)
+
+    def set_destroyedModules(self, _):
+        if self.__isPaused:
+            return
+        self.__applyDestroyedModules(isNeedAnimation=True)
+
+    def __applyDestructibleDestroy(self):
+        self.__applyFallenTrees(isNeedAnimation=False)
+        self.__applyFallenColumns(isNeedAnimation=False)
+        self.__applyDestroyedFragiles(isNeedAnimation=False)
+        self.__applyDestroyedModules(isNeedAnimation=False)
+
+    def __applyFallenTrees(self, isNeedAnimation):
         prev = self.__prevFallenTrees
         curr = frozenset(self.fallenTrees)
         self.__prevFallenTrees = curr
         for fallData in curr.difference(prev):
-            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_TREE, fallData, True)
+            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_TREE, fallData, isNeedAnimation)
 
-    def set_fallenColumns(self, prev):
+    def __applyFallenColumns(self, isNeedAnimation):
         prev = self.__prevFallenColumns
         curr = frozenset(self.fallenColumns)
         self.__prevFallenColumns = curr
         for fallData in curr.difference(prev):
-            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_FALLING_ATOM, fallData, True)
+            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_FALLING_ATOM, fallData, isNeedAnimation)
 
-    def set_destroyedFragiles(self, prev):
+    def __applyDestroyedFragiles(self, isNeedAnimation):
         prev = self.__prevDestroyedFragiles
         curr = frozenset(self.destroyedFragiles)
         self.__prevDestroyedFragiles = curr
         for fragileData in curr.difference(prev):
             _, isShotDamage = DestructiblesCache.decodeFragile(fragileData)
-            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_FRAGILE, fragileData, True, isShotDamage)
+            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_FRAGILE, fragileData, isNeedAnimation, isShotDamage)
 
-    def set_destroyedModules(self, prev):
+    def __applyDestroyedModules(self, isNeedAnimation):
         prev = self.__prevDestroyedModules
         curr = frozenset(self.destroyedModules)
         self.__prevDestroyedModules = curr
         for moduleData in curr.difference(prev):
             _, _, isShotDamage = DestructiblesCache.decodeDestructibleModule(moduleData)
-            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_STRUCTURE, moduleData, True, isShotDamage)
+            g_destructiblesManager.orderDestructibleDestroy(self.__chunkID, DestructiblesCache.DESTR_TYPE_STRUCTURE, moduleData, isNeedAnimation, isShotDamage)
 
 
 def _fallCollideCallback(curItemIndex, curChunkID, matKind, collFlags, itemIndex, chunkID):
@@ -212,6 +248,7 @@ class DestructiblesManager(object):
         self.__structuresEffects = {}
         self.__lifetimeEffects = {}
         self.forceNoAnimation = False
+        self.__isPaused = False
         self.__damagedModules = set()
         self.__destrInitialMatrices = {}
         self.__ctrls = {}
@@ -237,6 +274,13 @@ class DestructiblesManager(object):
         self.clear()
         self.__spaceID = spaceID
 
+    def setPause(self, isPaused):
+        if isPaused == self.__isPaused:
+            return
+        self.__isPaused = isPaused
+        for ctrl in self.__ctrls.itervalues():
+            ctrl.setPause(self.__isPaused)
+
     def getSpaceID(self):
         return self.__spaceID
 
@@ -255,6 +299,9 @@ class DestructiblesManager(object):
             chunkEntries = self.__destructiblesWaitDestroy.get(chunkID)
             if chunkEntries is not None:
                 for dmgType, destrData, isNeedAnimation in chunkEntries:
+                    if dmgType == DestructiblesCache.DESTR_TYPE_FALLING_ATOM:
+                        destrIndex, _, _ = DestructiblesCache.decodeFallenColumn(destrData)
+                        self.__setFragileDestroyed(self.__spaceID, chunkID, destrIndex, False, False)
                     self.__destroyDestructible(chunkID, dmgType, destrData, isNeedAnimation)
 
                 del self.__destructiblesWaitDestroy[chunkID]
@@ -299,10 +346,14 @@ class DestructiblesManager(object):
         if not gotDestrs:
             BigWorld.callback(_SHOT_EXPLOSION_SYNC_TIMEOUT, partial(self.__delayedHavokExplosion, self.__spaceID, explosionInfo))
 
-    def orderDestructibleDestroy(self, chunkID, dmgType, destrData, isNeedAnimation, syncWithProjectile=False):
+    def orderDestructibleDestroy(self, chunkID, dmgType, destrData, isNeedAnimation, syncWithProjectile=False, forceRemove=False):
         if self.forceNoAnimation:
             isNeedAnimation = False
         if self.__loadedChunkIDs.has_key(chunkID):
+            if forceRemove and dmgType == DestructiblesCache.DESTR_TYPE_FALLING_ATOM:
+                destrIndex, _, _ = DestructiblesCache.decodeFallenColumn(destrData)
+                self.__setFragileDestroyed(self.__spaceID, chunkID, destrIndex, False, False)
+                return
             if isNeedAnimation and syncWithProjectile:
                 if dmgType == DestructiblesCache.DESTR_TYPE_FRAGILE:
                     itemIndex, _ = DestructiblesCache.decodeFragile(destrData)
@@ -419,8 +470,11 @@ class DestructiblesManager(object):
             self.__dropDestructible(chunkID, destrIndex, dmgType, fallDirYaw, pitchConstr, fallSpeed, isNeedAnimation, collisionFlags)
         if dmgType == DestructiblesCache.DESTR_TYPE_TREE:
             destrIndex, fallDirYaw, pitchConstr, fallSpeed = DestructiblesCache.decodeFallenTree(destData)
-            _, collisionFlags = BigWorld.wg_getDestructibleFallPitchConstr(self.__spaceID, chunkID, destrIndex, fallDirYaw)
-            self.__dropDestructible(chunkID, destrIndex, dmgType, fallDirYaw, pitchConstr, fallSpeed, isNeedAnimation, collisionFlags)
+            if BigWorld.wg_checkDestructibleIsBush(self.__spaceID, chunkID, destrIndex):
+                BigWorld.wg_setDestructibleActive(self.__spaceID, chunkID, destrIndex, False)
+            else:
+                _, collisionFlags = BigWorld.wg_getDestructibleFallPitchConstr(self.__spaceID, chunkID, destrIndex, fallDirYaw)
+                self.__dropDestructible(chunkID, destrIndex, dmgType, fallDirYaw, pitchConstr, fallSpeed, isNeedAnimation, collisionFlags)
         elif dmgType == DestructiblesCache.DESTR_TYPE_FRAGILE:
             destrIndex, isShotDamage = DestructiblesCache.decodeFragile(destData)
             self.__destroyFragile(chunkID, destrIndex, isNeedAnimation, isShotDamage)
@@ -545,7 +599,7 @@ class DestructiblesManager(object):
         if args.effectName == 'none':
             return
         else:
-            effectVars = g_cache._getEffect(args.effectName, args.effectCategory, False)
+            effectVars = g_cache.getEffect(args.effectName, args.effectCategory, False)
             if not effectVars:
                 LOG_ERROR('Could not find any effects vars for: ' + str(args.effectName) + ' - type: ' + str(args.effectType) + ' - cat: ' + str(args.effectCategory) + ' (' + str(args.destrType) + ')')
                 return
@@ -618,7 +672,7 @@ class DestructiblesManager(object):
             effectName = BigWorld.wg_getDestructibleEffectName(self.__spaceID, chunkID, destrIndex, -1, effectType)
             if effectName == 'none':
                 return
-            effectVars = g_cache._getEffect(effectName, 'fallingAtoms', False)
+            effectVars = g_cache.getEffect(effectName, 'fallingAtoms', False)
             if effectVars is None:
                 return
             effectStuff = random.choice(effectVars)
@@ -638,7 +692,7 @@ class DestructiblesManager(object):
             effectName = BigWorld.wg_getDestructibleEffectName(self.__spaceID, chunkID, destrIndex, -1, effectType)
             if effectName == 'none':
                 return
-            effectVars = g_cache._getEffect(effectName, 'trees', False)
+            effectVars = g_cache.getEffect(effectName, 'trees', False)
             if effectVars is None:
                 return
             effectStuff = random.choice(effectVars)

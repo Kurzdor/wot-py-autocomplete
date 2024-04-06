@@ -11,7 +11,7 @@ from gui.impl.gen import R
 from gui.impl.gen.view_models.views.lobby.mode_selector.battle_session_model import BattleSessionModel
 from gui.impl.pub import ViewImpl
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
-from gui.shared.ClanCache import g_clanCache
+from gui.clans.clan_cache import g_clanCache
 from gui.shared.view_helpers.emblems import getClanEmblemURL, EmblemSize
 from gui.tournament.tournament_helpers import isTournamentEnabled, showTournaments
 from helpers import dependency
@@ -49,9 +49,11 @@ class BattleSessionView(ViewImpl):
             isInClan = g_clanCache.isInClan
             if isInClan:
                 tx.setClanName(g_clanCache.clanName)
-                tx.setClanIcon(getClanEmblemURL(g_clanCache.clanDBID, EmblemSize.SIZE_32))
+                clanIcon = getClanEmblemURL(g_clanCache.clanDBID, EmblemSize.SIZE_32)
+                tx.setClanIcon(clanIcon if clanIcon is not None else '')
             tx.setIsInClan(isInClan)
             tx.setIsTournamentLinkIGB(isTournamentEnabled())
+        return
 
     def __tournamentsClickedHandler(self):
         if isTournamentEnabled():

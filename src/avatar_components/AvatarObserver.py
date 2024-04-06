@@ -14,7 +14,8 @@ _OBSERVABLE_VIEWS = (CTRL_MODE_NAME.ARCADE,
  CTRL_MODE_NAME.SNIPER,
  CTRL_MODE_NAME.DUAL_GUN,
  CTRL_MODE_NAME.STRATEGIC,
- CTRL_MODE_NAME.ARTY)
+ CTRL_MODE_NAME.ARTY,
+ CTRL_MODE_NAME.MAP_CASE)
 _STRATEGIC_VIEW = (CTRL_MODE_NAME.STRATEGIC, CTRL_MODE_NAME.ARTY)
 
 class ObservedVehicleData(object):
@@ -29,7 +30,6 @@ class AvatarObserver(CallbackDelayer):
     observedVehicleID = property(lambda self: self.__observedVehicleID)
     observedVehicleData = property(lambda self: self.__observedVehicleData)
     isFPVModeSwitching = property(lambda self: self.__isFPVModeSwitching)
-    observerFPVControlMode = property(lambda self: self.__observerFPVControlMode)
 
     def __init__(self):
         super(AvatarObserver, self).__init__()
@@ -96,7 +96,6 @@ class AvatarObserver(CallbackDelayer):
                 if hasattr(self.vehicle.filter, 'enableStabilisedMatrix'):
                     self.vehicle.filter.enableStabilisedMatrix(True)
                 if not self.guiSessionProvider.shared.vehicleState.isInPostmortem:
-                    BigWorld.target.exclude = self.vehicle
                     for v in BigWorld.player().vehicles:
                         if v.appearance is not None:
                             v.appearance.highlighter.setVehicleOwnership()
@@ -155,7 +154,10 @@ class AvatarObserver(CallbackDelayer):
         vehicle = self.vehicle
         if vehicle is None:
             vehicle = BigWorld.entity(self.__observedVehicleID if self.__observedVehicleID else self.playerVehicleID)
-        return None if vehicle is None or not vehicle.inWorld or not vehicle.isStarted or vehicle.isDestroyed else vehicle
+        if vehicle is not None and vehicle.isHidden:
+            return vehicle
+        else:
+            return None if vehicle is None or not vehicle.inWorld or not vehicle.isStarted or vehicle.isDestroyed else vehicle
 
     def clearObservedVehicleID(self):
         self.__observedVehicleID = None
@@ -188,12 +190,13 @@ class AvatarObserver(CallbackDelayer):
                 self.delayCallback(0.0, self.__applyObserverModeChange)
                 return
             self.stopCallback(self.__applyObserverModeChange)
-            self.inputHandler.onVehicleControlModeChanged(None)
+            self.inputHandler.onObserverControlModeChanged(self.__getFPVControlMode())
             if vehicle is not None:
                 if self.isObserverFPV:
                     self.guiSessionProvider.stopVehicleVisual(vehicle.id, False)
                 else:
                     self.guiSessionProvider.startVehicleVisual(vehicle, True)
+                self.__resetHighlightProperties(vehicle)
             if self.observerSeesAll():
                 self.guiSessionProvider.shared.equipments.updateMapCase()
             else:
@@ -214,9 +217,9 @@ class AvatarObserver(CallbackDelayer):
                     self.__switchToObservedControlMode()
 
     def __switchToObservedControlMode(self):
-        eMode = CTRL_MODES[self.__observerFPVControlMode]
+        eMode = self.__getFPVControlMode()
         _logger.info('AvatarObserver.__switchToObservedControlMode(): %r, %r', self.__observerFPVControlMode, eMode)
-        if self.observerSeesAll() and self.inputHandler.ctrlModeName == eMode:
+        if self.inputHandler.ctrlModeName == eMode:
             return
         else:
             filteredValue = None
@@ -226,8 +229,11 @@ class AvatarObserver(CallbackDelayer):
                 _logger.info('AvatarObserver.__switchToObservedControlMode(): no filtered value yet.Rescheduling switch... %r', filteredValue)
                 self.delayCallback(0.0, self.__switchToObservedControlMode)
                 return
-            self.inputHandler.onVehicleControlModeChanged(eMode)
+            self.inputHandler.onObserverControlModeChanged(eMode)
             return
+
+    def __getFPVControlMode(self):
+        return CTRL_MODES[self.__observerFPVControlMode]
 
     def set_remoteCamera(self, _):
         self.setRemoteCamera(self.remoteCamera)
@@ -243,3 +249,13 @@ class AvatarObserver(CallbackDelayer):
 
     def __resetFPVModeSwitching(self):
         self.__isFPVModeSwitching = False
+
+    def __resetHighlightProperties(self, vehicle):
+        if self.isObserverFPV:
+            BigWorld.target.exclude = vehicle
+            if vehicle.appearance and vehicle.appearance.collisions is not None:
+                BigWorld.wgAddIgnoredCollisionEntity(vehicle, vehicle.appearance.collisions)
+        else:
+            BigWorld.target.exclude = None
+            BigWorld.wgDelIgnoredCollisionEntity(vehicle)
+        return

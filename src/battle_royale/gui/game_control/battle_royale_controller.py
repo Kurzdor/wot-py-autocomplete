@@ -1,67 +1,80 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: battle_royale/scripts/client/battle_royale/gui/game_control/battle_royale_controller.py
-import logging
-from functools import partial
-import typing
 import json
+import logging
+from collections import namedtuple
+from functools import partial
+from itertools import groupby
 import BigWorld
+import typing
 import Event
-from shared_utils import nextTick
 import season_common
-from stats_params import BATTLE_ROYALE_STATS_ENABLED
 from CurrentVehicle import g_currentVehicle
 from account_helpers import AccountSettings
-from account_helpers.AccountSettings import ROYALE_VEHICLE, CURRENT_VEHICLE
+from account_helpers.AccountSettings import ROYALE_VEHICLE, CURRENT_VEHICLE, ROYALE_INTRO_VIDEO_SHOWN
 from account_helpers.settings_core.settings_constants import GRAPHICS
 from adisp import adisp_process
-from constants import QUEUE_TYPE, Configs, PREBATTLE_TYPE, ARENA_BONUS_TYPE, BATTLE_ROYALE_SCENE
-from gui.ClientUpdateManager import g_clientUpdateManager
-from battle_royale.gui.constants import AmmoTypes, BattleRoyalePerfProblems
-from battle_royale.gui.royale_models import BattleRoyaleSeason
+from battle_royale.gui.constants import AmmoTypes, BattleRoyalePerfProblems, BattleRoyaleSubMode
 from battle_royale.gui.game_control.br_vo_controller import BRVoiceOverController
+from battle_royale.gui.royale_models import BattleRoyaleSeason
+from battle_royale_progression.skeletons.game_controller import IBRProgressionOnTokensController
+from constants import QUEUE_TYPE, Configs, PREBATTLE_TYPE, ARENA_BONUS_TYPE, BATTLE_ROYALE_SCENE
+from frameworks.wulf import WindowStatus, WindowFlags, WindowLayer
+from gui import GUI_NATIONS_ORDER_INDEX
+from gui import GUI_SETTINGS
+from gui.ClientHangarSpace import SERVER_CMD_CHANGE_HANGAR, SERVER_CMD_CHANGE_HANGAR_PREM
+from gui.ClientUpdateManager import g_clientUpdateManager
+from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
+from gui.Scaleform.daapi.view.common.battle_royale.br_helpers import currentHangarIsBattleRoyale
+from gui.Scaleform.genConsts.BATTLEROYALE_ALIASES import BATTLEROYALE_ALIASES
+from gui.Scaleform.genConsts.PROFILE_DROPDOWN_KEYS import PROFILE_DROPDOWN_KEYS
+from gui.game_control.links import URLMacros
+from gui.game_control.season_provider import SeasonProvider
+from gui.impl.gen import R
 from gui.prb_control.dispatcher import g_prbLoader
 from gui.prb_control.entities.base.ctx import PrbAction, LeavePrbAction
 from gui.prb_control.entities.listener import IGlobalListener
 from gui.prb_control.settings import PREBATTLE_ACTION_NAME
+from gui.prb_control.settings import SELECTOR_BATTLE_TYPES
+from gui.server_events.events_constants import BATTLE_ROYALE_GROUPS_ID
 from gui.shared import events, g_eventBus, EVENT_BUS_SCOPE
+from gui.shared.event_dispatcher import getParentWindow, showBrowserOverlayView
+from gui.shared.events import ProfilePageEvent, ProfileStatisticEvent, ProfileTechniqueEvent
+from gui.shared.gui_items.Tankman import TankmanSkill
 from gui.shared.gui_items.Vehicle import VEHICLE_TAGS, VEHICLE_TYPES_ORDER_INDICES
+from gui.shared.utils import SelectorBattleTypesUtils
 from gui.shared.utils.requesters import REQ_CRITERIA
-from gui import GUI_NATIONS_ORDER_INDEX
 from gui.shared.utils.scheduled_notifications import Notifiable, SimpleNotifier, PeriodicNotifier
 from helpers import dependency, time_utils
 from helpers.statistics import HARDWARE_SCORE_PARAMS
-from gui.impl.gen import R
+from items.battle_royale import isBattleRoyale
+from battle_royale.gui.constants import SUB_MODE_ID_KEY
 from shared_utils import first
+from shared_utils import nextTick
 from skeletons.account_helpers.settings_core import ISettingsCore
-from skeletons.gui.game_control import IEventsNotificationsController, IBootcampController, IHangarSpaceSwitchController, IBattleRoyaleController, IBattleRoyaleTournamentController
+from skeletons.gui.battle_session import IBattleSessionProvider
+from skeletons.gui.game_control import IEventsNotificationsController, IHangarSpaceSwitchController, IBattleRoyaleController, IBattleRoyaleTournamentController, IPlatoonController
+from skeletons.gui.impl import IGuiLoader
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.server_events import IEventsCache
 from skeletons.gui.shared import IItemsCache
 from skeletons.gui.shared.utils import IHangarSpace
-from gui.ClientHangarSpace import SERVER_CMD_CHANGE_HANGAR, SERVER_CMD_CHANGE_HANGAR_PREM
-from skeletons.gui.battle_session import IBattleSessionProvider
-from gui.game_control.links import URLMacros
-from gui.game_control.season_provider import SeasonProvider
-from gui.prb_control.settings import SELECTOR_BATTLE_TYPES
-from web.web_client_api.battle_royale import createBattleRoyaleWebHanlders
-from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
-from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
-from gui.shared.utils.functions import getUniqueViewName
-from gui.shared.utils import SelectorBattleTypesUtils
-from gui.server_events.events_constants import BATTLE_ROYALE_GROUPS_ID
-from gui.Scaleform.genConsts.PROFILE_DROPDOWN_KEYS import PROFILE_DROPDOWN_KEYS
-from gui.shared.events import ProfilePageEvent, ProfileStatisticEvent, ProfileTechniqueEvent
-from skeletons.gui.impl import IGuiLoader
-from gui.shared.event_dispatcher import getParentWindow
-from gui import GUI_SETTINGS
-from items.battle_royale import isBattleRoyale
+from stats_params import BATTLE_ROYALE_STATS_ENABLED
+from gui.shared.money import DynamicMoney
+from battle_royale.gui.constants import BR_COIN
 if typing.TYPE_CHECKING:
+    from frameworks.wulf import Window
     from helpers.server_settings import BattleRoyaleConfig
 _logger = logging.getLogger(__name__)
+BattleRoyaleProgressionPoints = namedtuple('BattleRoyaleProgressionPoints', ['lastInRange', 'points'])
 
 class BATTLE_ROYALE_GAME_LIMIT_TYPE(object):
     SYSTEM_DATA = 0
     HARDWARE_PARAMS = 1
+
+
+def predicateOpenedWindowsExist(window):
+    return window.typeFlag != WindowFlags.TOOLTIP and window.typeFlag != WindowFlags.CONTEXT_MENU and window.layer in (WindowLayer.FULLSCREEN_WINDOW, WindowLayer.OVERLAY) and window.windowStatus in (WindowStatus.CREATED, WindowStatus.LOADED, WindowStatus.LOADING)
 
 
 PERFORMANCE_GROUP_LIMITS = {BattleRoyalePerfProblems.HIGH_RISK: [{BATTLE_ROYALE_GAME_LIMIT_TYPE.SYSTEM_DATA: {'osBit': 1,
@@ -79,7 +92,9 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
     __notificationsCtrl = dependency.descriptor(IEventsNotificationsController)
     __sessionProvider = dependency.descriptor(IBattleSessionProvider)
     __battleRoyaleTournamentController = dependency.descriptor(IBattleRoyaleTournamentController)
-    __bootcamp = dependency.descriptor(IBootcampController)
+    __brProgression = dependency.descriptor(IBRProgressionOnTokensController)
+    __platoonCtrl = dependency.descriptor(IPlatoonController)
+    __guiLoader = dependency.descriptor(IGuiLoader)
     TOKEN_QUEST_ID = 'token:br:title:'
     MAX_STORED_ARENAS_RESULTS = 20
 
@@ -88,6 +103,11 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         self.onUpdated = Event.Event()
         self.onPrimeTimeStatusUpdated = Event.Event()
         self.onWidgetUpdate = Event.Event()
+        self.onBalanceUpdated = Event.Event()
+        self.onSubModeUpdated = Event.Event()
+        self.onBattleRoyaleSpaceLoaded = Event.Event()
+        self.onStatusTick = Event.Event()
+        self.__balance = None
         self.__clientValuesInited = False
         self.__clientShields = {}
         self.__performanceGroup = None
@@ -101,14 +121,17 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         self.__defaultHangars = {}
         self.__urlMacros = None
         self.__isNeedToUpdateHeroTank = False
+        self.__isHangarAnimationShowed = False
         self.__profileStatisticWasSelected = False
         self.__profStatSelectBattlesTypeInited = False
         self.__profTechSelectBattlesTypeInited = False
         self.__callbackID = None
+        self.__currentSubModeID = BattleRoyaleSubMode.SOLO_MODE_ID
         return
 
     def init(self):
         super(BattleRoyaleController, self).init()
+        self.__balance = DynamicMoney()
         self.__voControl = BRVoiceOverController()
         self.__voControl.init()
         self.__urlMacros = URLMacros()
@@ -139,10 +162,13 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         super(BattleRoyaleController, self).onLobbyInited(event)
         if not self.__clientValuesInited:
             self.__clientValuesInited = True
-        g_clientUpdateManager.addCallbacks({'battleRoyale': self.__updateRoyale})
+        g_clientUpdateManager.addCallbacks({'battleRoyale': self.__updateRoyale,
+         'cache.dynamicCurrencies': self.__updateDynamicCurrencies})
         self.startNotification()
         self.startGlobalListening()
+        self.__initBalanceCurrencies()
         self.__hangarsSpace.onVehicleChanged += self.__onVehicleChanged
+        self.__hangarsSpace.onSpaceCreate += self.__onSpaceCreate
         self.__notificationsCtrl.onEventNotificationsChanged += self.__onEventNotification
         self.__onEventNotification(self.__notificationsCtrl.getEventsNotifications())
         self.__battleRoyaleTournamentController.onSelectBattleRoyaleTournament += self.__selectBattleRoyaleTournament
@@ -157,6 +183,24 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
 
     def onPrbEntitySwitched(self):
         self.__modeEntered()
+
+    def getBRCoinBalance(self, default=None):
+        return self.__balance.get(BR_COIN, default)
+
+    def __initBalanceCurrencies(self):
+        self.__updateBalanceCurrencies()
+        self.onBalanceUpdated()
+
+    def __updateBalanceCurrencies(self):
+        self.__balance = self.__itemsCache.items.stats.getDynamicMoney()
+
+    def __updateDynamicCurrencies(self, currencies):
+        if BR_COIN not in currencies:
+            return False
+        brCoin = currencies.get(BR_COIN, 0)
+        if self.getBRCoinBalance(0) != brCoin:
+            self.__updateBalanceCurrencies()
+        self.onBalanceUpdated()
 
     def __onEventNotification(self, added, removed=()):
         for evNotification in removed:
@@ -194,6 +238,23 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         self.__voControl.onAvatarBecomePlayer()
         super(BattleRoyaleController, self).onAvatarBecomePlayer()
 
+    def getCurrentSubModeID(self):
+        return self.__currentSubModeID
+
+    def setCurrentSubModeID(self, currentSubModeID, updateNeeded=True):
+        if currentSubModeID not in BattleRoyaleSubMode.ALL_RANGE:
+            currentSubModeID = BattleRoyaleSubMode.SOLO_MODE_ID
+        self.__currentSubModeID = currentSubModeID
+        if updateNeeded:
+            self.onSubModeUpdated()
+
+    def selectSubModeBattle(self, selectedSubModeID, **kwargs):
+        extData = {SUB_MODE_ID_KEY: selectedSubModeID}
+        self.__selectRoyaleBattle(extData=extData, **kwargs)
+
+    def isSquadButtonEnabled(self):
+        return not self.isBattleRoyaleMode()
+
     def getModeSettings(self):
         return self.__lobbyContext.getServerSettings().battleRoyale
 
@@ -202,6 +263,9 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
 
     def getEndTime(self):
         return self.getCurrentSeason().getCycleEndDate()
+
+    def getStartTime(self):
+        return self.getCurrentSeason().getCycleStartDate()
 
     def getPerformanceGroup(self):
         if not self.__performanceGroup:
@@ -289,10 +353,21 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         else:
             return False
 
+    def isInRandomSquadSubMode(self):
+        return self.getCurrentSubModeID() == BattleRoyaleSubMode.SOLO_DYNAMIC_MODE_ID
+
     def selectRoyaleBattle(self):
         if not self.isEnabled():
             return
         self.__selectRoyaleBattle()
+
+    def openInfoPageWindow(self, isModeSelector=False):
+        from battle_royale.gui.impl.lobby.views.info_page import InfoPageWindow
+        view = self.__guiLoader.windowsManager.getViewByLayoutID(R.views.battle_royale.lobby.views.InfoPage())
+        if view is None:
+            window = InfoPageWindow(isModeSelector)
+            window.load()
+        return
 
     def setDefaultHangarEntryPoint(self):
         if self.__battleRoyaleTournamentController.isSelected():
@@ -315,14 +390,6 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
 
     def getStats(self):
         return self.__itemsCache.items.battleRoyale
-
-    @adisp_process
-    def openURL(self, url=None):
-        requestUrl = url or self.__battleRoyaleSettings.url
-        if requestUrl:
-            parsedUrl = yield self.__urlMacros.parse(requestUrl)
-            if parsedUrl:
-                self.__showBrowserView(parsedUrl)
 
     @staticmethod
     @dependency.replace_none_kwargs(guiLoader=IGuiLoader)
@@ -358,20 +425,55 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         return False
 
     def getIntroVideoURL(self):
-        introVideoUrl = GUI_SETTINGS.battleRoyaleVideo.get('introVideo')
-        return GUI_SETTINGS.checkAndReplaceWebBridgeMacros(introVideoUrl)
+        if not hasattr(GUI_SETTINGS, 'battleRoyaleVideo'):
+            return None
+        else:
+            introVideoUrl = GUI_SETTINGS.battleRoyaleVideo.get('introVideo')
+            return GUI_SETTINGS.checkAndReplaceWebBridgeMacros(introVideoUrl) if introVideoUrl else introVideoUrl
+
+    def getProgressionPointsTableData(self):
+        gameModes = sorted(self.__progressionPointsConfig().keys())
+        gameModeLists = []
+        for gameMode in gameModes:
+            gameModeLists.append(self.__getProgressionPointsPerPlace(gameMode))
+
+        return (gameModes, gameModeLists)
+
+    def __progressionPointsConfig(self):
+        return self.__battleRoyaleSettings.progressionTokenAward
+
+    def __getProgressionPointsPerPlace(self, gameMode=ARENA_BONUS_TYPE.BATTLE_ROYALE_SOLO):
+        pointsList = self.__progressionPointsConfig().get(gameMode, [])
+        if not pointsList:
+            return []
+        pointList = [ (key, len(list(group))) for key, group in groupby(zip(*pointsList)[1]) ]
+        result = []
+        count = 0
+        for points, pointsCount in pointList:
+            count += pointsCount
+            result.append(BattleRoyaleProgressionPoints(count, points))
+
+        return result
 
     def __modeEntered(self):
-        if self.isBattleRoyaleMode() and not SelectorBattleTypesUtils.isKnownBattleType(SELECTOR_BATTLE_TYPES.BATTLE_ROYALE):
+        if not self.isBattleRoyaleMode():
+            return
+        if not SelectorBattleTypesUtils.isKnownBattleType(SELECTOR_BATTLE_TYPES.BATTLE_ROYALE):
             SelectorBattleTypesUtils.setBattleTypeAsKnown(SELECTOR_BATTLE_TYPES.BATTLE_ROYALE)
+        introVideoUrl = self.getIntroVideoURL()
+        if AccountSettings.getSettings(ROYALE_INTRO_VIDEO_SHOWN) or not introVideoUrl:
+            return
+        AccountSettings.setSettings(ROYALE_INTRO_VIDEO_SHOWN, True)
+        showBrowserOverlayView(introVideoUrl, VIEW_ALIAS.BROWSER_OVERLAY, forcedSkipEscape=True)
 
-    def __selectRoyaleBattle(self):
+    def __selectRoyaleBattle(self, extData=None, **kwargs):
         dispatcher = g_prbLoader.getDispatcher()
         if dispatcher is None:
             _logger.error('Prebattle dispatcher is not defined')
             return
         else:
-            self.__doSelectBattleRoyalePrb(dispatcher)
+            isSquad = extData and extData.get(SUB_MODE_ID_KEY, BattleRoyaleSubMode.SOLO_MODE_ID) == BattleRoyaleSubMode.SQUAD_MODE_ID
+            self.__doSelectBattleRoyalePrb(dispatcher, isSquad=isSquad, extData=extData, **kwargs)
             return
 
     def __selectBattleRoyaleTournament(self):
@@ -384,12 +486,7 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
             return
 
     def __showBrowserView(self, url):
-        webHandlers = createBattleRoyaleWebHanlders()
-        alias = VIEW_ALIAS.BROWSER_VIEW
-        g_eventBus.handleEvent(events.LoadViewEvent(SFViewLoadParams(alias, getUniqueViewName(alias)), ctx={'url': url,
-         'webHandlers': webHandlers,
-         'returnAlias': VIEW_ALIAS.LOBBY_HANGAR,
-         'onServerSettingsChange': self.__serverSettingsChangeBrowserHandler}), EVENT_BUS_SCOPE.LOBBY)
+        showBrowserOverlayView(url, alias=BATTLEROYALE_ALIASES.BATTLE_ROYALE_BROWSER_VIEW)
 
     def __serverSettingsChangeBrowserHandler(self, browser, diff):
         if not diff.get(Configs.BATTLE_ROYALE_CONFIG.value, {}).get('isEnabled'):
@@ -418,7 +515,7 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         if self.isBattleRoyaleMode():
             self.__enableRoyaleMode()
             self.__spaceSwitchController.hangarSpaceUpdate(BATTLE_ROYALE_SCENE)
-        elif not self.__bootcamp.isInBootcamp() and self.__isBRLogicEnabled:
+        elif self.__isBRLogicEnabled:
             self.__disableRoyaleMode()
 
     def __enableRoyaleMode(self):
@@ -428,10 +525,7 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
             criteria = REQ_CRITERIA.VEHICLE.HAS_TAGS([VEHICLE_TAGS.BATTLE_ROYALE]) | REQ_CRITERIA.INVENTORY
             vehicles = self.__itemsCache.items.getVehicles
             values = vehicles(criteria=criteria).values()
-            royaleVehicle = first(sorted(values, key=lambda item: (item.isRented,
-             GUI_NATIONS_ORDER_INDEX[item.nationName],
-             VEHICLE_TYPES_ORDER_INDICES[item.type],
-             item.userName)))
+            royaleVehicle = first(sorted(values, key=lambda item: (GUI_NATIONS_ORDER_INDEX[item.nationName], VEHICLE_TYPES_ORDER_INDICES[item.type], item.userName)))
             if royaleVehicle:
                 royaleVehicleID = royaleVehicle.invID
         if royaleVehicleID:
@@ -445,7 +539,8 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         self.__isBRLogicEnabled = False
         storedVehInvID = AccountSettings.getFavorites(CURRENT_VEHICLE)
         if not storedVehInvID:
-            criteria = REQ_CRITERIA.INVENTORY | ~REQ_CRITERIA.VEHICLE.HAS_TAGS([VEHICLE_TAGS.BATTLE_ROYALE])
+            criteria = REQ_CRITERIA.INVENTORY | ~REQ_CRITERIA.VEHICLE.MODE_HIDDEN
+            criteria |= ~REQ_CRITERIA.VEHICLE.HAS_TAGS([VEHICLE_TAGS.BATTLE_ROYALE])
             vehicle = first(self.__itemsCache.items.getVehicles(criteria=criteria).values())
             if vehicle:
                 storedVehInvID = vehicle.invID
@@ -460,8 +555,11 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         yield dispatcher.doSelectAction(PrbAction(PREBATTLE_ACTION_NAME.BATTLE_ROYALE_TOURNAMENT))
 
     @adisp_process
-    def __doSelectBattleRoyalePrb(self, dispatcher):
-        yield dispatcher.doSelectAction(PrbAction(PREBATTLE_ACTION_NAME.BATTLE_ROYALE))
+    def __doSelectBattleRoyalePrb(self, dispatcher, isSquad=False, extData=None, accountsToInvite=None, **kwargs):
+        actionName = PREBATTLE_ACTION_NAME.BATTLE_ROYALE_SQUAD if isSquad else PREBATTLE_ACTION_NAME.BATTLE_ROYALE
+        result = yield dispatcher.doSelectAction(PrbAction(actionName, accountsToInvite=accountsToInvite, extData=extData))
+        if not result:
+            self.onSubModeUpdated()
 
     @adisp_process
     def __doSelectRandomPrb(self, dispatcher):
@@ -513,6 +611,7 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         self.__eventAvailabilityUpdate()
 
     def __timerTick(self):
+        self.onStatusTick()
         if self.isBattleRoyaleMode():
             self.onWidgetUpdate()
 
@@ -526,6 +625,7 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
             self.__serverSettings.onServerSettingsChange -= self.__updateRoyaleSettings
         self.__serverSettings = serverSettings
         self.__battleRoyaleSettings = self.__getBattleRoyaleSettings()
+        self.__brProgression.setSettings(self.getModeSettings().eventProgression)
         self.__updateEquipmentCount()
         self.__serverSettings.onServerSettingsChange += self.__updateRoyaleSettings
         return
@@ -536,6 +636,7 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         else:
             self.__eventAvailabilityUpdate()
             self.__battleRoyaleSettings = self.__getBattleRoyaleSettings()
+            self.__brProgression.setSettings(self.getModeSettings().eventProgression)
             self.__updateEquipmentCount()
             self.__divisions = None
             self.onUpdated()
@@ -593,7 +694,9 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         self.stopNotification()
         self.stopGlobalListening()
         self.__hangarsSpace.onVehicleChanged -= self.__onVehicleChanged
+        self.__hangarsSpace.onSpaceCreate -= self.__onSpaceCreate
         self.__notificationsCtrl.onEventNotificationsChanged -= self.__onEventNotification
+        self.__guiLoader.windowsManager.onWindowStatusChanged -= self.__onWindowStatusChanged
         self.__battleRoyaleTournamentController.onSelectBattleRoyaleTournament -= self.__selectBattleRoyaleTournament
         g_eventBus.removeListener(ProfilePageEvent.SELECT_PROFILE_ALIAS, self.__onChangeProfileAlias, scope=EVENT_BUS_SCOPE.LOBBY)
         g_eventBus.removeListener(ProfileStatisticEvent.SELECT_BATTLE_TYPE, self.__onProfileStatisticSelectBattlesType, scope=EVENT_BUS_SCOPE.LOBBY)
@@ -602,7 +705,9 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         g_eventBus.removeListener(ProfileTechniqueEvent.DISPOSE, self.__onProfileTechniqueDispose, scope=EVENT_BUS_SCOPE.LOBBY)
         g_eventBus.removeListener(events.HangarVehicleEvent.SELECT_VEHICLE_IN_HANGAR, self.__onSelectVehicleInHangar, scope=EVENT_BUS_SCOPE.LOBBY)
         self.__defaultHangars = {}
+        self.__balance = None
         g_clientUpdateManager.removeObjectCallbacks(self)
+        return
 
     def __clearClientValues(self):
         if self.__serverSettings is not None:
@@ -656,6 +761,24 @@ class BattleRoyaleController(Notifiable, SeasonProvider, IBattleRoyaleController
         if self.__isNeedToUpdateHeroTank:
             self.__hangarsSpace.onHeroTankReady()
             self.__isNeedToUpdateHeroTank = False
+
+    def __onSpaceCreate(self):
+        if currentHangarIsBattleRoyale():
+            self.__guiLoader.windowsManager.onWindowStatusChanged += self.__onWindowStatusChanged
+            windows = self.__guiLoader.windowsManager.findWindows(predicateOpenedWindowsExist)
+            if not windows:
+                self.__showBattleRoyaleSpaceLoaded()
+
+    def __onWindowStatusChanged(self, uniqueID, newStatus):
+        if currentHangarIsBattleRoyale() and newStatus == WindowStatus.DESTROYING:
+            windows = self.__guiLoader.windowsManager.findWindows(predicateOpenedWindowsExist)
+            if not windows:
+                self.__showBattleRoyaleSpaceLoaded()
+
+    def __showBattleRoyaleSpaceLoaded(self):
+        showAnimation = not self.__isHangarAnimationShowed
+        self.onBattleRoyaleSpaceLoaded(showAnimation)
+        self.__isHangarAnimationShowed = True
 
     def __tokenIsValid(self, quest):
         tokens = quest.accountReqs.getTokens()

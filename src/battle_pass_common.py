@@ -11,19 +11,22 @@ from constants import ARENA_BONUS_TYPE, MAX_VEHICLE_LEVEL, OFFER_TOKEN_PREFIX
 from debug_utils import LOG_ERROR
 from items import parseIntCompactDescr, vehicles
 if typing.TYPE_CHECKING:
-    from typing import Dict, Generator, Sequence, Tuple, Union, List
+    from typing import Dict, Generator, Sequence, Tuple, Union, List, Set
 BATTLE_PASS_TOKEN_PREFIX = 'battle_pass:'
 BATTLE_PASS_TOKEN_PASS = BATTLE_PASS_TOKEN_PREFIX + 'pass:'
 BATTLE_PASS_ENTITLEMENT_PASS = BATTLE_PASS_TOKEN_PASS.replace(':', '_')
 BATTLE_PASS_SHOP_ENTITLEMENT_PASS = 'battle_pass_shop_'
 BATTLE_PASS_OFFER_TOKEN_PREFIX = OFFER_TOKEN_PREFIX + BATTLE_PASS_TOKEN_PREFIX
 BATTLE_PASS_Q_CHAIN_TOKEN_PREFIX = BATTLE_PASS_TOKEN_PREFIX + 'q_chain:'
+BATTLE_PASS_RANDOM_QUEST_TOKEN_PREFIX = BATTLE_PASS_TOKEN_PREFIX + 'random_quest:'
 BATTLE_PASS_TOKEN_TROPHY_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'trophy:'
 BATTLE_PASS_TOKEN_TROPHY_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'trophy_gift:'
-BATTLE_PASS_TOKEN_NEW_DEVICE_MI_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'new_device_mi:'
-BATTLE_PASS_TOKEN_NEW_DEVICE_FV_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'new_device_fv:'
-BATTLE_PASS_TOKEN_NEW_DEVICE_MI_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'new_device_mi_gift:'
-BATTLE_PASS_TOKEN_NEW_DEVICE_FV_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'new_device_fv_gift:'
+BATTLE_PASS_TOKEN_NEW_DEVICE_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'new_device:'
+BATTLE_PASS_TOKEN_NEW_DEVICE_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'new_device_gift:'
+BATTLE_PASS_TOKEN_MODERNIZED_DEVICE_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'modernized_device:'
+BATTLE_PASS_TOKEN_MODERNIZED_DEVICE_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'modernized_device_gift:'
+BATTLE_PASS_TOKEN_BATTLE_BOOSTER_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'battle_booster:'
+BATTLE_PASS_TOKEN_BATTLE_BOOSTER_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'battle_booster_gift:'
 BATTLE_PASS_TOKEN_BLUEPRINT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'blueprint:'
 BATTLE_PASS_TOKEN_BLUEPRINT_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'blueprint_gift:'
 BATTLE_PASS_TOKEN_BROCHURE_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'brochure:'
@@ -31,15 +34,18 @@ BATTLE_PASS_TOKEN_BROCHURE_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'brochu
 BATTLE_PASS_TOKEN_GUIDE_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'guide:'
 BATTLE_PASS_TOKEN_GUIDE_GIFT_OFFER = BATTLE_PASS_OFFER_TOKEN_PREFIX + 'guide_gift:'
 BATTLE_PASS_TOKEN_3D_STYLE = BATTLE_PASS_TOKEN_PREFIX + '3D_style:'
+BATTLE_PASS_RANDOM_QUEST_ID_PREFIX = 'battle_pass_random'
 BATTLE_PASS_CHOICE_REWARD_OFFER_TOKENS = (BATTLE_PASS_TOKEN_TROPHY_OFFER,
- BATTLE_PASS_TOKEN_NEW_DEVICE_MI_OFFER,
- BATTLE_PASS_TOKEN_NEW_DEVICE_FV_OFFER,
+ BATTLE_PASS_TOKEN_NEW_DEVICE_OFFER,
+ BATTLE_PASS_TOKEN_MODERNIZED_DEVICE_OFFER,
+ BATTLE_PASS_TOKEN_BATTLE_BOOSTER_OFFER,
  BATTLE_PASS_TOKEN_BLUEPRINT_OFFER,
  BATTLE_PASS_TOKEN_BROCHURE_OFFER,
  BATTLE_PASS_TOKEN_GUIDE_OFFER)
 BATTLE_PASS_CHOICE_REWARD_OFFER_GIFT_TOKENS = (BATTLE_PASS_TOKEN_TROPHY_GIFT_OFFER,
- BATTLE_PASS_TOKEN_NEW_DEVICE_MI_GIFT_OFFER,
- BATTLE_PASS_TOKEN_NEW_DEVICE_FV_GIFT_OFFER,
+ BATTLE_PASS_TOKEN_NEW_DEVICE_GIFT_OFFER,
+ BATTLE_PASS_TOKEN_MODERNIZED_DEVICE_GIFT_OFFER,
+ BATTLE_PASS_TOKEN_BATTLE_BOOSTER_GIFT_OFFER,
  BATTLE_PASS_TOKEN_BLUEPRINT_GIFT_OFFER,
  BATTLE_PASS_TOKEN_BROCHURE_GIFT_OFFER,
  BATTLE_PASS_TOKEN_GUIDE_GIFT_OFFER)
@@ -50,13 +56,38 @@ BATTLE_PASS_CONFIG_NAME = 'battlePass_config'
 BATTLE_PASS_SELECT_BONUS_NAME = 'battlePassSelectToken'
 BATTLE_PASS_STYLE_PROGRESS_BONUS_NAME = 'styleProgressToken'
 BATTLE_PASS_Q_CHAIN_BONUS_NAME = 'battlePassQuestChainToken'
+BATTLE_PASS_RANDOM_QUEST_BONUS_NAME = 'randomQuestToken'
 NON_VEH_CD = 0
 MAX_NON_CHAPTER_POINTS = 1000000
+BATTLE_PASS_TOKEN_LIFETIME = 4320
+HOLIDAY_SEASON_OFFSET = 1000
+BATTLE_PASS_COST_CURRENCIES = {'gold'}
+BATTLE_PASS_EXTRA_COST_CURRENCIES = {'gold'}
+BP_TANKMEN_ENTITLEMENT_TAG_PREFIX = 'tankmen_bp'
+BP_HOLIDAY_TANKMEN_ENTITLEMENT_TAG_PREFIX = 'tankmen_bph'
+BP_TANKMAN_QUEST_CHAIN_TOKEN_POSTFIX = '_bp_chain'
+TANKMAN_QUEST_CHAIN_ENTITLEMENT_POSTFIX = '_qch'
+
+class BattlePassTankmenSource(object):
+    FREE = 'free_progression'
+    PAID = 'paid_progression'
+    SHOP = 'shop'
+    QUEST_CHAIN = 'quest_chain'
+    ALL = (FREE,
+     PAID,
+     SHOP,
+     QUEST_CHAIN)
+    PROGRESSION = (FREE, PAID)
+    PURCHASABLE = (SHOP, QUEST_CHAIN)
+
 
 @unique
-class FinalReward(Enum):
+class FinalReward(str, Enum):
+    BATTLE_QUEST = 'battleQuest'
+    PROGRESSIVE_STYLE = 'progressiveStyle'
     STYLE = 'style'
     TANKMAN = 'tankman'
+    VEHICLE = 'vehicle'
 
 
 @unique
@@ -74,7 +105,11 @@ class BattlePassRewardReason(object):
     SELECT_REWARD = 6
     PURCHASE_BATTLE_PASS_MULTIPLE = 7
     SELECT_CHAPTER = 8
-    PURCHASE_REASONS = (PURCHASE_BATTLE_PASS, PURCHASE_BATTLE_PASS_LEVELS, PURCHASE_BATTLE_PASS_MULTIPLE)
+    PURCHASE_BATTLE_PASS_WITH_LEVELS = 9
+    PURCHASE_REASONS = (PURCHASE_BATTLE_PASS,
+     PURCHASE_BATTLE_PASS_LEVELS,
+     PURCHASE_BATTLE_PASS_MULTIPLE,
+     PURCHASE_BATTLE_PASS_WITH_LEVELS)
 
 
 class BattlePassState(object):
@@ -244,16 +279,20 @@ class BattlePassConfig(object):
 
     def __init__(self, config):
         self._config = config
-        self._season = config.get('season') or {}
-        self._rewards = config.get('rewards') or {}
+        self._season = config.get('season', {})
+        self._rewards = config.get('rewards', {})
         self._regularChapterIds = set()
         self._extraChapterIds = set()
+        self._customChapterIds = set()
         if not self.chapters:
             return
         for chapterID, chapterData in self.chapters.iteritems():
             if chapterData['extra']:
                 self._extraChapterIds.add(chapterID)
-            self._regularChapterIds.add(chapterID)
+            else:
+                self._regularChapterIds.add(chapterID)
+            if chapterData['custom']:
+                self._customChapterIds.add(chapterID)
 
     @property
     def mode(self):
@@ -266,6 +305,10 @@ class BattlePassConfig(object):
     @property
     def seasonNum(self):
         return self._season.get('seasonNum', 0)
+
+    @property
+    def currentCollectionId(self):
+        return self._season.get('currentCollectionId', 0)
 
     @property
     def seasonStart(self):
@@ -288,6 +331,10 @@ class BattlePassConfig(object):
         return self._season.get('chapters', {})
 
     @property
+    def specialVoiceChapters(self):
+        return self._season.get('specialVoiceChapters', set())
+
+    @property
     def vehLevelCaps(self):
         return self._season.get('vehLevelCaps', (0,) * MAX_VEHICLE_LEVEL)
 
@@ -295,15 +342,22 @@ class BattlePassConfig(object):
     def vehCDCaps(self):
         return self._season.get('vehCDCaps', {})
 
-    def getRewardType(self, chapterID):
+    @property
+    def isHoliday(self):
+        return len(self.chapters) == 1
+
+    def getRewardTypes(self, chapterID):
         if chapterID not in self.chapters:
             LOG_ERROR('BattlePass wrong chapter={}, exists: {}'.format(chapterID, self.chapters))
             return None
         else:
-            return FinalReward(self.chapters[chapterID]['finalRewardType'])
+            return self.chapters[chapterID]['finalRewardTypes']
 
     def getChapterLevels(self, chapterID):
         return self.getChapter(chapterID).get('levels', (0,))
+
+    def getCustomChapterIds(self):
+        return self._customChapterIds
 
     def getMaxChapterLevel(self, chapterID):
         return len(self.getChapterLevels(chapterID)) if chapterID else 0
@@ -314,8 +368,11 @@ class BattlePassConfig(object):
     def getRegularChapterIds(self):
         return self._regularChapterIds
 
-    def getbattlePassCost(self, chapterID):
+    def getBattlePassCost(self, chapterID):
         return self.chapters.get(chapterID, {}).get('battlePassCost', {'gold': 0})
+
+    def getSpecialTankmen(self):
+        return self._season.get('specialTankmen', {})
 
     @staticmethod
     def iterRewardRanges(prevLvl, newLvl, rewardMask):
@@ -342,6 +399,9 @@ class BattlePassConfig(object):
     def isSeasonTimeOver(self, curTime):
         return int(curTime) >= self.seasonFinish
 
+    def isCustomChapter(self, chapterID):
+        return chapterID in self._customChapterIds
+
     def isExtraChapter(self, chapterID):
         return chapterID in self._extraChapterIds
 
@@ -357,6 +417,12 @@ class BattlePassConfig(object):
     def isSpecialVehicle(self, vehTypeCompDescr):
         return vehTypeCompDescr in self.getSpecialVehicles()
 
+    def isSpecialVoiceChapter(self, chapterID):
+        return chapterID in self.specialVoiceChapters
+
+    def isCustomSeason(self):
+        return self._season.get('customSeason', False)
+
     def capBonusList(self):
         return self._season.get('capBonuses', (0,) * MAX_VEHICLE_LEVEL)
 
@@ -370,8 +436,7 @@ class BattlePassConfig(object):
         return self.capBonusList()[getVehicleLevel(vehTypeCompDescr) - 1]
 
     def vehicleCapacity(self, vehTypeCompDescr):
-        isSecret = 'secret' in vehicles.getVehicleType(vehTypeCompDescr).tags
-        return 0 if isSecret and vehTypeCompDescr not in self.vehCDCaps else self.vehCDCaps.get(vehTypeCompDescr, self.vehLevelCaps[getVehicleLevel(vehTypeCompDescr) - 1])
+        return self.vehCDCaps.get(vehTypeCompDescr, self.vehLevelCaps[getVehicleLevel(vehTypeCompDescr) - 1])
 
     def bonusPointsList(self, vehTypeCompDescr=None, isWinner=True, gameMode=ARENA_BONUS_TYPE.REGULAR):
         teamKey = 'win' if isWinner else 'lose'

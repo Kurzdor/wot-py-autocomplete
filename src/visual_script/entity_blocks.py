@@ -4,9 +4,10 @@ import BigWorld
 import weakref
 import Math
 import items
+from constants import IS_CLIENT
 from visual_script.block import Meta, Block, InitParam, buildStrKeysValue, EDITOR_TYPE
 from visual_script.slot_types import SLOT_TYPE, arrayOf
-from visual_script.misc import ASPECT, errorVScript
+from visual_script.misc import ASPECT, EDITOR_TYPE, errorVScript
 
 class EntityMeta(Meta):
 
@@ -146,7 +147,12 @@ class IsEntityOfType(Block, EntityMeta):
         return 'Is Entity ' + self._type
 
     def _execute(self):
-        self._res.setValue(self._entity.getValue().className == self._type)
+        entity = self._entity.getValue()
+        if IS_CLIENT:
+            className = entity.__class__.__name__
+        else:
+            className = entity.className
+        self._res.setValue(className == self._type)
 
 
 class BoardEntity(Block, EntityMeta):
@@ -232,3 +238,25 @@ class GetEntityTransform(Block, EntityMeta):
             self._yaw.setValue(entity.yaw)
             self._pitch.setValue(entity.pitch)
             self._roll.setValue(entity.roll)
+
+
+class IsEntityDestroyed(Block, EntityMeta):
+
+    def __init__(self, *args, **kwargs):
+        super(IsEntityDestroyed, self).__init__(*args, **kwargs)
+        self._entity = self._makeDataInputSlot('entity', SLOT_TYPE.ENTITY)
+        self._isDestroyed = self._makeDataOutputSlot('isDestroyed', SLOT_TYPE.BOOL, self._exec)
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.SERVER]
+
+    def _exec(self):
+        try:
+            entity = self._entity.getValue()
+            if entity:
+                self._isDestroyed.setValue(entity.isDestroyed)
+            else:
+                self._isDestroyed.setValue(True)
+        except (AttributeError, ReferenceError):
+            self._isDestroyed.setValue(True)

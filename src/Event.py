@@ -52,25 +52,6 @@ class SafeEvent(Event):
                 LOG_CURRENT_EXCEPTION()
 
 
-class SafeComponentEvent(SafeEvent):
-
-    def __init__(self, manager=None, component=None):
-        super(SafeComponentEvent, self).__init__(manager)
-        self.__component = component
-
-    def __call__(self, *args, **kwargs):
-        if self.__component is None or not self.__component.isActive:
-            return
-        else:
-            super(SafeEvent, self).__call__(*args, **kwargs)
-            return
-
-    def clear(self):
-        self.__component = None
-        super(SafeComponentEvent, self).clear()
-        return
-
-
 class Handler(object):
     __slots__ = ('__delegate',)
 
@@ -160,6 +141,7 @@ class EventsSubscriber(object):
         super(EventsSubscriber, self).__init__()
         self.__subscribeList = []
         self.__contextSubscribeList = []
+        self.__callbacksOnUnsubscribe = []
 
     def subscribeToContextEvent(self, event, delegate, *contextIDs):
         event.subscribe(delegate, *contextIDs)
@@ -169,6 +151,9 @@ class EventsSubscriber(object):
         event += delegate
         self.__subscribeList.append((event, delegate))
 
+    def addCallbackOnUnsubscribe(self, callback):
+        self.__callbacksOnUnsubscribe.append(callback)
+
     def unsubscribeFromAllEvents(self):
         for event, delegate in self.__subscribeList:
             event -= delegate
@@ -176,7 +161,12 @@ class EventsSubscriber(object):
         for event, delegate in self.__contextSubscribeList:
             event.unsubscribe(delegate)
 
+        while self.__callbacksOnUnsubscribe:
+            callback = self.__callbacksOnUnsubscribe.pop(0)
+            callback()
+
         self.__subscribeList = []
+        self.__callbacksOnUnsubscribe = []
 
 
 class ContextEvent(object):
@@ -215,3 +205,16 @@ class ContextEvent(object):
 
     def clear(self):
         self.__contextSubscribers.clear()
+
+
+class EventCallback(object):
+    __slots__ = ('event', '_callback')
+
+    def __init__(self, event, callback):
+        self.event = event
+        self._callback = callback
+        self.event += self.callback
+
+    def callback(self, *args, **kwargs):
+        self._callback(*args, **kwargs)
+        self.event -= self.callback

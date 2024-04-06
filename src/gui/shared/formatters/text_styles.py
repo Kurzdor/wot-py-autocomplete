@@ -61,7 +61,8 @@ __all__ = ('standard',
  'yellowText',
  'greenText',
  'poiCapturedBoldText',
- 'poiCapturedRegularText')
+ 'poiCapturedRegularText',
+ 'prestige')
 
 def _getStyle(style, ctx=None):
     if ctx is None:
@@ -85,6 +86,18 @@ def locked(text):
 
 def main(text):
     return _formatText('mainText', text)
+
+
+def linkText(text):
+    return _formatText('linkText', text)
+
+
+def earningsInformation(text):
+    return _formatText('earningsInformation', text)
+
+
+def goldColor(text):
+    return _formatText('goldColor', text)
 
 
 def mainSmall(text):
@@ -113,6 +126,10 @@ def standartPing(text):
 
 def stats(text):
     return _formatText('statsText', text)
+
+
+def rewards(text):
+    return _formatText('rewardsText', text)
 
 
 def h15ParSecondary(text):
@@ -223,6 +240,10 @@ def success(text):
     return _formatText('successText', text)
 
 
+def successBright(text):
+    return _formatText('successBrightText', text)
+
+
 def statsIncrease(text):
     return _formatText('statsIncrease', text)
 
@@ -259,6 +280,10 @@ def demountKitText(text):
     return _formatText('demountKitText', text)
 
 
+def wotPlusText(text):
+    return _formatText('wotPlusText', text)
+
+
 def credits(text):
     return _formatText('creditsText', text)
 
@@ -289,6 +314,10 @@ def bpcoin(text):
 
 def brcoin(text):
     return _formatText('creditsText', text)
+
+
+def brProgressionToken(text):
+    return _formatText('brProgressionToken', text)
 
 
 def defRes(text):
@@ -441,6 +470,10 @@ def discountText(text):
     return _formatText('discountText', text)
 
 
+def discountSmallText(text):
+    return _formatText('discountSmallText', text)
+
+
 def goldTitle(text):
     return _formatText('goldTitle', text)
 
@@ -463,6 +496,10 @@ def poiCapturedBoldText(text):
 
 def poiCapturedRegularText(text):
     return _formatText('poiCapturedRegularText', text)
+
+
+def prestige(text):
+    return _formatText('prestigeText', text)
 
 
 def getRawStyles(names):

@@ -6,6 +6,7 @@ import time
 import typing
 from account_shared import getCustomizationItem
 from battle_pass_common import NON_VEH_CD
+from dog_tags_common.components_config import componentConfigAdapter
 from soft_exception import SoftException
 if typing.TYPE_CHECKING:
     from typing import Dict, Optional
@@ -69,11 +70,24 @@ def __mergeTankmen(total, key, value, isLeaf, count, *args):
 def __mergeCustomizations(total, key, value, isLeaf, count, vehTypeCompDescr):
     customizations = total.setdefault(key, [])
     for subvalue in value:
+        currentValue = __findCustomization(customizations, subvalue)
+        if currentValue is not None:
+            currentValue['value'] += subvalue['value'] * count
         subvalue = copy.deepcopy(subvalue)
         subvalue['value'] *= count
         if 'boundToCurrentVehicle' in subvalue:
             subvalue['vehTypeCompDescr'] = vehTypeCompDescr
         customizations.append(subvalue)
+
+    return
+
+
+def __findCustomization(customizations, value):
+    for customization in customizations:
+        if all([ customization.get(param) == value.get(param) for param in ('custType', 'id', 'vehTypeCompDescr') ]):
+            return customization
+
+    return None
 
 
 def __mergeCrewSkins(total, key, value, isLeaf, count, *args):
@@ -176,7 +190,9 @@ def __mergeEnhancements(total, key, value, isLeaf=False, count=1, *args):
 
 
 def __mergeDogTag(total, key, value, isLeaf=False, count=1, *args):
-    total[key] = value
+    dogTags = total.setdefault(key, [])
+    dogTags.extend(value)
+    dogTags.sort(key=lambda v: componentConfigAdapter.getComponentById(v['id']).viewType.value)
 
 
 def __mergeBattlePassPoints(total, key, value, isLeaf=False, count=1, *args):
@@ -200,6 +216,14 @@ def __mergeFreePremiumCrew(total, key, value, isLeaf=False, count=1, *args):
 
 def __mergeMeta(total, key, value, isLeaf=False, count=1, *args):
     total[key] = value
+
+
+def __mergeNoviceReset(total, key, value, isLeaf=False, count=1, *args):
+    total[key] = value
+
+
+def __mergeDailyQuestReroll(total, key, value, isLeaf, count, *args):
+    total.setdefault(key, set()).update(value)
 
 
 BONUS_MERGERS = {'credits': __mergeValue,
@@ -241,10 +265,13 @@ BONUS_MERGERS = {'credits': __mergeValue,
  'dogTagComponents': __mergeDogTag,
  'battlePassPoints': __mergeBattlePassPoints,
  'freePremiumCrew': __mergeFreePremiumCrew,
- 'meta': __mergeMeta}
+ 'meta': __mergeMeta,
+ 'dailyQuestReroll': __mergeDailyQuestReroll,
+ 'noviceReset': __mergeNoviceReset}
 ITEM_INVENTORY_CHECKERS = {'vehicles': lambda account, key: account._inventory.getVehicleInvID(key) != 0 and not account._rent.isVehicleRented(account._inventory.getVehicleInvID(key)),
  'customizations': lambda account, key: account._customizations20.getItems((key,), 0)[key] > 0,
  'tokens': lambda account, key: account._quests.hasToken(key)}
+RENT_ITEM_INVENTORY_CHECKERS = {'vehicles': lambda account, key: account._rent.isVehicleRented(account._inventory.getVehicleInvID(key))}
 
 class BonusItemsCache(object):
 
@@ -255,33 +282,37 @@ class BonusItemsCache(object):
     def getRawData(self):
         return self.__cache
 
-    def onItemAccepted(self, itemName, itemKey):
+    def onItemAccepted(self, itemName, itemKey, isRent=False):
         cache = self.__cache.setdefault(itemName, {})
-        state = cache.get(itemKey, None)
+        state = cache.setdefault(itemKey, {}).get(isRent, None)
         if state is not None:
             wasInInventory, wasAccepted = state
         else:
-            wasInInventory = ITEM_INVENTORY_CHECKERS[itemName](self.__account, itemKey)
-        cache[itemKey] = (wasInInventory, True)
+            wasInInventory = (RENT_ITEM_INVENTORY_CHECKERS if isRent else ITEM_INVENTORY_CHECKERS)[itemName](self.__account, itemKey)
+        cache[itemKey][isRent] = (wasInInventory, True)
         return
 
-    def isItemExists(self, itemName, itemKey):
+    def isItemExists(self, itemName, itemKey, isRent=False):
         cache = self.__cache.setdefault(itemName, {})
-        state = cache.get(itemKey, None)
+        state = cache.setdefault(itemKey, {}).get(isRent, None)
         if state is not None:
             wasInInventory, wasAccepted = state
         else:
-            wasInInventory = ITEM_INVENTORY_CHECKERS[itemName](self.__account, itemKey)
+            wasInInventory = (RENT_ITEM_INVENTORY_CHECKERS if isRent else ITEM_INVENTORY_CHECKERS)[itemName](self.__account, itemKey)
             wasAccepted = False
-            cache[itemKey] = (wasInInventory, wasAccepted)
-        return wasInInventory or wasAccepted
+            cache[itemKey][isRent] = (wasInInventory, wasAccepted)
+        if isRent and itemName in ITEM_INVENTORY_CHECKERS and cache[itemKey].get(False, None) is None:
+            cache[itemKey][False] = (ITEM_INVENTORY_CHECKERS[itemName](self.__account, itemKey), False)
+        return wasInInventory or wasAccepted or isRent and any((state for state in cache[itemKey].get(False, ())))
 
     def getFinalizedCache(self):
         result = {}
         for bonus, checks in self.__cache.iteritems():
             bonusResult = result.setdefault(bonus, {})
-            for key, (wasInInventory, wasAccepted) in checks.iteritems():
-                bonusResult[key] = (wasInInventory or wasAccepted, False)
+            for key, keyData in checks.iteritems():
+                keyResult = bonusResult.setdefault(key, {})
+                for flag, (wasInInventory, wasAccepted) in keyData.iteritems():
+                    keyResult[flag] = (wasInInventory or wasAccepted, False)
 
         return result
 
@@ -289,12 +320,16 @@ class BonusItemsCache(object):
     def isInventoryChanged(account, itemsCache):
         for bonus, checks in itemsCache.iteritems():
             checker = ITEM_INVENTORY_CHECKERS[bonus]
-            for key, (state, _) in checks.iteritems():
-                if checker(account, key) != state:
+            for key, keyData in checks.iteritems():
+                if False in keyData and checker(account, key) != keyData[False][0]:
                     return True
 
         return False
 
+
+DEEP_CHECKERS = {'groups': lambda nodeAcceptor, bonusNode, checkInventory, depthLevel: all((nodeAcceptor.depthCheck(subBonusNode, checkInventory, depthLevel) for subBonusNode in bonusNode)),
+ 'allof': lambda nodeAcceptor, bonusNode, checkInventory, depthLevel: all((nodeAcceptor.isAcceptable(subBonusNode[-1], False, depthLevel - 1) for subBonusNode in bonusNode)),
+ 'oneof': lambda nodeAcceptor, bonusNode, checkInventory, depthLevel: any((nodeAcceptor.isAcceptable(subBonusNode[-1], checkInventory, depthLevel - 1) for subBonusNode in bonusNode[-1]))}
 
 class BonusNodeAcceptor(object):
 
@@ -346,10 +381,10 @@ class BonusNodeAcceptor(object):
     def getBonusCache(self):
         return self.__bonusCache
 
-    def isAcceptable(self, bonusNode, checkInventory=True):
+    def isAcceptable(self, bonusNode, checkInventory=True, depthLevel=None):
         if self.isLimitReached(bonusNode):
             return False
-        return False if checkInventory and self.isBonusExists(bonusNode) else True
+        return False if checkInventory and self.isBonusExists(bonusNode) else self.depthCheck(bonusNode, checkInventory, depthLevel)
 
     def getNodesForVisit(self, ids):
         return self.__shouldVisitNodes.intersection(ids) if ids and self.__shouldVisitNodes else None
@@ -367,23 +402,32 @@ class BonusNodeAcceptor(object):
 
     def updateBonusCache(self, bonusNode):
         cache = self.__bonusCache
-        for itemType in ('vehicles', 'tokens'):
-            if itemType in bonusNode:
-                for itemID in bonusNode[itemType].iterkeys():
-                    cache.onItemAccepted(itemType, itemID)
+        if 'vehicles' in bonusNode:
+            for itemID, itemData in bonusNode['vehicles'].iteritems():
+                cache.onItemAccepted('vehicles', itemID, bool(itemData.get('rent', None)))
+
+        if 'tokens' in bonusNode:
+            for itemID in bonusNode['tokens'].iterkeys():
+                cache.onItemAccepted('tokens', itemID)
 
         if 'customizations' in bonusNode:
             for customization in bonusNode['customizations']:
                 c11nItem = getCustomizationItem(customization['custType'], customization['id'])[0]
                 cache.onItemAccepted('customizations', c11nItem.compactDescr)
 
+        return
+
     def isBonusExists(self, bonusNode):
         cache = self.__bonusCache
-        for itemType in ('vehicles', 'tokens'):
-            if itemType in bonusNode:
-                for itemID in bonusNode[itemType].iterkeys():
-                    if cache.isItemExists(itemType, itemID):
-                        return True
+        if 'vehicles' in bonusNode:
+            for itemID, itemData in bonusNode['vehicles'].iteritems():
+                if cache.isItemExists('vehicles', itemID, bool(itemData.get('rent', None))):
+                    return True
+
+        if 'tokens' in bonusNode:
+            for itemID, itemData in bonusNode['tokens'].iteritems():
+                if cache.isItemExists('tokens', itemID):
+                    return True
 
         if 'customizations' in bonusNode:
             for customization in bonusNode['customizations']:
@@ -392,6 +436,10 @@ class BonusNodeAcceptor(object):
                     return True
 
         return False
+
+    def depthCheck(self, bonusNode, checkInventory, depthLevel=None):
+        currentDepthLevel = bonusNode.get('properties', {}).get('depthLevel', 0) if depthLevel is None else depthLevel
+        return True if currentDepthLevel <= 0 else all((DEEP_CHECKERS[bonusNodeName](self, bonusNodeValue, checkInventory, currentDepthLevel) for bonusNodeName, bonusNodeValue in bonusNode.iteritems() if bonusNodeName in DEEP_CHECKERS))
 
     def getProbabilityStages(self):
         return self.__probabilitiesStage

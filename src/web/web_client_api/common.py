@@ -82,6 +82,7 @@ class ItemPackType(CONST_CONTAINER):
     ITEM_EQUIPMENT = 'item/equipment'
     ITEM_DEVICE = 'item/optionalDevice'
     ITEM_SHELL = 'item/shell'
+    ITEM_CREW_SKIN = 'item/crewSkin'
     GOODIE_GOLD = 'goodie/gold'
     GOODIE_CREDITS = 'goodie/credits'
     GOODIE_EXPERIENCE = 'goodie/experience'
@@ -104,12 +105,16 @@ class ItemPackType(CONST_CONTAINER):
     CUSTOM_EVENT_COIN = 'custom/eventCoin'
     CUSTOM_EVENT_COIN_EXTERNAL = 'custom/event_coin'
     CUSTOM_BPCOIN = 'custom/bpcoin'
+    CUSTOM_EQUIP_COIN = 'custom/equipCoin'
+    CUSTOM_EQUIP_COIN_EXTERNAL = 'custom/equip_coin'
     CUSTOM_SLOT = 'custom/slot'
     CUSTOM_SEVERAL_SLOTS = 'custom/slots'
     CUSTOM_REFERRAL_CREW = 'custom/crew'
     CUSTOM_SUPPLY_POINT = 'custom/supply_point'
     CUSTOM_BATTLE_PASS_POINTS = 'custom/battlePassPoints'
     CUSTOM_X5_BATTLE_BONUS = 'custom/X5_battle'
+    CUSTOM_X3_CREW_BONUS = 'custom/X3_crew'
+    CUSTOM_FREE_XP = 'custom/freeXP'
     TOKEN = 'token'
     PAINT_ALL = 'paint/all'
     PAINT_SUMMER = 'paint/summer'
@@ -189,6 +194,8 @@ class ItemPackTypeGroup(CONST_CONTAINER):
      ItemPackType.CUSTOM_CREDITS,
      ItemPackType.CUSTOM_EVENT_COIN,
      ItemPackType.CUSTOM_EVENT_COIN_EXTERNAL,
+     ItemPackType.CUSTOM_EQUIP_COIN,
+     ItemPackType.CUSTOM_EQUIP_COIN_EXTERNAL,
      ItemPackType.CUSTOM_REFERRAL_CREW,
      ItemPackType.CUSTOM_SLOT,
      ItemPackType.CUSTOM_SUPPLY_POINT)

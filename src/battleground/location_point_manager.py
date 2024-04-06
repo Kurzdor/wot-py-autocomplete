@@ -38,7 +38,8 @@ COMMAND_NAME_TO_LOCATION_MARKER_SUBTYPE = {BATTLE_CHAT_COMMAND_NAMES.GOING_THERE
  BATTLE_CHAT_COMMAND_NAMES.SPG_AIM_AREA: LocationMarkerSubType.SPG_AIM_AREA_SUBTYPE,
  BATTLE_CHAT_COMMAND_NAMES.VEHICLE_SPOTPOINT: LocationMarkerSubType.VEHICLE_SPOTPOINT_SUBTYPE,
  BATTLE_CHAT_COMMAND_NAMES.SHOOTING_POINT: LocationMarkerSubType.SHOOTING_POINT_SUBTYPE,
- BATTLE_CHAT_COMMAND_NAMES.NAVIGATION_POINT: LocationMarkerSubType.NAVIGATION_POINT_SUBTYPE}
+ BATTLE_CHAT_COMMAND_NAMES.NAVIGATION_POINT: LocationMarkerSubType.NAVIGATION_POINT_SUBTYPE,
+ BATTLE_CHAT_COMMAND_NAMES.FLAG_POINT: LocationMarkerSubType.FLAG_POINT_SUBTYPE}
 
 class LocationPointData(object):
 
@@ -121,6 +122,16 @@ class LocationPointManager(CallbackDelayer):
         for _, locPointData in self.__markedAreas.iteritems():
             for area in locPointData.areas:
                 area.setGUIVisible(visible)
+
+    def getRepliablePoints(self, currPlayerID):
+        result = []
+        for point in self.__markedAreas.itervalues():
+            commandName = _ACTIONS.battleChatCommandFromActionID(point.commandID).name
+            if point.creatorID == currPlayerID and commandName == BATTLE_CHAT_COMMAND_NAMES.ATTENTION_TO_POSITION:
+                continue
+            result.append(point)
+
+        return result
 
     def __onPrereqsLoaded(self, resourceRefs):
         for chatCmd, params in self.__visualisationData.iteritems():

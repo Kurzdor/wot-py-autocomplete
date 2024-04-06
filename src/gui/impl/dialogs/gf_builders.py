@@ -3,16 +3,18 @@
 import typing
 from frameworks.wulf import WindowLayer
 from gui.impl.dialogs.dialog_template import DialogTemplateView, DEFAULT_DIMMER_ALPHA
+from gui.impl.dialogs.sub_views.common.simple_text import ImageSubstitution
 from gui.impl.dialogs.sub_views.content.text_warning_content import TextWithWarning
 from gui.impl.dialogs.dialog_template_button import ButtonPresenter, CancelButton, ConfirmButton
 from gui.impl.dialogs.dialog_template_utils import toString
 from gui.impl.dialogs.sub_views.content.simple_text_content import SimpleTextContent
 from gui.impl.dialogs.sub_views.icon.icon_set import IconSet
+from gui.impl.dialogs.sub_views.icon.item_icon import ItemIcons
 from gui.impl.dialogs.sub_views.title.simple_text_title import SimpleTextTitle
 from gui.impl.dialogs.sub_views.top_right.money_balance import MoneyBalance
 from gui.impl.gen import R
 from gui.impl.gen.view_models.views.dialogs.default_dialog_place_holders import DefaultDialogPlaceHolders
-from gui.impl.gen.view_models.views.dialogs.sub_views.icon_set_view_model import IconPositionLogicEnum
+from gui.impl.gen.view_models.views.dialogs.sub_views.multiple_icons_set_view_model import IconPositionLogicEnum
 from gui.impl.gen.view_models.views.dialogs.dialog_template_button_view_model import ButtonType
 from gui.impl.gen_utils import DynAccessor
 from gui.impl.lobby.dialogs.full_screen_dialog_view import FullScreenDialogWindowWrapper
@@ -184,6 +186,22 @@ class ConfirmCancelWarningDialogBuilder(ConfirmCancelDialogBuilder):
             template.setSubView(DefaultDialogPlaceHolders.CONTENT, TextWithWarning(self.__descriptionMsg, self.__warningMsg))
 
 
+class ConfirmCancelDescriptionDialogBuilder(ConfirmCancelDialogBuilder):
+    __slots__ = ('__descriptionMsg',)
+
+    def __init__(self, uniqueID=None):
+        super(ConfirmCancelDescriptionDialogBuilder, self).__init__(uniqueID)
+        self.__descriptionMsg = None
+        return
+
+    def setDescriptionMsg(self, text):
+        self.__descriptionMsg = toString(text)
+
+    def _extendTemplate(self, template):
+        if self.__descriptionMsg:
+            template.setSubView(DefaultDialogPlaceHolders.CONTENT, TextWithWarning(self.__descriptionMsg, ''))
+
+
 class AlertBuilder(BaseDialogBuilder):
     __slots__ = ()
 
@@ -203,6 +221,47 @@ class InfoDialogBuilder(ConfirmCancelDialogBuilder):
         super(InfoDialogBuilder, self).__init__(uniqueID)
         rDialogs = R.images.gui.maps.uiKit.dialogs
         self.setIcon(rDialogs.icons.info(), [rDialogs.highlights.blue()])
+
+
+class AcceleratedCrewTrainingDialogBuilder(ConfirmCancelDialogBuilder):
+    __slots__ = ()
+
+    def __init__(self, uniqueID=None):
+        super(AcceleratedCrewTrainingDialogBuilder, self).__init__(uniqueID)
+        self.setIcon(R.images.gui.maps.uiKit.dialogs.icons.accelerated_crew())
+
+
+class PassiveXPDialogBuilder(ConfirmCancelDialogBuilder):
+    __slots__ = ('__descriptionMsg', '__iconFrom', '__iconTo', '__vehsCD')
+
+    def __init__(self, uniqueID=None):
+        super(PassiveXPDialogBuilder, self).__init__(uniqueID)
+        self.__descriptionMsg = None
+        self.__iconFrom = None
+        self.__iconTo = None
+        self.__vehsCD = None
+        return
+
+    def setDescriptionMsg(self, text):
+        self.__descriptionMsg = text
+
+    def setMessageIconFrom(self, icon):
+        self.__iconFrom = icon
+
+    def setMessageIconTo(self, icon):
+        self.__iconTo = icon
+
+    def setVehiclesCD(self, vehsCD):
+        self.__vehsCD = vehsCD
+
+    def _extendTemplate(self, template):
+        super(PassiveXPDialogBuilder, self)._extendTemplate(template)
+        if self.__descriptionMsg and self.__iconFrom:
+            imageFrom = ImageSubstitution(self.__iconFrom(), 'typeIconFrom', -1, -5, -5, -5)
+            imageTo = ImageSubstitution(self.__iconTo(), 'typeIconTo', -1, -5, -5, -5)
+            template.setSubView(DefaultDialogPlaceHolders.CONTENT, SimpleTextContent(self.__descriptionMsg, imageSubstitutions=[imageFrom, imageTo]))
+        if self.__vehsCD:
+            template.setSubView(DefaultDialogPlaceHolders.ICON, ItemIcons(self.__vehsCD, True))
 
 
 class WarningDialogBuilder(ConfirmCancelDialogBuilder):

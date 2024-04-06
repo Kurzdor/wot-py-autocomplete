@@ -5,8 +5,8 @@ import weakref
 import GUI
 import Math
 import SoundGroups
-import BigWorld
 from AvatarInputHandler import AvatarInputHandler
+from gui.Scaleform.daapi.view.battle.shared.map_zones.minimap import MapZonesEntriesPlugin
 from gui.Scaleform.daapi.view.battle.shared.minimap import settings, plugins
 from gui.Scaleform.daapi.view.meta.MinimapMeta import MinimapMeta
 from gui.Scaleform.flash_wrapper import InputKeyMode
@@ -15,7 +15,6 @@ from gui.shared.utils.plugins import PluginsCollection
 from helpers import dependency
 from skeletons.account_helpers.settings_core import ISettingsCore
 from skeletons.gui.battle_session import IBattleSessionProvider
-from arena_bonus_type_caps import ARENA_BONUS_TYPE_CAPS as BONUS_CAPS
 _IMAGE_PATH_FORMATTER = 'img://{}'
 _logger = logging.getLogger(__name__)
 _DEFUALT_MINIMAP_DIMENSION = 10
@@ -119,20 +118,11 @@ class MinimapComponent(MinimapMeta, IMinimapComponent):
         return self.__component
 
     def getBoundingBox(self):
-        arenaVisitor = self.sessionProvider.arenaVisitor
-        bl, tr = arenaVisitor.type.getBoundingBox()
-        if arenaVisitor.gui.isBootcampBattle():
-            topRightX, topRightY = tr
-            bottomLeftX, bottomLeftY = bl
-            vSide = topRightX - bottomLeftX
-            hSide = topRightY - bottomLeftY
-            if vSide > hSide:
-                bl = (bottomLeftX, bottomLeftX)
-                tr = (topRightX, topRightX)
-            else:
-                bl = (bottomLeftY, bottomLeftY)
-                tr = (topRightY, topRightY)
-        return (bl, tr)
+        return self.sessionProvider.arenaVisitor.type.getBoundingBox()
+
+    @classmethod
+    def getImagePath(cls, minimapTexture):
+        return _IMAGE_PATH_FORMATTER.format(minimapTexture)
 
     def _populate(self):
         super(MinimapComponent, self)._populate()
@@ -167,10 +157,8 @@ class MinimapComponent(MinimapMeta, IMinimapComponent):
          'personal': plugins.PersonalEntriesPlugin,
          'area': plugins.AreaStaticMarkerPlugin,
          'area_markers': plugins.AreaMarkerEntriesPlugin,
-         'spgShot': plugins.EnemySPGShotPlugin}
-        arenaBonusType = BigWorld.player().arenaBonusType
-        if arenaBonusType and BONUS_CAPS.checkAny(arenaBonusType, BONUS_CAPS.DEATHZONES):
-            setup['deathzones'] = plugins.DeathZonesMinimapPlugin
+         'spgShot': plugins.EnemySPGShotPlugin,
+         'map_zones': MapZonesEntriesPlugin}
         return setup
 
     def _createFlashComponent(self):
@@ -183,7 +171,7 @@ class MinimapComponent(MinimapMeta, IMinimapComponent):
         pass
 
     def _getMinimapTexture(self, arenaVisitor):
-        return _IMAGE_PATH_FORMATTER.format(arenaVisitor.type.getMinimapTexture())
+        return self.getImagePath(arenaVisitor.type.getMinimapTexture())
 
     def _processMinimapSize(self, minSize, maxSize):
         pass

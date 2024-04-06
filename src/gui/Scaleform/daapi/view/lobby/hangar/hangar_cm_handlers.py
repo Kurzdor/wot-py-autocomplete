@@ -1,24 +1,21 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/Scaleform/daapi/view/lobby/hangar/hangar_cm_handlers.py
 from logging import getLogger
+from typing import TYPE_CHECKING
 import BigWorld
 from CurrentVehicle import g_currentVehicle
 from adisp import adisp_process
-from gui import SystemMessages
 from gui.Scaleform.daapi.view.lobby.store.browser.shop_helpers import getTradeInVehiclesUrl
 from gui.Scaleform.framework.entities.EventSystemEntity import EventSystemEntity
 from gui.Scaleform.framework.managers.context_menu import AbstractContextMenuHandler, CM_BUY_COLOR
-from gui.Scaleform.genConsts.PERSONALCASECONST import PERSONALCASECONST
 from gui.Scaleform.locale.MENU import MENU
-from gui.impl.lobby.buy_vehicle_view import VehicleBuyActionTypes
+from gui.impl.lobby.hangar.buy_vehicle_view import VehicleBuyActionTypes
 from gui.prb_control import prbDispatcherProperty
 from gui.shared import event_dispatcher as shared_events
 from gui.shared import events, EVENT_BUS_SCOPE
-from gui.shared.event_dispatcher import showShop, showVehicleRentalPage, showTelecomRentalPage
+from gui.shared.event_dispatcher import showShop, showTelecomRentalPage
 from gui.shared.gui_items.items_actions import factory as ItemsActionsFactory
-from gui.shared.gui_items.processors.tankman import TankmanUnload
 from gui.shared.gui_items.processors.vehicle import VehicleFavoriteProcessor
-from gui.shared.utils import decorators
 from helpers import dependency
 from items import UNDEFINED_ITEM_CD
 from skeletons.gui.game_control import IVehicleComparisonBasket, IEpicBattleMetaGameController, ITradeInController
@@ -27,11 +24,9 @@ from skeletons.gui.shared import IItemsCache
 from account_helpers import AccountSettings
 from account_helpers.AccountSettings import NATION_CHANGE_VIEWED
 _logger = getLogger(__name__)
-
-class CREW(object):
-    PERSONAL_CASE = 'personalCase'
-    UNLOAD = 'tankmanUnload'
-
+if TYPE_CHECKING:
+    from typing import Optional
+    from gui.shared.gui_items import Vehicle
 
 class MODULE(object):
     INFO = 'moduleInfo'
@@ -62,36 +57,7 @@ class VEHICLE(object):
     BLUEPRINT = 'blueprint'
     NATION_CHANGE = 'nationChange'
     GO_TO_COLLECTION = 'goToCollection'
-    WOT_PLUS_RENT = 'wotPlusRent'
     TELECOM_RENT = 'telecomRent'
-
-
-class CrewContextMenuHandler(AbstractContextMenuHandler, EventSystemEntity):
-    itemsCache = dependency.descriptor(IItemsCache)
-
-    def __init__(self, cmProxy, ctx=None):
-        super(CrewContextMenuHandler, self).__init__(cmProxy, ctx, {CREW.PERSONAL_CASE: 'showPersonalCase',
-         CREW.UNLOAD: 'unloadTankman'})
-
-    def showPersonalCase(self):
-        shared_events.showPersonalCase(self._tankmanID, PERSONALCASECONST.STATS_TAB_ID, EVENT_BUS_SCOPE.LOBBY)
-
-    @decorators.adisp_process('unloading')
-    def unloadTankman(self):
-        tankman = self.itemsCache.items.getTankman(self._tankmanID)
-        result = yield TankmanUnload(g_currentVehicle.item, tankman.vehicleSlotIdx).request()
-        if result.userMsg:
-            SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
-
-    def _generateOptions(self, ctx=None):
-        return [self._makeItem(CREW.PERSONAL_CASE, MENU.contextmenu('personalCase')), self._makeSeparator(), self._makeItem(CREW.UNLOAD, MENU.contextmenu('tankmanUnload'), {'enabled': not g_currentVehicle.isInBattle()})]
-
-    def _initFlashValues(self, ctx):
-        self._tankmanID = int(ctx.tankmanID)
-
-    def _clearFlashValues(self):
-        self._tankmanID = None
-        return
 
 
 class TechnicalMaintenanceCMHandler(AbstractContextMenuHandler, EventSystemEntity):
@@ -178,7 +144,6 @@ class VehicleContextMenuHandler(SimpleVehicleCMHandler):
          VEHICLE.COMPARE: 'compareVehicle',
          VEHICLE.NATION_CHANGE: 'changeVehicleNation',
          VEHICLE.GO_TO_COLLECTION: 'goToCollection',
-         VEHICLE.WOT_PLUS_RENT: 'showWotPlusRent',
          VEHICLE.TELECOM_RENT: 'showTelecomRent'})
 
     @prbDispatcherProperty
@@ -226,9 +191,6 @@ class VehicleContextMenuHandler(SimpleVehicleCMHandler):
         vehicle = self.itemsCache.items.getVehicle(self.vehInvID)
         shared_events.showCollectibleVehicles(vehicle.nationID)
 
-    def showWotPlusRent(self):
-        showVehicleRentalPage()
-
     def showTelecomRent(self):
         showTelecomRentalPage()
 
@@ -262,8 +224,6 @@ class VehicleContextMenuHandler(SimpleVehicleCMHandler):
                     options.append(self._makeItem(VEHICLE.EXCHANGE, MENU.contextmenu(VEHICLE.EXCHANGE), {'enabled': vehicle.isReadyToTradeOff,
                      'textColor': CM_BUY_COLOR}))
                 options.extend([self._makeItem(VEHICLE.INFO, MENU.contextmenu(VEHICLE.INFO)), self._makeItem(VEHICLE.STATS, MENU.contextmenu(VEHICLE.STATS), {'enabled': vehicleWasInBattle})])
-                if not vehicleWasInBattle:
-                    options.append(self._makeSeparator())
                 self._manageVehCompareOptions(options, vehicle)
                 if self.prbDispatcher is not None:
                     isNavigationEnabled = not self.prbDispatcher.getFunctionalState().isNavigationDisabled()
@@ -281,21 +241,19 @@ class VehicleContextMenuHandler(SimpleVehicleCMHandler):
                      'isNew': isNew}))
                 if vehicle.isRented:
                     canSell = vehicle.canSell and vehicle.rentalIsOver
-                    if not vehicle.isPremiumIGR:
+                    if vehicle.isWotPlus and not self._lobbyContext.getServerSettings().isWoTPlusExclusiveVehicleEnabled():
+                        canSell = False
+                    if not vehicle.isPremiumIGR and not vehicle.isWotPlus:
                         items = self.itemsCache.items
                         enabled = vehicle.mayObtainWithMoneyExchange(items.stats.money, items.shop.exchangeRate)
                         label = MENU.CONTEXTMENU_RESTORE if vehicle.isRestoreAvailable() else MENU.CONTEXTMENU_BUY
                         options.append(self._makeItem(VEHICLE.BUY, label, {'enabled': enabled}))
-                    if vehicle.isWotPlusRent:
-                        serverSettings = self._lobbyContext.getServerSettings()
-                        isRentalEnabled = serverSettings.isWotPlusTankRentalEnabled()
-                        options.append(self._makeItem(VEHICLE.WOT_PLUS_RENT, MENU.contextmenu(VEHICLE.WOT_PLUS_RENT), {'enabled': isRentalEnabled}))
                     if vehicle.isTelecomRent:
                         canSell = False
                         serverSettings = self._lobbyContext.getServerSettings()
                         isRentalEnabled = serverSettings.isTelecomRentalsEnabled()
                         isActive = BigWorld.player().telecomRentals.isActive()
-                        options.append(self._makeItem(VEHICLE.TELECOM_RENT, MENU.contextmenu(VEHICLE.WOT_PLUS_RENT), {'enabled': isRentalEnabled and isActive}))
+                        options.append(self._makeItem(VEHICLE.TELECOM_RENT, MENU.contextmenu(VEHICLE.TELECOM_RENT), {'enabled': isRentalEnabled and isActive}))
                     options.append(self._makeItem(VEHICLE.SELL, MENU.contextmenu(VEHICLE.REMOVE), {'enabled': canSell}))
                 else:
                     options.append(self._makeItem(VEHICLE.SELL, MENU.contextmenu(VEHICLE.SELL), {'enabled': vehicle.canSell and not isEventVehicle}))

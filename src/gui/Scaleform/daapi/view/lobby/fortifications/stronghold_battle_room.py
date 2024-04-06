@@ -6,10 +6,11 @@ from adisp import adisp_process
 from constants import PREBATTLE_TYPE_NAMES, PREBATTLE_TYPE
 from frameworks.wulf import WindowLayer
 from gui import GUI_SETTINGS
+from gui import makeHtmlString
 from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
 from gui.Scaleform.daapi.view.lobby.MinimapGrid import MinimapGrid
 from gui.Scaleform.daapi.view.lobby.MinimapLobby import MinimapLobby
-from gui.Scaleform.daapi.view.lobby.fortifications.vo_converters import FILTER_STATE, makeStrongholdsSlotsVOs, makeSortieVO
+from gui.Scaleform.daapi.view.lobby.fortifications.vo_converters import FILTER_STATE, makeStrongholdsSlotsVOs, makeSortieVO, makeStrongholdVehicleVO
 from gui.Scaleform.daapi.view.lobby.prb_windows.stronghold_action_button_state_vo import StrongholdActionButtonStateVO
 from gui.Scaleform.daapi.view.lobby.rally import rally_dps
 from gui.Scaleform.daapi.view.lobby.rally import vo_converters
@@ -24,17 +25,17 @@ from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.clans.clan_helpers import getStrongholdChangeModeUrl
 from gui.impl import backport
 from gui.prb_control import settings
+from gui.prb_control.entities.base.external_battle_unit.base_external_battle_ctx import ChangeVehTypesInSlotFilterCtx, ChangeVehiclesInSlotFilterCtx
 from gui.prb_control.entities.base.unit.listener import IStrongholdListener
 from gui.prb_control.entities.base.unit.listener import IUnitListener
 from gui.prb_control.entities.stronghold.unit.ctx import SetReserveUnitCtx, UnsetReserveUnitCtx
-from gui.prb_control.entities.base.external_battle_unit.base_external_battle_ctx import ChangeVehTypesInSlotFilterCtx, ChangeVehiclesInSlotFilterCtx
 from gui.prb_control.items.stronghold_items import REQUISITION_TYPE
 from gui.prb_control.settings import CTRL_ENTITY_TYPE, FUNCTIONAL_FLAG
 from gui.shared import events
 from gui.shared.event_bus import EVENT_BUS_SCOPE
+from gui.shared.gui_items import GUI_ITEM_TYPE
 from gui.shared.utils.functions import getViewName, makeTooltip
 from gui.shared.view_helpers import UsersInfoHelper
-from gui.shared.gui_items import GUI_ITEM_TYPE
 from helpers import dependency, i18n
 from helpers import int2roman
 from helpers import time_utils
@@ -46,7 +47,6 @@ from shared_utils import CONST_CONTAINER
 from skeletons.gui.app_loader import IAppLoader
 from skeletons.gui.game_control import IBrowserController
 from skeletons.gui.shared import IItemsCache
-from gui import makeHtmlString
 
 class StrongholdBattleRoom(FortClanBattleRoomMeta, IUnitListener, IStrongholdListener, UsersInfoHelper):
     browserCtrl = dependency.descriptor(IBrowserController)
@@ -111,9 +111,10 @@ class StrongholdBattleRoom(FortClanBattleRoomMeta, IUnitListener, IStrongholdLis
         pInfo = self.prbEntity.getPlayerInfo(dbID=dbID)
         if pInfo.isInSlot:
             slotIdx = pInfo.slotIdx
+            frozenVehicles = self.prbEntity.getEventFrozenVehicles(dbID)
             if vInfos and not vInfos[0].isEmpty():
                 vInfo = vInfos[0]
-                vehicleVO = vo_converters.makeVehicleVO(self.itemsCache.items.getItemByCD(vInfo.vehTypeCD), self.prbEntity.getRosterSettings().getLevelsRange(), isCurrentPlayer=pInfo.isCurrentPlayer())
+                vehicleVO = makeStrongholdVehicleVO(self.itemsCache.items.getItemByCD(vInfo.vehTypeCD), self.prbEntity.getRosterSettings().getLevelsRange(), isCurrentPlayer=pInfo.isCurrentPlayer(), frozenVehicles=frozenVehicles)
                 slotCost = vInfo.vehLevel
             else:
                 slotState = self.prbEntity.getSlotState(slotIdx)
@@ -123,6 +124,8 @@ class StrongholdBattleRoom(FortClanBattleRoomMeta, IUnitListener, IStrongholdLis
                 else:
                     slotCost = 0
             self.as_setMemberVehicleS(slotIdx, slotCost, vehicleVO)
+            if frozenVehicles:
+                self._updateMembersData()
         if pInfo.isCurrentPlayer() or pInfo.isCommander():
             self._setActionButtonState()
         return
@@ -209,6 +212,10 @@ class StrongholdBattleRoom(FortClanBattleRoomMeta, IUnitListener, IStrongholdLis
     def onSlotVehileFiltersChanged(self):
         self._updateRallyData()
 
+    def onEventFrozenVehiclesChanged(self, data):
+        self._updateMembersData()
+        self._updateRallyData()
+
     def onStrongholdDoBattleQueue(self, isFirstBattle, readyButtonEnabled, reserveOrder):
         self._updateConfigureButtonState(isFirstBattle, readyButtonEnabled)
         self.as_setReservesEnabledS([ readyButtonEnabled for _ in reserveOrder ])
@@ -235,6 +242,9 @@ class StrongholdBattleRoom(FortClanBattleRoomMeta, IUnitListener, IStrongholdLis
     def onFiltersChange(self, slotIndex, filters):
         self.__setFilters(slotIndex, filters)
         self._updateMembersData()
+
+    def onUnfrozenVehicleSlotClick(self, slotIndex):
+        self.prbEntity.onUnfreezeVehicleInSlot(slotIndex, parent=self.__proxy)
 
     def _populate(self):
         super(StrongholdBattleRoom, self)._populate()

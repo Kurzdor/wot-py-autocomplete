@@ -6,7 +6,7 @@ import Math
 from arena_bonus_type_caps import ARENA_BONUS_TYPE_CAPS
 from battle_royale.gui.constants import BattleRoyaleEquipments
 from cgf_script.bonus_caps_rules import bonusCapsManager
-from cgf_script.component_meta_class import CGFComponent, ComponentProperty, CGFMetaTypes
+from cgf_script.component_meta_class import ComponentProperty, CGFMetaTypes, registerComponent
 from cgf_script.managers_registrator import onAddedQuery, onRemovedQuery
 from constants import IS_CLIENT
 from Event import EventsSubscriber
@@ -16,7 +16,8 @@ import GenericComponents
 from items import vehicles
 from skeletons.gui.battle_session import IBattleSessionProvider
 from vehicle_systems.model_assembler import loadAppearancePrefab
-from vehicle_systems.tankStructure import TankNodeNames
+from vehicle_systems.tankStructure import TankNodeNames, TankPartNames
+from battle_royale.abilities.common import getEffectSuffixForGunLength
 if IS_CLIENT:
     from VehicleShotPassionComponent import VehicleShotPassionComponent
     from InBattleUpgrades import UpgradeInProgressComponent
@@ -30,24 +31,32 @@ else:
         pass
 
 
+_GUN_LENGTH_RANGES = {'short': (0.0, 3.7),
+ 'med': (3.7, 4.2),
+ 'med_02': (4.2, 5.0),
+ 'long': (5.0, float('inf'))}
 _NODE_NAME_IDX = {TankNodeNames.TURRET_JOINT: 0,
  TankNodeNames.GUN_INCLINATION: 1}
 
-class ShotPassionComponent(CGFComponent):
+@registerComponent
+class ShotPassionComponent(object):
     editorTitle = 'Shot Passion Component'
     category = 'Abilities'
+    domain = CGF.DomainOption.DomainClient
     turretNode = ComponentProperty(type=CGFMetaTypes.LINK, value=CGF.GameObject, editorName='Turret Node')
     gunNode = ComponentProperty(type=CGFMetaTypes.LINK, value=CGF.GameObject, editorName='Gun Node')
 
 
-class ShotPassionNodeComponent(CGFComponent):
+@registerComponent
+class ShotPassionNodeComponent(object):
     editorTitle = 'Shot Passion Node Component'
     category = 'Abilities'
+    domain = CGF.DomainOption.DomainClient
     effectTemplate = ComponentProperty(type=CGFMetaTypes.STRING, value='', editorName='Effect Template')
     maxAnimationStage = ComponentProperty(type=CGFMetaTypes.INT, value=0, editorName='Max animation stage')
 
 
-@bonusCapsManager(ARENA_BONUS_TYPE_CAPS.BATTLEROYALE)
+@bonusCapsManager(ARENA_BONUS_TYPE_CAPS.BATTLEROYALE, CGF.DomainOption.DomainClient)
 class ShotPassionManager(CGF.ComponentManager):
     __guiSessionProvider = dependency.descriptor(IBattleSessionProvider)
 
@@ -82,24 +91,29 @@ class ShotPassionManager(CGF.ComponentManager):
         return
 
     def __launch(self, vehicleShotPassionComponent):
+        appearance = vehicleShotPassionComponent.entity.appearance
 
         def postloadSetup(go):
             shotPassionComponent = go.findComponentByType(ShotPassionComponent)
             stage = vehicleShotPassionComponent.stage
-            self.__setupVFX(shotPassionComponent.gunNode, stage)
-            self.__setupVFX(shotPassionComponent.turretNode, stage)
+            self.__setupVFX(shotPassionComponent.gunNode, stage, appearance, TankPartNames.GUN)
+            self.__setupVFX(shotPassionComponent.turretNode, stage, appearance, TankPartNames.TURRET)
             go.createComponent(GenericComponents.RemoveGoDelayedComponent, vehicleShotPassionComponent.finishTime - BigWorld.serverTime())
 
-        appearance = vehicleShotPassionComponent.entity.appearance
         equipmentID = vehicles.g_cache.equipmentIDs().get(VehicleShotPassionComponent.EQUIPMENT_NAME)
         equipment = vehicles.g_cache.equipments()[equipmentID]
         loadAppearancePrefab(equipment.usagePrefab, appearance, postloadSetup)
 
-    def __setupVFX(self, nodeGO, stage):
+    def __setupVFX(self, nodeGO, stage, appearance, nodeType):
         nodeComponent = nodeGO.findComponentByType(ShotPassionNodeComponent)
         effectTemplate = nodeComponent.effectTemplate
+        stageClamp = math_utils.clamp(0, nodeComponent.maxAnimationStage, stage)
+        if nodeType == TankPartNames.GUN:
+            effectPath = effectTemplate.format(stage=stageClamp, length=getEffectSuffixForGunLength(_GUN_LENGTH_RANGES, appearance))
+        else:
+            effectPath = effectTemplate.format(stage=stageClamp)
         nodeGO.removeComponentByType(GenericComponents.AnimatorComponent)
-        nodeGO.createComponent(GenericComponents.AnimatorComponent, effectTemplate.format(math_utils.clamp(0, nodeComponent.maxAnimationStage, stage)), 0, 1, -1, True, '')
+        nodeGO.createComponent(GenericComponents.AnimatorComponent, effectPath, 0, 1, -1, True, '')
         nodeGO.deactivate()
         nodeGO.activate()
 
@@ -112,8 +126,8 @@ class ShotPassionManager(CGF.ComponentManager):
                 return
             stage = data.get('stage', 0)
             shotPassionComponent = effectGO.findComponentByType(ShotPassionComponent)
-            self.__setupVFX(shotPassionComponent.turretNode, stage)
-            self.__setupVFX(shotPassionComponent.gunNode, stage)
+            self.__setupVFX(shotPassionComponent.turretNode, stage, vehicle.appearance, TankPartNames.TURRET)
+            self.__setupVFX(shotPassionComponent.gunNode, stage, vehicle.appearance, TankPartNames.GUN)
         else:
             self.endShotPassion(vehicle)
 

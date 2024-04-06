@@ -124,6 +124,7 @@ class MusicController(object):
             if self.__event is not None:
                 if self.__event.name != event.name:
                     if unlink:
+                        self.__event.stop()
                         self.__event.unlink()
                 else:
                     self.__eventID = eventId
@@ -296,8 +297,10 @@ class MusicController(object):
                 wwSetup = self.__specialSounds.arenaMusicSetup
                 self.stopAmbient()
                 if wwSetup is not None:
-                    import SoundGroups
-                    SoundGroups.g_instance.playSound2D(wwSetup.get('wwmusicEndbattleStop', ''))
+                    endBattleSoundName = wwSetup.get('wwmusicEndbattleStop', '')
+                    if endBattleSoundName:
+                        import SoundGroups
+                        SoundGroups.g_instance.playSound2D(endBattleSoundName)
                 lastBattleEvents = {}
                 if wwSetup is not None:
                     lastBattleEvents[MUSIC_EVENT_COMBAT_VICTORY] = wwSetup.get('wwmusicResultWin', '')
@@ -414,7 +417,7 @@ class MusicController(object):
         soundEvent = self._getSoundEventById(soundEventID)
         return soundEvent.getEventId() == soundEventID and not soundEvent.isPlaying()
 
-    def __reloadSounds(self):
+    def reloadSounds(self):
         self.__loadConfig()
         self.play(self.__music.getEventId())
         self.play(self.__ambient.getEventId())
@@ -446,7 +449,7 @@ class MusicController(object):
                 hasChanges = True
 
         if hasChanges:
-            self.__reloadSounds()
+            self.reloadSounds()
         return
 
     def changeHangarSound(self, notificationsDiff):

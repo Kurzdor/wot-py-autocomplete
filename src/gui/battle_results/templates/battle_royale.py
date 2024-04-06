@@ -76,7 +76,8 @@ _BATTLE_PASS_VO_META.bind(battle_royale.BattlePassBlock)
 _REWARDS_VO_META = base.PropertyMeta((('achievements', [], 'achievements'),
  ('bonuses', [], 'bonuses'),
  ('completedQuestsCount', 0, 'completedQuestsCount'),
- ('completedQuests', {}, 'completedQuests')))
+ ('completedQuests', {}, 'completedQuests'),
+ ('brAwardTokens', {}, 'brAwardTokens')))
 _REWARDS_VO_META.bind(battle_royale.BattleRoyaleRewardsBlock)
 BR_PERSONAL_STATS_BLOCK = base.StatsBlock(_PERSONAL_VO_META, 'personal')
 BR_PERSONAL_STATS_BLOCK.addNextComponent(battle_royale.BattleRoyaleFinancialBlock(_FINANCIAL_BLOCK_VO_META, 'financialBalance'))
@@ -96,6 +97,7 @@ TEAM_ITEM_VO_META = base.PropertyMeta((('isPersonal', False, 'isPersonal'),
  ('achievedLevel', 0, 'achievedLevel'),
  ('damage', 0, 'damage'),
  ('kills', 0, 'kills'),
- ('databaseID', 0, 'databaseID')))
+ ('databaseID', 0, 'databaseID'),
+ ('prebattleID', 0, 'prebattleID')))
 TEAM_ITEM_VO_META.bind(battle_royale.BattleRoyalePlayerBlock)
 BR_TEAM_STATS_BLOCK = battle_royale.BattleRoyaleTeamStatsBlock(base.ListMeta(), 'leaderboard', _RECORD.VEHICLES)

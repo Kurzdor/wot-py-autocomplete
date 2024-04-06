@@ -34,9 +34,12 @@ _rankedBlockBuilder_10x10 = StaticSizeBlockBuilder('ranked_10x10', RANKED_BLOCK_
 _a30x30BlockBuilder = StaticSizeBlockBuilder('a30x30', A30X30_BLOCK_LAYOUT, A30X30_STATS_DEPENDENCIES, [])
 _epicBattleBlockBuilder = StaticSizeBlockBuilder('epicBattle', EPIC_BATTLE_VEHICLE_BLOCK_LAYOUT, {}, [])
 _comp7Season1BlockBuilder = StaticSizeBlockBuilder('comp7Season1', COMP7_BLOCK_LAYOUT, {}, [])
+_comp7Season2BlockBuilder = StaticSizeBlockBuilder('comp7Season2', COMP7_BLOCK_LAYOUT, {}, [])
+_comp7Season3BlockBuilder = StaticSizeBlockBuilder('comp7Season3', COMP7_BLOCK_LAYOUT, {}, [])
+_comp7ArchiveGriffinBlockBuilder = StaticSizeBlockBuilder('comp7ArchiveGriffin', COMP7_BLOCK_LAYOUT, {}, [])
 _maxPopUps = ['maxXP', 'maxFrags', 'maxDamage']
 _maxFalloutPopUps = _maxPopUps + ['maxWinPoints', 'maxCoins']
-_max15x15BlockBuilder = StaticSizeBlockBuilder('max15x15', MAX_BLOCK_LAYOUT, {}, _maxPopUps)
+_max15x15BlockBuilder = StaticSizeBlockBuilder('max15x15', MAX_15x15_BLOCK_LAYOUT, {}, _maxPopUps)
 _max7x7BlockBuilder = StaticSizeBlockBuilder('max7x7', MAX_BLOCK_LAYOUT, {}, _maxPopUps)
 _maxHistoricalBlockBuilder = StaticSizeBlockBuilder('maxHistorical', MAX_BLOCK_LAYOUT, {}, _maxPopUps)
 _maxFortBattlesBlockBuilder = StaticSizeBlockBuilder('maxFortBattles', MAX_BLOCK_LAYOUT, {}, _maxPopUps)
@@ -49,6 +52,9 @@ _max30x30BlockBuilder = StaticSizeBlockBuilder('max30x30', MAX_BLOCK_LAYOUT, {},
 _maxEpicBattleBlockBuilder = StaticSizeBlockBuilder('maxEpicBattle', MAX_BLOCK_LAYOUT, {}, _maxPopUps)
 _maxRankedBlockBuilder_10x10 = StaticSizeBlockBuilder('maxRanked_10x10', MAX_BLOCK_LAYOUT, {}, _maxPopUps)
 _maxComp7Season1BlockBuilder = StaticSizeBlockBuilder('maxComp7Season1', MAX_COMP7_BLOCK_LAYOUT, {}, [])
+_maxComp7Season2BlockBuilder = StaticSizeBlockBuilder('maxComp7Season2', MAX_COMP7_BLOCK_LAYOUT, {}, [])
+_maxComp7Season3BlockBuilder = StaticSizeBlockBuilder('maxComp7Season3', MAX_COMP7_BLOCK_LAYOUT, {}, [])
+_maxComp7ArchiveGriffinBlockBuilder = StaticSizeBlockBuilder('maxComp7ArchiveGriffin', MAX_COMP7_BLOCK_LAYOUT, {}, [])
 _vehTypeFragsBlockBuilder = DictBlockBuilder('vehTypeFrags', 'I', 'H', VEH_TYPE_FRAGS_DEPENDENCIES)
 _rankedSeasonsBlockBuilder = DictBlockBuilder('rankedSeasons', 'II', 'BB', {})
 _maxRankedSeason1BlockBuilder = StaticSizeBlockBuilder('maxRankedSeason1', MAX_BLOCK_LAYOUT, {}, _maxPopUps)
@@ -316,5 +322,11 @@ vehicleDossierLayout = (_a15x15BlockBuilder,
  _rankedBlockBuilder_10x10,
  _maxRankedBlockBuilder_10x10,
  _comp7Season1BlockBuilder,
- _maxComp7Season1BlockBuilder)
+ _maxComp7Season1BlockBuilder,
+ _comp7Season2BlockBuilder,
+ _maxComp7Season2BlockBuilder,
+ _comp7Season3BlockBuilder,
+ _maxComp7Season3BlockBuilder,
+ _comp7ArchiveGriffinBlockBuilder,
+ _maxComp7ArchiveGriffinBlockBuilder)
 VEHICLE_DOSSIER_BLOCKS = {b.name:b for b in vehicleDossierLayout}

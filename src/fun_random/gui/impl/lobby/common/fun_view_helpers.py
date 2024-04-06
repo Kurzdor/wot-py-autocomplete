@@ -4,11 +4,14 @@ import typing
 import math_utils
 from fun_random.gui.impl.gen.view_models.views.lobby.common.fun_random_progression_state import FunRandomProgressionStatus
 from fun_random.gui.impl.gen.view_models.views.lobby.common.fun_random_progression_stage import FunRandomProgressionStage
+from gui.impl import backport
 from gui.impl.gen import R
+from gui.impl.auxiliary.rewards_helper import BlueprintBonusTypes
 from gui.impl.lobby.common.view_helpers import packBonusModelAndTooltipData
 from gui.shared.formatters import time_formatters
-from gui.shared.missions.packers.bonus import BonusUIPacker, getDefaultBonusPackersMap
-from shared_utils import findFirst
+from gui.shared.formatters.ranges import toRomanRangeString
+from gui.shared.missions.packers.bonus import BonusUIPacker, ExtendedBlueprintBonusUIPacker, getDefaultBonusPackersMap
+from shared_utils import first, findFirst
 if typing.TYPE_CHECKING:
     from frameworks.wulf import Array
     from fun_random.gui.feature.models.progressions import FunProgressionStage, FunProgression
@@ -25,8 +28,21 @@ def getFormattedTimeLeft(seconds):
     return time_formatters.getTillTimeByResource(seconds, R.strings.fun_random.modeSelector.status.timeLeft, removeLeadingZeros=True)
 
 
+def getConditionText(rootStrPath, levels):
+    battleCondition = rootStrPath.dyn('battleCondition')
+    components = [backport.text(battleCondition()) if battleCondition.exists() else '']
+    levelCondition = rootStrPath.dyn('levelCondition')
+    levels = toRomanRangeString(levels)
+    if levelCondition.exists() and levels:
+        components.append(backport.text(levelCondition(), levels=levels))
+    return ' '.join(components) if len(components) > 1 else first(components, '')
+
+
 def getFunRandomBonusPacker():
     mapping = getDefaultBonusPackersMap()
+    mapping.update({BlueprintBonusTypes.BLUEPRINTS: ExtendedBlueprintBonusUIPacker,
+     BlueprintBonusTypes.BLUEPRINTS_ANY: ExtendedBlueprintBonusUIPacker,
+     BlueprintBonusTypes.FINAL_BLUEPRINTS: ExtendedBlueprintBonusUIPacker})
     return BonusUIPacker(mapping)
 
 

@@ -5,6 +5,7 @@ from collections import namedtuple
 from functools import partial
 from itertools import chain
 import typing
+from typing import Callable
 import wg_async as future_async
 from PlayerEvents import g_playerEvents
 from account_helpers import AccountSettings
@@ -14,11 +15,10 @@ from debug_utils import LOG_ERROR
 from gui import SystemMessages, DialogsInterface
 from gui.ClientUpdateManager import g_clientUpdateManager
 from gui.Scaleform.Waiting import Waiting
-from gui.Scaleform.daapi.view.bootcamp.lobby.unlock import BCUnlockItemConfirmator
 from gui.Scaleform.daapi.view.dialogs.ConfirmModuleMeta import BuyModuleMeta
 from gui.Scaleform.daapi.view.dialogs.ConfirmModuleMeta import LocalSellModuleMeta
 from gui.Scaleform.daapi.view.dialogs.ConfirmModuleMeta import MAX_ITEMS_FOR_OPERATION
-from gui.Scaleform.daapi.view.dialogs.ExchangeDialogMeta import ExchangeCreditsSingleItemMeta
+from gui.Scaleform.daapi.view.dialogs.ExchangeDialogMeta import ExchangeCreditsSingleItemMeta, ExchangeCreditsForSlotMeta
 from gui.Scaleform.daapi.view.dialogs.ExchangeDialogMeta import ExchangeXpMeta
 from gui.Scaleform.daapi.view.dialogs.ExchangeDialogMeta import RestoreExchangeCreditsMeta
 from gui.Scaleform.daapi.view.lobby.techtree import unlock
@@ -35,17 +35,18 @@ from gui.impl.lobby.personal_reserves import personal_reserves_dialogs
 from gui.impl.lobby.personal_reserves.personal_reserves_utils import canBuyBooster as utilsCanBuyBooster
 from gui.shared import event_dispatcher as shared_events
 from gui.shared.economics import getGUIPrice
-from gui.shared.event_dispatcher import showDeconstructionDeviceDialog, showConfirmOnSlotDialog
+from gui.shared.event_dispatcher import showDeconstructionMultDeviceDialog, showDeconstructionDeviceDialog
 from gui.shared.gui_items import GUI_ITEM_TYPE, GUI_ITEM_ECONOMY_CODE
 from gui.shared.gui_items.fitting_item import canBuyWithGoldExchange
 from gui.shared.gui_items.gui_item_economics import getVehicleShellsLayoutPrice
 from gui.shared.gui_items.processors import makeSuccess
-from gui.shared.gui_items.processors.common import ConvertBlueprintFragmentProcessor
+from gui.shared.gui_items.processors.common import ConvertBlueprintFragmentProcessor, BuyBattleAbilitiesProcessor
 from gui.shared.gui_items.processors.common import TankmanBerthsBuyer
 from gui.shared.gui_items.processors.common import UseCrewBookProcessor
+from gui.shared.gui_items.processors.tankman import TankmanFreeToOwnXpConvertor, TankmanRetraining, TankmanUnload, TankmanEquip, TankmanChangePassport, TankmanDismiss, TankmanRestore, TankmanChangeRole, TankmenJunkConverter
 from gui.shared.gui_items.processors.goodies import BoosterBuyer, BoosterActivator
 from gui.shared.gui_items.processors.messages.items_processor_messages import ItemDeconstructionProcessorMessage, MultItemsDeconstructionProcessorMessage
-from gui.shared.gui_items.processors.module import BuyAndInstallItemProcessor, BCBuyAndInstallItemProcessor, OptDeviceInstaller, ModuleDeconstruct
+from gui.shared.gui_items.processors.module import BuyAndInstallItemProcessor, OptDeviceInstaller, ModuleDeconstruct, EquippedModernizedDeviceDestroyProcessor
 from gui.shared.gui_items.processors.module import ModuleSeller
 from gui.shared.gui_items.processors.module import ModuleUpgradeProcessor
 from gui.shared.gui_items.processors.module import MultipleModulesSeller
@@ -57,7 +58,7 @@ from gui.shared.gui_items.processors.vehicle import tryToLoadDefaultShellsLayout
 from gui.shared.money import ZERO_MONEY, Money, Currency
 from gui.shared.utils import decorators
 from gui.shared.utils.requesters import RequestCriteria, REQ_CRITERIA
-from gui.shop import showBuyGoldForPersonalReserves
+from gui.shop import showBuyGoldForPersonalReserves, showBuyGoldForSlot
 from helpers import dependency
 from items import vehicles, ITEM_TYPE_NAMES, parseIntCompactDescr
 from shared_utils import first, allEqual
@@ -65,8 +66,8 @@ from skeletons.gui.game_control import ITradeInController
 from skeletons.gui.goodies import IGoodiesCache
 from skeletons.gui.impl import IGuiLoader
 from skeletons.gui.shared import IItemsCache
+from skeletons.gui.game_control import IWotPlusController
 from soft_exception import SoftException
-from uilogging.personal_reserves.logging_constants import PersonalReservesLogDialogs
 if typing.TYPE_CHECKING:
     from gui.shared.gui_items.Vehicle import Vehicle
     from gui.goodies.goodie_items import Booster
@@ -145,6 +146,23 @@ class IGUIItemAction(object):
 
 class CachedItemAction(IGUIItemAction):
     _itemsCache = dependency.descriptor(IItemsCache)
+
+
+class GroupedItemAction(CachedItemAction):
+    __slots__ = ('_groupID', '_groupSize')
+
+    def __init__(self, groupID, groupSize):
+        super(GroupedItemAction, self).__init__()
+        self._groupID = groupID
+        self._groupSize = groupSize
+
+    @staticmethod
+    def _pushGroupedMessages(result):
+        if result and result.auxData:
+            if result.success:
+                SystemMessages.pushMessage(result.userMsg + ' ' + ', '.join((m.userMsg for m in result.auxData if m)), type=result.sysMsgType, priority=result.msgPriority, messageData=result.msgData)
+            else:
+                SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
 
 
 class BuyAction(CachedItemAction):
@@ -358,11 +376,6 @@ class UnlockItemAction(_UnlockItem):
         self._showResult(result)
 
 
-class BCUnlockItemAction(UnlockItemAction):
-    _itemConfirmatorCls = BCUnlockItemConfirmator
-    _itemValidatorCls = unlock.UnlockItemValidator
-
-
 class UnlockItemActionWithResult(_UnlockItem):
 
     @adisp_async
@@ -490,10 +503,6 @@ class BuyAndInstallWithOptionalSellItemAction(BuyAndInstallItemAction):
         else:
             yield lambda callback=None: callback
         return
-
-
-class BCBuyAndInstallItemAction(BuyAndInstallItemAction):
-    _buyAndInstallItemProcessorCls = BCBuyAndInstallItemProcessor
 
 
 class VehicleAutoFillLayoutAction(IGUIItemAction):
@@ -679,37 +688,88 @@ class VehicleRepairAction(AsyncGUIItemAction):
 
 
 class BuyVehicleSlotAction(CachedItemAction):
+    __itemsCache = dependency.descriptor(IItemsCache)
+    __DEFAULT_FLOW = -1
+    __NO_ENOUGH_CREDITS_FLOW = 0
+    __NO_ENOUGH_GOLD_FLOW = 1
+
+    def __init__(self):
+        super(BuyVehicleSlotAction, self).__init__()
+        self.__price = self.__itemsCache.items.shop.getVehicleSlotsPrice(self.__itemsCache.items.stats.vehicleSlots)
+        self.__currency = self.__price.getCurrency()
 
     @decorators.adisp_process('buySlot')
     def doAction(self):
+        isEnoughMoney, status = self.__checkMoney()
+        if not isEnoughMoney:
+            if status == self.__NO_ENOUGH_GOLD_FLOW:
+                showBuyGoldForSlot(self.__price)
+                return
+            if status == self.__NO_ENOUGH_CREDITS_FLOW:
+                isOk, _ = yield DialogsInterface.showDialog(ExchangeCreditsForSlotMeta(name=backport.text(R.strings.dialogs.buySlot.hangarSlot.header()), count=1, price=self.__price.get(Currency.CREDITS)))
+                if not isOk:
+                    return
         result = yield VehicleSlotBuyer().request()
         if result.userMsg:
             SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
 
+    def __checkMoney(self):
+        availableMoney = self.__itemsCache.items.stats.money
+        if self.__currency == Currency.GOLD and availableMoney.gold < self.__price.gold:
+            return (False, self.__NO_ENOUGH_GOLD_FLOW)
+        return (False, self.__NO_ENOUGH_CREDITS_FLOW) if self.__currency == Currency.CREDITS and availableMoney.credits < self.__price.credits and _needExchangeForBuy(self.__price) else (True, self.__DEFAULT_FLOW)
+
 
 class BuyBerthsAction(CachedItemAction):
 
+    def __init__(self, berthPrice, countPacksBerths, groupID=0, groupSize=1):
+        super(BuyBerthsAction, self).__init__()
+        self.__berthPrice = berthPrice
+        self.__countPacksBerths = countPacksBerths
+
     @decorators.adisp_process('buyBerths')
     def doAction(self):
-        items = self._itemsCache.items
-        berthPrice, berthsCount = items.shop.getTankmanBerthPrice(items.stats.tankmenBerthsCount)
-        result = yield TankmanBerthsBuyer(berthPrice, berthsCount).request()
+        result = yield TankmanBerthsBuyer(self.__berthPrice, self.__countPacksBerths).request()
         if result.userMsg:
+            SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
+
+
+class TankmanRestoreAction(GroupedItemAction):
+
+    def __init__(self, tankmanInvID, berthsNeeded, groupID=0, groupSize=1):
+        super(TankmanRestoreAction, self).__init__(groupID, groupSize)
+        self.__tankmanInvID = tankmanInvID
+        self.__berthsNeeded = berthsNeeded
+
+    @decorators.adisp_process('updating')
+    def doAction(self):
+        tankman = self._itemsCache.items.getTankman(self.__tankmanInvID)
+        result = yield TankmanRestore(tankman, self.__berthsNeeded, self._groupID, self._groupSize).request()
+        self._pushGroupedMessages(result)
+
+
+class ConvertJunkTankmenAction(IGUIItemAction):
+
+    @decorators.adisp_process('updating')
+    def doAction(self):
+        result = yield TankmenJunkConverter().request()
+        if result:
             SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
 
 
 class BuyBoosterAction(CachedItemAction):
 
-    def __init__(self, booster, count, currency):
+    def __init__(self, booster, count, currency, doActivation=False):
         super(BuyBoosterAction, self).__init__()
         self.booster = booster
         self.count = count
         self.currency = currency
+        self.doActivation = doActivation
 
     @adisp_async
     @decorators.adisp_process('buyItem')
     def doAction(self, callback):
-        result = yield BoosterBuyer(self.booster, self.count, self.currency).request()
+        result = yield BoosterBuyer(self.booster, self.count, self.currency, doActivation=self.doActivation).request()
         if result.userMsg:
             SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
         callback(result.success)
@@ -763,7 +823,7 @@ class ActivateBoosterAction(CachedItemAction):
         canActivate = False
         if self.isUpgrade(booster, currentBooster):
             dialog = personal_reserves_dialogs.getUpgradeBoosterDialog(booster=booster, previousBooster=currentBooster)
-            canActivate = yield personal_reserves_dialogs.showDialogAndLogInteraction(dialog, dialogLogItem=PersonalReservesLogDialogs.BUY_AND_UPGRADE)
+            canActivate = yield personal_reserves_dialogs.showDialogAndLogInteraction(dialog)
         callback(canActivate)
 
 
@@ -781,8 +841,7 @@ class BuyAndActivateBooster(ActivateBoosterAction):
     @adisp_process
     def doAction(self):
         booster = self.booster
-        canActivate = booster.isInAccount
-        mustBuy = not canActivate
+        mustBuy = not booster.isInAccount
         canDoAction = False
         if mustBuy:
             canPurchase, reason = self.canBuyBooster(booster)
@@ -795,22 +854,16 @@ class BuyAndActivateBooster(ActivateBoosterAction):
             canDoAction = yield self.canReplace()
         elif mustBuy:
             dialog = personal_reserves_dialogs.getBuyAndActivateBoosterDialog(booster)
-            canDoAction = yield personal_reserves_dialogs.showDialogAndLogInteraction(dialog, dialogLogItem=PersonalReservesLogDialogs.BUY_AND_ACTIVATE)
+            canDoAction = yield personal_reserves_dialogs.showDialogAndLogInteraction(dialog)
         if canDoAction and mustBuy:
-            action = BuyBoosterAction(booster, 1, self.currency)
-            canActivate = yield action.doAction()
-            if canActivate and not booster.isInAccount:
-                yield self.waitForClientUpdate()
-        if canDoAction and canActivate:
-            action = ActivateBoosterAction(booster)
-            action.skipConfirm = True
-            action.doAction()
+            action = BuyBoosterAction(booster, 1, self.currency, doActivation=True)
+            yield action.doAction()
 
     @adisp_async
     @adisp_process
     def handleGoldPurchase(self, booster, callback):
         dialog = personal_reserves_dialogs.getBuyGoldDialog(booster)
-        isConfirm = yield personal_reserves_dialogs.showDialogAndLogInteraction(dialog, dialogLogItem=PersonalReservesLogDialogs.BUY_GOLD)
+        isConfirm = yield personal_reserves_dialogs.showDialogAndLogInteraction(dialog)
         if isConfirm:
             showBuyGoldForPersonalReserves(booster.getBuyPrice().price.get(self.currency, 0))
         callback(False)
@@ -856,21 +909,131 @@ class ConvertBlueprintFragmentAction(IGUIItemAction):
             SystemMessages.pushI18nMessage(SYSTEM_MESSAGES.BLUEPRINTS_CONVERSION_ERROR, type=result.sysMsgType)
 
 
-class UseCrewBookAction(IGUIItemAction):
+class UseCrewBookAction(GroupedItemAction):
 
-    def __init__(self, bookCD, vehicleCD, tankmanId=None):
-        super(UseCrewBookAction, self).__init__()
+    def __init__(self, bookCD, vehicleInvID, bookCount, tankmanInvID, groupID=0, groupSize=1):
+        super(UseCrewBookAction, self).__init__(groupID, groupSize)
         self.__bookCD = bookCD
-        self.__vehicleCD = vehicleCD
-        self.__tankmanId = tankmanId
+        self.__bookCount = bookCount
+        self.__vehicleInvID = vehicleInvID
+        self.__tankmanInvID = tankmanInvID
 
     @decorators.adisp_process('crewBooks/useCrewBook')
     def doAction(self):
-        result = yield UseCrewBookProcessor(self.__bookCD, self.__vehicleCD, self.__tankmanId).request()
-        if result.success:
-            SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
-        else:
-            SystemMessages.pushI18nMessage(SYSTEM_MESSAGES.CREWBOOKS_FAILED, type=result.sysMsgType)
+        result = yield UseCrewBookProcessor(self.__bookCD, self.__bookCount, self.__vehicleInvID, self.__tankmanInvID, self._groupID, self._groupSize).request()
+        self._pushGroupedMessages(result)
+
+
+class UseFreeXpToTankman(GroupedItemAction):
+
+    def __init__(self, selectedXpForConvert, tankmanInvID, groupID=0, groupSize=1):
+        super(UseFreeXpToTankman, self).__init__(groupID, groupSize)
+        self.__tankmanInvID = tankmanInvID
+        self.__selectedXpForConvert = selectedXpForConvert
+
+    @decorators.adisp_process('updatingSkillWindow')
+    def doAction(self):
+        result = yield TankmanFreeToOwnXpConvertor(self.__tankmanInvID, self.__selectedXpForConvert, self._groupID, self._groupSize).request()
+        self._pushGroupedMessages(result)
+
+    @staticmethod
+    def _pushGroupedMessages(result):
+        if result:
+            if result.success:
+                msg = result.userMsg
+                if result.auxData:
+                    msg += ' ' + ', '.join((m.userMsg for m in result.auxData if m))
+                SystemMessages.pushMessage(msg, type=result.sysMsgType, priority=result.msgPriority, messageData=result.msgData)
+            else:
+                SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
+
+
+class TankmanRetrainingAction(GroupedItemAction):
+
+    def __init__(self, tankmanInvID, vehicleIntCD, tmanCostTypeIdx, isRoleChange, groupID=0, groupSize=1):
+        super(TankmanRetrainingAction, self).__init__(groupID, groupSize)
+        self.__tankmanInvID = tankmanInvID
+        self.__vehicleIntCD = vehicleIntCD
+        self.__tmanCostTypeIdx = tmanCostTypeIdx
+        self.__isRoleChange = isRoleChange
+
+    @decorators.adisp_process('retraining')
+    def doAction(self):
+        result = yield TankmanRetraining(self.__tankmanInvID, self.__vehicleIntCD, self.__tmanCostTypeIdx, self.__isRoleChange, self._groupID, self._groupSize).request()
+        self._pushGroupedMessages(result)
+
+
+class TankmanChangeRoleAction(GroupedItemAction):
+
+    def __init__(self, tankmanInvID, role, vehicleIntCD, vehSlotIdx=-1, groupID=0, groupSize=1):
+        super(TankmanChangeRoleAction, self).__init__(groupID, groupSize)
+        self.__tankmanInvID = tankmanInvID
+        self.__vehicleIntCD = vehicleIntCD
+        self.__role = role
+        self.__vehSlotIdx = vehSlotIdx
+
+    @decorators.adisp_process('changingRole')
+    def doAction(self):
+        result = yield TankmanChangeRole(self.__tankmanInvID, self.__role, self.__vehicleIntCD, self.__vehSlotIdx, self._groupID, self._groupSize).request()
+        if not result.success:
+            self._pushGroupedMessages(result)
+
+
+class TankmanChangePassportAction(IGUIItemAction):
+
+    def __init__(self, tankmanInvID, firstNameID, firstNameGroup, lastNameID, lastNameGroup, iconID, iconGroup):
+        super(TankmanChangePassportAction, self).__init__()
+        self.__tankmanInvID = tankmanInvID
+        self.__firstNameID = firstNameID
+        self.__firstNameGroup = firstNameGroup
+        self.__lastNameID = lastNameID
+        self.__lastNameGroup = lastNameGroup
+        self.__iconID = iconID
+        self.__iconGroup = iconGroup
+
+    @decorators.adisp_process('updating')
+    def doAction(self):
+        yield TankmanChangePassport(self.__tankmanInvID, self.__firstNameID, self.__firstNameGroup, self.__lastNameID, self.__lastNameGroup, self.__iconID, self.__iconGroup).request()
+
+
+class TankmanUnloadAction(GroupedItemAction):
+
+    def __init__(self, vehicleInvID, vehicleSlotIdx, groupID=0, groupSize=1):
+        super(TankmanUnloadAction, self).__init__(groupID, groupSize)
+        self.__vehicleInvID = vehicleInvID
+        self.__vehicleSlotIdx = vehicleSlotIdx
+
+    @decorators.adisp_process('updating')
+    def doAction(self):
+        result = yield TankmanUnload(self.__vehicleInvID, self.__vehicleSlotIdx, self._groupID, self._groupSize).request()
+        self._pushGroupedMessages(result)
+
+
+class TankmanEquipAction(GroupedItemAction):
+
+    def __init__(self, tankmanInvID, vehicleInvID, vehicleSlotIdx, groupID=0, groupSize=1):
+        super(TankmanEquipAction, self).__init__(groupID, groupSize)
+        self.__tankmanInvID = tankmanInvID
+        self.__vehicleInvID = vehicleInvID
+        self.__vehicleSlotIdx = vehicleSlotIdx
+
+    @decorators.adisp_process('updating')
+    def doAction(self):
+        result = yield TankmanEquip(self.__tankmanInvID, self.__vehicleInvID, self.__vehicleSlotIdx, self._groupID, self._groupSize).request()
+        self._pushGroupedMessages(result)
+
+
+class TankmanDismissAction(CachedItemAction):
+
+    def __init__(self, tankmanInvID):
+        super(TankmanDismissAction, self).__init__()
+        self.__tankmanInvID = tankmanInvID
+
+    @decorators.adisp_process('updating')
+    def doAction(self):
+        tankman = self._itemsCache.items.getTankman(self.__tankmanInvID)
+        result = yield TankmanDismiss(tankman).request()
+        SystemMessages.pushI18nMessage(result.userMsg, type=result.sysMsgType)
 
 
 class UpgradeOptDeviceAction(AsyncGUIItemAction):
@@ -932,7 +1095,7 @@ class DeconstructOptDevice(AsyncGUIItemAction):
     @adisp_async
     @future_async.wg_async
     def _confirm(self, callback):
-        isOk, count = yield showConfirmOnSlotDialog(self.__module.intCD, fromVehicle=self.__vehicle is not None)
+        isOk, count = yield showDeconstructionDeviceDialog(self.__module.intCD, fromVehicle=self.__vehicle is not None)
         self.__deconstructStorageProcessor.count = count
         callback(isOk)
         return
@@ -979,7 +1142,7 @@ class DeconstructMultOptDevice(AsyncGUIItemAction):
                         _slotIdx = setup.index(_item)
                         break
 
-                processor = OptDeviceInstaller(_vehicle, _item, _slotIdx, install=False, allSetups=True, financeOperation=False, skipConfirm=True, showWaiting=False)
+                processor = EquippedModernizedDeviceDestroyProcessor(_vehicle, _item)
                 result = yield processor.request()
                 if not result.success:
                     callback(result)
@@ -1022,7 +1185,7 @@ class DeconstructMultOptDevice(AsyncGUIItemAction):
     @adisp_async
     @future_async.wg_async
     def _confirm(self, callback):
-        isOk, _ = yield future_async.wg_await(showDeconstructionDeviceDialog)(self.ctx)
+        isOk, _ = yield future_async.wg_await(showDeconstructionMultDeviceDialog)(self.ctx)
         callback(isOk)
 
     def __sortItemsKey(self, item):
@@ -1032,12 +1195,13 @@ class DeconstructMultOptDevice(AsyncGUIItemAction):
 
 
 class InstallBattleAbilities(AsyncGUIItemAction):
-    __slots__ = ('__vehicle', '__classVehs')
+    __slots__ = ('__vehicle', '__classVehs', '__setupItems')
 
-    def __init__(self, vehicle, classVehs=False):
+    def __init__(self, vehicle, classVehs=False, setupItems=None):
         super(InstallBattleAbilities, self).__init__()
         self.__vehicle = vehicle
         self.__classVehs = classVehs
+        self.__setupItems = setupItems
 
     @adisp_async
     @decorators.adisp_process('techMaintenance')
@@ -1045,10 +1209,67 @@ class InstallBattleAbilities(AsyncGUIItemAction):
         result = yield InstallBattleAbilitiesProcessor(self.__vehicle, self.__classVehs).request()
         callback(result)
 
+    @adisp_async
+    @future_async.wg_async
+    def _confirm(self, callback):
+        if not self.__setupItems:
+            callback(True)
+        else:
+            dialogResult = yield future_async.wg_await(shared_events.showBattleAbilitiesConfirmDialog(items=self.__setupItems, withInstall=bool(self.__setupItems), vehicleType=self.__vehicle.type, applyForAllVehiclesByType=self.__classVehs))
+            if dialogResult is None or dialogResult.busy:
+                callback(False)
+            isOK, _ = dialogResult.result
+            callback(isOK)
+        return
+
+
+class FrontlineInstallReserves(AsyncGUIItemAction):
+    __slots__ = ('__vehicle', '__applyForAllOfType', '__skillIds')
+
+    def __init__(self, vehicle, applyForAllOfType=False, skillIds=None):
+        super(FrontlineInstallReserves, self).__init__()
+        self.__vehicle = vehicle
+        self.__applyForAllOfType = applyForAllOfType
+        self.__skillIds = skillIds
+
+    @adisp_async
+    @decorators.adisp_process('techMaintenance')
+    def _action(self, callback):
+        result = yield InstallBattleAbilitiesProcessor(self.__vehicle, self.__applyForAllOfType).request()
+        callback(result)
+
+    @adisp_async
+    @future_async.wg_async
+    def _confirm(self, callback):
+        if not self.__skillIds:
+            callback(True)
+        else:
+            dialogResult = yield future_async.wg_await(shared_events.showFrontlineConfirmDialog(skillIds=self.__skillIds, vehicleType=self.__vehicle.type, applyForAllOfType=self.__applyForAllOfType, isBuy=False))
+            if dialogResult is None or dialogResult.busy:
+                callback(False)
+            isOK, _ = dialogResult.result
+            callback(isOK)
+        return
+
+
+class BuyBattleAbilities(AsyncGUIItemAction):
+    __slots__ = ('__skillIDs',)
+
+    def __init__(self, skillIDs):
+        super(BuyBattleAbilities, self).__init__()
+        self.__skillIDs = skillIDs
+
+    @adisp_async
+    @decorators.adisp_process('buyItem')
+    def _action(self, callback):
+        result = yield BuyBattleAbilitiesProcessor(self.__skillIDs).request()
+        callback(result)
+
 
 class RemoveOptionalDevice(AsyncGUIItemAction):
     __slots__ = ('__vehicle', '__device', '__slotID', '__destroy', '__forFitting', '__everywhere', '__removeProcessor')
     __goodiesCache = dependency.descriptor(IGoodiesCache)
+    __wotPlusController = dependency.descriptor(IWotPlusController)
 
     def __init__(self, vehicle, device, slotID, destroy=False, forFitting=False, everywhere=True):
         super(RemoveOptionalDevice, self).__init__()
@@ -1063,12 +1284,19 @@ class RemoveOptionalDevice(AsyncGUIItemAction):
     @adisp_async
     @future_async.wg_async
     def _confirm(self, callback):
+        isFreeToDemount = self.__wotPlusController.isFreeToDemount(self.__device)
         if self.__device.isRemovable:
             callback(True)
         elif self.__destroy:
+            if isFreeToDemount:
+                callback(False)
+                return
             isOk, _ = yield future_async.await_callback(shared_events.showOptionalDeviceDestroy)(self.__device.intCD)
             callback(isOk)
         else:
+            if isFreeToDemount:
+                callback(True)
+                return
             if self.__everywhere:
                 demountKit, _ = getDemountKitForOptDevice(self.__device)
                 isDkEnabled = demountKit and demountKit.enabled

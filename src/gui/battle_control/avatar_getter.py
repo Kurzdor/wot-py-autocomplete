@@ -244,14 +244,14 @@ def getArenaUniqueID(avatar=None):
     return None
 
 
-def updateVehicleSetting(code, value, avatar=None):
+def predictVehicleSetting(code, value, avatar=None):
     if avatar is None:
         avatar = BigWorld.player()
     vehicleid = avatar.playerVehicleID
     if avatar.getVehicleAttached() is not None:
         vehicleid = avatar.getVehicleAttached().id
     try:
-        avatar.updateVehicleSetting(vehicleid, code, value)
+        avatar.predictVehicleSetting(vehicleid, code, value)
     except AttributeError:
         _logger.exception('Attribute "updateVehicleSetting" not found')
 
@@ -269,11 +269,11 @@ def changeVehicleSetting(code, value, avatar=None):
     return
 
 
-def activateAvatarEquipment(equipmentID, avatar=None):
+def activateAvatarEquipment(equipmentID, avatar=None, index=0):
     if avatar is None:
         avatar = BigWorld.player()
     try:
-        avatar.cell.activateEquipment(equipmentID)
+        avatar.cell.activateEquipment(equipmentID, index)
     except AttributeError:
         _logger.exception('Attribute "cell.activateEquipment" not found')
 
@@ -452,6 +452,29 @@ def isBecomeObserverAfterDeath(avatar=None):
     return result
 
 
+def isObserverBothTeams(avatar=None):
+    if avatar is None:
+        avatar = BigWorld.player()
+    try:
+        result = avatar.isObserverBothTeams
+    except AttributeError as error:
+        _logger.exception('Attribute "isObserverBothTeams" not found, exception %s', error.message)
+        result = False
+
+    return result
+
+
+def getObserverTeam(avatar=None):
+    if avatar is None:
+        avatar = BigWorld.player()
+    result = getPlayerTeam(avatar)
+    if isObserver(avatar) and isObserverBothTeams(avatar):
+        vehicle = getPlayerVehicle(avatar)
+        if vehicle:
+            result = vehicle.publicInfo['team']
+    return result
+
+
 def getInBattleVehicleSwitchComponent():
     avatar = BigWorld.player()
     try:
@@ -471,8 +494,9 @@ def getSpaceID():
     return spaceID
 
 
-def getPlayerVehicle():
-    avatar = BigWorld.player()
+def getPlayerVehicle(avatar=None):
+    if avatar is None:
+        avatar = BigWorld.player()
     try:
         vehicle = avatar.getVehicleAttached()
     except AttributeError:
@@ -480,3 +504,20 @@ def getPlayerVehicle():
         vehicle = None
 
     return vehicle
+
+
+def isPostmortemFeatureEnabled(ctrlModeName, avatar=None):
+    if avatar is None:
+        avatar = BigWorld.player()
+    try:
+        result = avatar.isPostmortemFeatureEnabled(ctrlModeName)
+    except AttributeError as error:
+        _logger.debug('Attribute "isPostmortemFeatureEnabled" not found, exception %s', error.message)
+        result = False
+
+    return result
+
+
+def getIsObserverFPV():
+    player = BigWorld.player()
+    return player.isObserverFPV if player else False

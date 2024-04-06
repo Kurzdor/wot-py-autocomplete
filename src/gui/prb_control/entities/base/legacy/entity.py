@@ -81,6 +81,9 @@ class BaseLegacyEntity(BasePrbEntity):
     def isGUIProcessed(self):
         return False
 
+    def _goToHangar(self):
+        pass
+
 
 class LegacyIntroEntryPoint(BasePrbEntryPoint):
 
@@ -302,6 +305,9 @@ class LegacyEntity(_LegacyEntity):
 
     def getLimits(self):
         return self._limits
+
+    def setLimits(self, limits):
+        self._limits = limits
 
     def getPermissions(self, pID=None):
         clazz = self._permClass

@@ -2,14 +2,15 @@
 # Embedded file name: scripts/client/gui/shared/gui_items/processors/__init__.py
 import logging
 import typing
+from collections import namedtuple
+import BigWorld
+from adisp import adisp_process, adisp_async
 from gui.Scaleform.locale.SYSTEM_MESSAGES import SYSTEM_MESSAGES
+from gui.SystemMessages import SM_TYPE, ResultMsg
+from gui.shared.gui_items.processors import plugins as proc_plugs
+from gui.shared.utils import code2str
 from helpers import dependency
 from helpers import i18n
-from adisp import adisp_process, adisp_async
-from gui.SystemMessages import SM_TYPE, ResultMsg
-from gui.shared.utils import code2str
-from gui.shared.gui_items.processors import plugins as proc_plugs
-from gui.shared.money import Currency
 from skeletons.gui.shared import IItemsCache
 _logger = logging.getLogger(__name__)
 
@@ -32,13 +33,13 @@ def makeI18nError(sysMsgKey='', defaultSysMsgKey='', auxData=None, *args, **kwar
     return makeError(i18n.makeString(localKey, *args, **kwargs), kwargs.get('type', SM_TYPE.Error), auxData)
 
 
-def makeCrewSkinCompensationMessage(comp):
-    compMsg = None
-    if comp is not None:
-        amount = comp.price.get(Currency.CREDITS, None)
-        if amount is not None:
-            compMsg = makeI18nSuccess(sysMsgKey='crewSkinsCompensation/success', compensation=amount, type=SM_TYPE.SkinCompensation)
-    return compMsg
+class GroupedServerResponse(namedtuple('GroupedServerResponse', ['itemID', 'itemCount'])):
+
+    def __new__(cls, *args, **kwargs):
+        data = dict(itemID=-1, itemCount=0)
+        data.update(dict(((field, val) for field, val in zip(cls._fields[:len(args)], args))))
+        data.update(kwargs)
+        return super(GroupedServerResponse, cls).__new__(cls, **data)
 
 
 class Processor(object):
@@ -145,6 +146,35 @@ class ItemProcessor(Processor):
             _logger.error("Server responses an error [%s] while process %s '%s'", code2str(code), self.item.itemTypeName, str(self.item))
             return callback(self._errorHandler(code, ctx=ctx, errStr=errStr))
         return callback(self._successHandler(code, ctx=ctx))
+
+
+class GroupedRequestProcessor(Processor):
+
+    def __init__(self, request, *args, **kwargs):
+        super(GroupedRequestProcessor, self).__init__(plugins=kwargs.get('plugins'))
+        self.__request = request
+        self.__params = args
+        self.__groupID = kwargs.get('groupID') or int(BigWorld.serverTime())
+        self.__groupSize = kwargs.get('groupSize', 1)
+
+    def _request(self, callback):
+        _logger.debug('Make server request {}: '.format(self.__request.__name__) + ', '.join((str(i) for i in self.__params)))
+        self.__request(*(self.__params + (self.__groupID, self.__groupSize, lambda code, errStr, ctx=None: self._response(code, callback, errStr=errStr, ctx=ctx))))
+        return
+
+    def _response(self, code, callback, ctx=None, errStr=''):
+        items = list((GroupedServerResponse(*itemConfig) for itemConfig in ctx)) if ctx else []
+        if code < 0:
+            _logger.warning('Server fail response: code=%r, error=%r, ctx=%r', code, errStr, ctx)
+            return callback(self._errorHandler(code, errStr=errStr, ctx=items) if ctx else makeError())
+        _logger.debug('Server success response: code=%r, ctx=%r', code, ctx)
+        return callback(self._successHandler(code, ctx=items) if ctx else makeSuccess())
+
+    def _makeSuccessData(self, *args, **kwargs):
+        return [makeSuccess()]
+
+    def _makeErrorData(self, *args, **kwargs):
+        return [makeError()]
 
 
 class VehicleItemProcessor(ItemProcessor):

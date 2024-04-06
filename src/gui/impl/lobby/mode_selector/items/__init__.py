@@ -6,7 +6,7 @@ from constants import ARENA_BONUS_TYPE
 from gui.impl.gen.view_models.views.lobby.mode_selector.mode_selector_normal_card_model import BattlePassState
 from gui.prb_control.settings import PREBATTLE_ACTION_NAME
 from helpers import dependency
-from skeletons.gui.game_control import IBattlePassController, IBootcampController
+from skeletons.gui.game_control import IBattlePassController
 if typing.TYPE_CHECKING:
     from gui.impl.gen.view_models.views.lobby.mode_selector.mode_selector_normal_card_model import ModeSelectorNormalCardModel
 BATTLE_PASS_SEASON_ID = 'seasonId'
@@ -15,11 +15,11 @@ _arenaBonusTypeByModeName = {PREBATTLE_ACTION_NAME.RANDOM: ARENA_BONUS_TYPE.REGU
  PREBATTLE_ACTION_NAME.EPIC: ARENA_BONUS_TYPE.EPIC_BATTLE,
  PREBATTLE_ACTION_NAME.BATTLE_ROYALE: ARENA_BONUS_TYPE.BATTLE_ROYALE_SOLO,
  PREBATTLE_ACTION_NAME.MAPBOX: ARENA_BONUS_TYPE.MAPBOX,
- PREBATTLE_ACTION_NAME.COMP7: ARENA_BONUS_TYPE.COMP7}
+ PREBATTLE_ACTION_NAME.COMP7: ARENA_BONUS_TYPE.COMP7,
+ PREBATTLE_ACTION_NAME.WINBACK: ARENA_BONUS_TYPE.WINBACK}
 
 def setBattlePassState(itemVM):
     battlePassController = dependency.instance(IBattlePassController)
-    bootcampController = dependency.instance(IBootcampController)
     arenaBonusType = _arenaBonusTypeByModeName.get(itemVM.getModeName(), ARENA_BONUS_TYPE.UNKNOWN)
     isActive = battlePassController.isEnabled()
     isPaused = battlePassController.isPaused()
@@ -33,10 +33,7 @@ def setBattlePassState(itemVM):
     bpSettings = AccountSettings.getSettings(MODE_SELECTOR_BATTLE_PASS_SHOWN)
     isShown = bpSettings.get(itemVM.getModeName(), False)
     isNewSeason = bpSettings.get(BATTLE_PASS_SEASON_ID, 0) != seasonId
-    if bootcampController.isInBootcamp():
-        state = BattlePassState.NONE
-    else:
-        state = BattlePassState.STATIC if isShown and not isNewSeason else BattlePassState.NEW
+    state = BattlePassState.STATIC if isShown and not isNewSeason else BattlePassState.NEW
     itemVM.setBattlePassState(state)
 
 

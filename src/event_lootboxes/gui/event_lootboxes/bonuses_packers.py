@@ -40,6 +40,8 @@ def getEventLootBoxesBonusPacker():
      'vehicles': EventLootBoxVehiclesBonusUIPacker(),
      Currency.CREDITS: simplePacker,
      Currency.GOLD: simplePacker,
+     Currency.FREE_XP: simplePacker,
+     Currency.EQUIP_COIN: simplePacker,
      constants.PREMIUM_ENTITLEMENTS.PLUS: EventLootBoxPremiumBonusUIPacker})
     return BonusUIPacker(mapping)
 
@@ -121,13 +123,18 @@ class EventLootBoxSimpleBonusUIPacker(SimpleBonusUIPacker):
 
 
 class EventLootBoxCustomizationBonusUIPacker(CustomizationBonusUIPacker):
+    _3D_STYLE_ICON_NAME = 'style_3d'
 
     @classmethod
     def _packSingleBonus(cls, bonus, item, label):
         model = RewardModel()
         cls._packCommon(bonus, model)
         model.setCount(item.get('value', 0))
-        model.setIconSource(_R_BONUS_ICONS.s600x450.dyn(bonus.getC11nItem(item).itemTypeName)())
+        c11nItem = bonus.getC11nItem(item)
+        iconName = c11nItem.itemTypeName
+        if iconName == 'style' and c11nItem.modelsSet:
+            iconName = cls._3D_STYLE_ICON_NAME
+        model.setIconSource(_R_BONUS_ICONS.s600x450.dyn(iconName)())
         return model
 
 
@@ -197,9 +204,8 @@ class EventLootBoxTokenBonusUIPacker(TokenBonusUIPacker):
         bonusTokens = bonus.getTokens()
         result = []
         for tokenID, _ in bonusTokens.iteritems():
-            complexToken = parseComplexToken(tokenID)
             if tokenID.startswith(BATTLE_BONUS_X5_TOKEN):
-                tooltip = TokenBonusFormatter.getBattleBonusX5Tooltip(complexToken)
+                tooltip = TokenBonusFormatter.getBonusFactorTooltip(BATTLE_BONUS_X5_TOKEN)
                 result.append(createTooltipData(tooltip))
 
         return result

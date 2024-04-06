@@ -22,6 +22,8 @@ class EDITOR_TYPE(object):
     STR_KEY_SELECTOR = 1
     ENUM_SELECTOR = 2
     COMPLEX_KEY_SELECTOR = 3
+    VEHICLE_NAME_SELECTOR = 4
+    VEHICLE_PRESET_SELECTOR = 5
 
 
 class BLOCK_MODE(object):
@@ -36,8 +38,8 @@ def makePlanPath(planName):
 
 
 def errorVScript(owner, msg):
-    LOG_ERROR('[VScript]', owner.__class__.__name__, msg)
-    owner._writeLog('%s : %s' % (owner.__class__.__name__, msg))
+    LOG_ERROR('[VScript]', str(owner.planName()), str(owner.blockId()), msg)
+    owner._writeLog('%s:%s : %s' % (owner.planName(), owner.blockId(), msg))
 
 
 def readVisualScriptPlanParams(section, commonParams={}):
@@ -59,9 +61,11 @@ def readVisualScriptPlans(section, commonParams={}):
             if subsection.has_key('name'):
                 planDef['name'] = subsection['name'].asString
                 planDef['params'] = readVisualScriptPlanParams(subsection, commonParams)
+                planDef['plan_id'] = subsection['plan_id'].asString if subsection.has_key('plan_id') else ''
             else:
                 planDef['name'] = subsection.asString
                 planDef['params'] = dict(commonParams)
+                planDef['plan_id'] = ''
             plans.append(planDef)
 
     return plans

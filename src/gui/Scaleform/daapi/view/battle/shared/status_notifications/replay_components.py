@@ -3,7 +3,7 @@
 import logging
 import BattleReplay
 from ReplayEvents import g_replayEvents
-from gui.Scaleform.daapi.view.battle.shared.status_notifications.components import StatusNotificationContainer
+from gui.Scaleform.daapi.view.battle.shared.status_notifications.components import StatusNotificationContainer, StatusNotificationsGroup
 from gui.Scaleform.daapi.view.battle.shared.status_notifications.sn_items import TimerSN, TimeSnapshotHandler
 from gui.Scaleform.daapi.view.battle.shared.timers_common import PrecisePythonTimer
 _logger = logging.getLogger(__name__)
@@ -82,7 +82,9 @@ class _ReplaySnapshotHandler(TimeSnapshotHandler):
 
     def __restartTicker(self):
         if self.__totalTime > 0:
-            startTime = self.__totalTime - self.__ticker.getTimeLeft() if self.__ticker else None
+            startTime = None
+            if self.__ticker and self.__ticker.getTimeLeft() is not None:
+                startTime = self.__totalTime - self.__ticker.getTimeLeft()
             self.__destroyTicker()
             self.__ticker = CallbackTruePythonTimer(viewObject=CallbackPrecisePythonTimer(self.__onTickerTick, self.__onTickerFinished), typeID=0, viewID=0, totalTime=self.__totalTime, finishTime=self.__finishTime, interval=BattleReplay.g_replayCtrl.playbackSpeed, startTime=startTime)
             self.__ticker.show()
@@ -107,6 +109,9 @@ class ReplayStatusNotificationContainer(StatusNotificationContainer):
 
     def __init__(self, items, updateCallback):
         super(ReplayStatusNotificationContainer, self).__init__(items, updateCallback)
+        itemUpdater = lambda item: item.setTimeHandler(_ReplaySnapshotHandler) if isinstance(item, TimerSN) else None
         for itm in self._items:
             if isinstance(itm, TimerSN):
-                itm.setTimeHandler(_ReplaySnapshotHandler)
+                itemUpdater(itm)
+            if isinstance(itm, StatusNotificationsGroup):
+                itm.updateItems(itemUpdater)

@@ -4,6 +4,7 @@ from constants import PREBATTLE_TYPE as _P_TYPE
 from constants import QUEUE_TYPE as _Q_TYPE
 from constants import PREBATTLE_TYPE_NAMES as _P_NAMES
 from constants import QUEUE_TYPE_NAMES as _Q_NAMES
+from gui.prb_control.storages.winback_storage import WinbackStorage
 from gui.shared.system_factory import registerPrbStorage, collectPrbStorage, collectAllStorages
 from gui.prb_control.settings import CTRL_ENTITY_TYPE as _C_TYPE
 from gui.prb_control.settings import CTRL_ENTITY_TYPE_NAMES as _C_NAMES
@@ -12,7 +13,6 @@ from gui.prb_control.storages.comp7_storage import Comp7Storage
 from gui.prb_control.storages.maps_training_storage import MapsTrainingStorage
 from gui.prb_control.storages.prb_storage import TrainingStorage
 from gui.prb_control.storages.ranked_storage import RankedStorage
-from gui.prb_control.storages.epic_storage import EpicStorage
 from gui.prb_control.storages.event_battles_storage import EventBattlesStorage
 from gui.prb_control.storages.stronghold_storage import StrongholdStorage
 from gui.prb_control.storages.tournament_storage import TournamentStorage
@@ -40,7 +40,6 @@ RECENT_PRB_STORAGE = 'recentPrbStorage'
 registerPrbStorage(RECENT_PRB_STORAGE, RecentPrbStorage())
 registerPrbStorage(_makeLegacyName(_P_TYPE.TRAINING), TrainingStorage())
 registerPrbStorage(makeQueueName(_Q_TYPE.RANKED), RankedStorage())
-registerPrbStorage(makeQueueName(_Q_TYPE.EPIC), EpicStorage())
 registerPrbStorage(makeQueueName(_Q_TYPE.EVENT_BATTLES), EventBattlesStorage())
 registerPrbStorage(makeQueueName(_Q_TYPE.STRONGHOLD_UNITS), StrongholdStorage())
 registerPrbStorage(makeQueueName(_Q_TYPE.TOURNAMENT_UNITS), TournamentStorage())
@@ -48,6 +47,7 @@ registerPrbStorage(_makeLegacyName(_P_TYPE.EPIC_TRAINING), TrainingStorage())
 registerPrbStorage(makeQueueName(_Q_TYPE.MAPBOX), MapboxStorage())
 registerPrbStorage(makeQueueName(_Q_TYPE.MAPS_TRAINING), MapsTrainingStorage())
 registerPrbStorage(makeQueueName(_Q_TYPE.COMP7), Comp7Storage())
+registerPrbStorage(makeQueueName(_Q_TYPE.WINBACK), WinbackStorage())
 
 class storage_getter(object):
 

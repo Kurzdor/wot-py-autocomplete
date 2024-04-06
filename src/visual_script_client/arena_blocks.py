@@ -3,7 +3,9 @@
 import weakref
 from typing import List
 import BigWorld
-from constants import IS_VS_EDITOR, ARENA_PERIOD, ARENA_PERIOD_NAMES
+import Math
+from ArenaType import g_cache
+from constants import IS_VS_EDITOR, ARENA_PERIOD, ARENA_PERIOD_NAMES, CollisionFlags, TEAMS_IN_ARENA
 from visual_script.block import Block, InitParam
 from visual_script.dependency import dependencyImporter
 from visual_script.misc import ASPECT, errorVScript
@@ -50,6 +52,46 @@ class GetControlPoint(Block, ArenaMeta):
         if baseKey not in GetControlPoint._CACHE:
             GetControlPoint._CACHE[baseKey] = GetControlPoint.TeamBase(*baseKey)
         self._value.setValue(weakref.proxy(GetControlPoint._CACHE[baseKey]))
+
+    @classmethod
+    def blockIcon(cls):
+        pass
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class GetActiveControlPoints(Block, ArenaMeta):
+    TeamBase = GetControlPoint.TeamBase
+    _CACHE = {}
+
+    def __init__(self, *args, **kwargs):
+        super(GetActiveControlPoints, self).__init__(*args, **kwargs)
+        self._team = self._makeDataInputSlot('teamId', SLOT_TYPE.INT)
+        self._value = self._makeDataOutputSlot('value', arrayOf(SLOT_TYPE.CONTROL_POINT), self._execValue)
+
+    def _execValue(self):
+        team = self._team.getValue()
+        controlPoints = g_cache[BigWorld.player().arenaTypeID].controlPoints
+        teamBasePositions = g_cache[BigWorld.player().arenaTypeID].teamBasePositions
+        teambases = []
+        if team == TEAMS_IN_ARENA.ANY_TEAM and controlPoints is not None:
+            for i, _ in enumerate(controlPoints):
+                baseKey = (team, i + 1)
+                if baseKey not in self._CACHE:
+                    self._CACHE[baseKey] = self.TeamBase(*baseKey)
+                teambases.append(self._CACHE[baseKey])
+
+        elif team != TEAMS_IN_ARENA.ANY_TEAM and team <= len(teamBasePositions):
+            for baseId in teamBasePositions[team - 1].iterkeys():
+                baseKey = (team, baseId)
+                if baseKey not in self._CACHE:
+                    self._CACHE[baseKey] = self.TeamBase(*baseKey)
+                teambases.append(self._CACHE[baseKey])
+
+        self._value.setValue(map(weakref.proxy, teambases))
+        return
 
     @classmethod
     def blockIcon(cls):
@@ -292,7 +334,7 @@ class OnBattleRoundFinished(Block, ArenaMeta):
     def onFinishScript(self):
         g_playerEvents.onRoundFinished -= self._onRoundFinished
 
-    def _onRoundFinished(self, winnerTeam, reason, extraData):
+    def _onRoundFinished(self, winnerTeam, reason):
         self._winner.setValue(winnerTeam)
         self._reason.setValue(reason)
         self._out.call()
@@ -377,3 +419,71 @@ class GetDataFromStorage(GetDataFromStorageBase):
     def _exec(self):
         self.arena = BigWorld.player().arena
         super(GetDataFromStorage, self)._exec()
+
+
+class CollideSegment(Block, ArenaMeta):
+
+    def __init__(self, *args, **kwargs):
+        super(CollideSegment, self).__init__(*args, **kwargs)
+        self._in = self._makeEventInputSlot('in', self._collide)
+        self._out = self._makeEventOutputSlot('out')
+        self._spaceID = self._makeDataInputSlot('spaceId', SLOT_TYPE.INT)
+        self._from = self._makeDataInputSlot('from', SLOT_TYPE.VECTOR3)
+        self._to = self._makeDataInputSlot('to', SLOT_TYPE.VECTOR3)
+        self._hitFlags = self._makeDataInputSlot('excludeHitFlags', SLOT_TYPE.INT)
+        self._collision = self._makeDataOutputSlot('hasCollision', SLOT_TYPE.BOOL, None)
+        self._collidePosition = self._makeDataOutputSlot('position', SLOT_TYPE.VECTOR3, None)
+        return
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT, ASPECT.HANGAR]
+
+    def _collide(self):
+        res = BigWorld.wg_collideSegment(self._spaceID.getValue(), self._from.getValue(), self._to.getValue(), self._hitFlags.getValue())
+        collide = res is not None
+        self._collision.setValue(collide)
+        if collide:
+            self._collidePosition.setValue(res.closestPoint)
+        self._out.call()
+        return
+
+
+class GetControlPointPosition(Block, ArenaMeta):
+    DELTA_Y = 500.0
+
+    def __init__(self, *args, **kwargs):
+        super(GetControlPointPosition, self).__init__(*args, **kwargs)
+        self._controlPoint = self._makeDataInputSlot('controlPoint', SLOT_TYPE.CONTROL_POINT)
+        self._position = self._makeDataOutputSlot('position', SLOT_TYPE.VECTOR3, self._execValue)
+
+    def _execValue(self):
+        if not (self._controlPoint.hasValue() and helpers.isPlayerAvatar()):
+            self._position.setValue(Math.Vector3(0.0, 0.0, 0.0))
+            return
+        else:
+            controlPoint = self._controlPoint.getValue()
+            team, baseID = controlPoint.team, controlPoint.baseID
+            controlPoints = g_cache[BigWorld.player().arenaTypeID].controlPoints
+            teamBasePositions = g_cache[BigWorld.player().arenaTypeID].teamBasePositions
+            if team == TEAMS_IN_ARENA.ANY_TEAM and controlPoints is not None:
+                x, z = controlPoints[0]
+            elif team <= len(teamBasePositions) and baseID in teamBasePositions[team - 1]:
+                x, z = teamBasePositions[team - 1][baseID]
+            else:
+                self._position.setValue(Math.Vector3(0.0, 0.0, 0.0))
+                return
+            testRes = BigWorld.wg_collideSegment(BigWorld.player().spaceID, Math.Vector3(x, self.DELTA_Y, z), Math.Vector3(x, -self.DELTA_Y, z), CollisionFlags.TRIANGLE_NOCOLLIDE)
+            if testRes is None:
+                self._position.setValue(Math.Vector3(0.0, 0.0, 0.0))
+            else:
+                self._position.setValue(testRes.closestPoint)
+            return
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+    @classmethod
+    def blockIcon(cls):
+        pass

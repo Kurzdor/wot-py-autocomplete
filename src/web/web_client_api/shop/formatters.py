@@ -15,7 +15,6 @@ from gui.shared.gui_items.Vehicle import Vehicle, getShortUserName, getUserName
 from gui.shop import SHOP_RENT_SEASON_TYPE_MAP, SHOP_RENT_TYPE_MAP
 from helpers import dependency, i18n, time_utils
 from helpers.func_utils import replaceImgPrefix
-from items.components.skills_constants import PERKS
 from items.components.supply_slot_categories import SlotCategories
 from items import vehicles
 from nation_change.nation_change_helpers import getGroupByVehTypeCompactDescr, iterVehTypeCDsInNationGroup
@@ -113,8 +112,6 @@ def _formatVehicleOwnership(item):
 
             if event:
                 rentType = 'event'
-            elif item.isWotPlusRent:
-                rentType = 'wotPlus'
             elif item.isTelecomRent:
                 rentType = 'telecom'
             else:
@@ -390,17 +387,11 @@ def makeBattleBoosterFormatter(fittedVehGetter=None):
         return CREW_SKILL_TO_KPI_NAME_MAP.get(i.getAffectedSkillName(), '') if i.isCrewBooster() else ''
 
     def formatBoosterType(i):
-        if i.isCrewBooster():
-            if i.getAffectedSkillName() in PERKS:
-                return 'perk'
-            return 'skill'
+        return 'skill' if i.isCrewBooster() else 'device'
 
     def formatBoosterTypeName(i):
         if i.isCrewBooster():
-            if i.getAffectedSkillName() in PERKS:
-                key = ITEM_TYPES.TANKMAN_SKILLS_TYPE_PERK_SHORT
-            else:
-                key = ITEM_TYPES.TANKMAN_SKILLS_TYPE_SKILL_SHORT
+            key = ITEM_TYPES.TANKMAN_SKILLS_TYPE_SKILL_SHORT
         else:
             key = ITEM_TYPES.OPTIONALDEVICE_NAME
         return i18n.makeString(key)
@@ -462,7 +453,7 @@ def makeShellFormatter(includeCount=False):
 
 
 def makeCrewFormatter():
-    fields = [Field('fullName', lambda i: i.fullUserName), Field('role', lambda i: i.role), Field('roleLevel', lambda i: i.realRoleLevel[0])]
+    fields = [Field('fullName', lambda i: i.fullUserName), Field('role', lambda i: i.role), Field('roleLevel', lambda i: i.realRoleLevel.lvl)]
     return Formatter(fields)
 
 

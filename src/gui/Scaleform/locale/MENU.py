@@ -42,7 +42,6 @@ class MENU(object):
     LOGIN_STATUS_INVALID_NICKNAME = '#menu:login/status/invalid_nickname'
     LOGIN_STATUS_INVALID_LOGIN = '#menu:login/status/invalid_login'
     LOGIN_STATUS_EMPTY_PASSWORD = '#menu:login/status/empty_password'
-    LOGIN_STATUS_INVALID_PASSWORD = '#menu:login/status/invalid_password'
     LOGIN_STATUS_EMPTY_SERVER = '#menu:login/status/empty_server'
     LOGIN_STATUS_CONNECTING = '#menu:login/status/connecting'
     LOGIN_STATUS_CHECKOUT_ERROR = '#menu:login/status/checkout_error'
@@ -78,10 +77,6 @@ class MENU(object):
     HANGAR_CREW_RODY_DOG_USSR_NAME = '#menu:hangar/crew/rody/dog/ussr/name'
     HANGAR_CREW_RODY_DOG_POLAND_NAME = '#menu:hangar/crew/rody/dog/poland/name'
     HANGAR_CREW_RODY_DOG_MOREINFOLABEL = '#menu:hangar/crew/rody/dog/moreInfoLabel'
-    HANGAR_CREW_RODY_DOG_WINDOW_TITLE = '#menu:hangar/crew/rody/dog/window/title'
-    HANGAR_CREW_RODY_DOG_WINDOW_HEADER = '#menu:hangar/crew/rody/dog/window/header'
-    HANGAR_CREW_RODY_DOG_WINDOW_DESCRIPTION = '#menu:hangar/crew/rody/dog/window/description'
-    HANGAR_CREW_RODY_DOG_WINDOW_CLOSEBTNLABEL = '#menu:hangar/crew/rody/dog/window/closeBtnLabel'
     HANGAR_CREW_TOOLTIP_NEW_SKILL = '#menu:hangar/crew/tooltip/new_skill'
     HANGAR_CREW_TOOLTIP_DROP_SKILL = '#menu:hangar/crew/tooltip/drop_skill'
     HANGAR_XPTOTMENCHECKBOX_TOOLTIP = '#menu:hangar/xpToTmenCheckbox/tooltip'
@@ -115,9 +110,6 @@ class MENU(object):
     LOGIN_STATUS_ACCESSFORBIDDENTOPERIPHERY = '#menu:login/status/accessForbiddenToPeriphery'
     LOGIN_STATUS_CENTERRESTART = '#menu:login/status/centerRestart'
     LOGIN_STATUS_CLIENT_SERVER_VERSIONS_ARE_DIFFERENT = '#menu:login/status/CLIENT_SERVER_VERSIONS_ARE_DIFFERENT'
-    LOADING_GAME = '#menu:loading/game'
-    LOADING_GAMEINFO = '#menu:loading/gameInfo'
-    LOADING_GAMEINFO_AGE = '#menu:loading/gameInfo/age'
     LOADING_BATTLETYPES_0 = '#menu:loading/battleTypes/0'
     LOADING_BATTLETYPES_DESC_0 = '#menu:loading/battleTypes/desc/0'
     LOADING_BATTLETYPES_1 = '#menu:loading/battleTypes/1'
@@ -174,6 +166,12 @@ class MENU(object):
     LOADING_BATTLETYPES_DESC_29 = '#menu:loading/battleTypes/desc/29'
     LOADING_BATTLETYPES_30 = '#menu:loading/battleTypes/30'
     LOADING_BATTLETYPES_DESC_30 = '#menu:loading/battleTypes/desc/30'
+    LOADING_BATTLETYPES_31 = '#menu:loading/battleTypes/31'
+    LOADING_BATTLETYPES_DESC_31 = '#menu:loading/battleTypes/desc/31'
+    LOADING_BATTLETYPES_33 = '#menu:loading/battleTypes/33'
+    LOADING_BATTLETYPES_DESC_33 = '#menu:loading/battleTypes/desc/33'
+    LOADING_BATTLETYPES_34 = '#menu:loading/battleTypes/34'
+    LOADING_BATTLETYPES_DESC_34 = '#menu:loading/battleTypes/desc/34'
     LOADING_TEAM1 = '#menu:loading/team1'
     LOADING_TEAM2 = '#menu:loading/team2'
     LOADING_TEAMS_ALLIES = '#menu:loading/teams/allies'
@@ -203,51 +201,6 @@ class MENU(object):
     TANKMEN_HEAVYTANK = '#menu:tankmen/heavyTank'
     TANKMEN_AT_SPG = '#menu:tankmen/AT-SPG'
     TANKMEN_SPG = '#menu:tankmen/SPG'
-    TANKMANPERSONALCASE_TITLE = '#menu:tankmanPersonalCase/title'
-    TANKMANPERSONALCASE_RANK = '#menu:tankmanPersonalCase/rank'
-    TANKMANPERSONALCASE_NAME = '#menu:tankmanPersonalCase/name'
-    TANKMANPERSONALCASE_CREW = '#menu:tankmanPersonalCase/crew'
-    TANKMANPERSONALCASE_MAINSPECIALIZATION = '#menu:tankmanPersonalCase/mainSpecialization'
-    TANKMANPERSONALCASE_DOCS_INFO = '#menu:tankmanPersonalCase/docs/info'
-    TANKMANPERSONALCASE_PERSONALDOCS = '#menu:tankmanPersonalCase/personalDocs'
-    TANKMANPERSONALCASE_CHANGEDOCSBTN = '#menu:tankmanPersonalCase/changeDocsBtn'
-    TANKMANPERSONALCASE_USINGLEVEL = '#menu:tankmanPersonalCase/usingLevel'
-    TANKMANPERSONALCASE_COMMANDERFEATURE = '#menu:tankmanPersonalCase/commanderFeature'
-    TANKMANPERSONALCASE_MODIFIERS_FROMCOMMANDER = '#menu:tankmanPersonalCase/modifiers/fromCommander'
-    TANKMANPERSONALCASE_MODIFIERS_FROMEQUIPMENT = '#menu:tankmanPersonalCase/modifiers/fromEquipment'
-    TANKMANPERSONALCASE_MODIFIERS_CUSTOMIZATION = '#menu:tankmanPersonalCase/modifiers/customization'
-    TANKMANPERSONALCASE_MODIFIERS_FROMSKILLS = '#menu:tankmanPersonalCase/modifiers/fromSkills'
-    TANKMANPERSONALCASE_MODIFIERS_PENALTY = '#menu:tankmanPersonalCase/modifiers/penalty'
-    TANKMANPERSONALCASE_MODIFIERSHEADER = '#menu:tankmanPersonalCase/modifiersHeader'
-    TANKMANPERSONALCASE_MODIFIERSRESULT = '#menu:tankmanPersonalCase/modifiersResult'
-    TANKMANPERSONALCASE_SPECIALIZATION = '#menu:tankmanPersonalCase/specialization'
-    TANKMANPERSONALCASE_TRAININGBTN = '#menu:tankmanPersonalCase/trainingBtn'
-    TANKMANPERSONALCASE_BTNRESET = '#menu:tankmanPersonalCase/btnReset'
-    TANKMANPERSONALCASE_RETRAININGBTN = '#menu:tankmanPersonalCase/retrainingBtn'
-    TANKMANPERSONALCASE_VEHICLETYPE = '#menu:tankmanPersonalCase/vehicleType'
-    TANKMANPERSONALCASE_VEHICLE = '#menu:tankmanPersonalCase/vehicle'
-    TANKMANPERSONALCASE_CLOSEBTN = '#menu:tankmanPersonalCase/closeBtn'
-    TANKMANPERSONALCASE_CHANGEROLEBTN = '#menu:tankmanPersonalCase/changeRoleBtn'
-    TANKMANPERSONALCASE_TABBATTLEINFO = '#menu:tankmanPersonalCase/tabBattleInfo'
-    TANKMANPERSONALCASE_TABTRAINING = '#menu:tankmanPersonalCase/tabTraining'
-    TANKMANPERSONALCASE_BTNTRAINING = '#menu:tankmanPersonalCase/btnTraining'
-    TANKMANPERSONALCASE_BTNRETRAINING = '#menu:tankmanPersonalCase/btnRetraining'
-    TANKMANPERSONALCASE_VEHICLETYPEID = '#menu:tankmanPersonalCase/vehicleTypeID'
-    TANKMANPERSONALCASE_SKILLSBUTTON_MAINTEXT = '#menu:tankmanPersonalCase/skillsButton/mainText'
-    TANKMANPERSONALCASE_SKILLSBUTTON_ADDITIONTEXT = '#menu:tankmanPersonalCase/skillsButton/additionText'
-    TANKMANPERSONALCASE_RETRAININGWARNING = '#menu:tankmanPersonalCase/retrainingWarning'
-    TANKMANPERSONALCASE_RETRAININGWARNING2 = '#menu:tankmanPersonalCase/retrainingWarning2'
-    TANKMANPERSONALCASE_NOMODIFIERS = '#menu:tankmanPersonalCase/noModifiers'
-    TANKMSNPERSONALCASE_LACKOFSKILLSFORLEARN = '#menu:tankmsnPersonalCase/lackOfSkillsForLearn'
-    TANKMSNPERSONALCASE_LOADINGINFO = '#menu:tankmsnPersonalCase/loadingInfo'
-    TANKMANPERSONALCASE_NOACHIVS = '#menu:tankmanPersonalCase/noAchivs'
-    TANKMANPERSONALCASE_ACHIVS = '#menu:tankmanPersonalCase/achivs'
-    TANKMANPERSONALCASE_TABDOCS = '#menu:tankmanPersonalCase/tabDocs'
-    TANKMANPERSONALCASE_TABFREESKILLS = '#menu:tankmanPersonalCase/tabFreeSkills'
-    TANKMANPERSONALCASE_TABSKILLS = '#menu:tankmanPersonalCase/tabSkills'
-    TANKMANPERSONALCASE_SKILLSDESC = '#menu:tankmanPersonalCase/skillsDesc'
-    TANKMANPERSONALCASE_DROPSKILLSBUTTONLABEL = '#menu:tankmanPersonalCase/dropSkillsButtonLabel'
-    TANKMANPERSONALCASE_ACCELERATETEACHINGOFSKILL = '#menu:tankmanPersonalCase/accelerateTeachingOfSkill'
     TANKMANTRAININGWINDOW_TITLE = '#menu:tankmanTrainingWindow/title'
     TANKMANTRAININGWINDOW_ACADEMY = '#menu:tankmanTrainingWindow/academy'
     TANKMANTRAININGWINDOW_SCOOL = '#menu:tankmanTrainingWindow/scool'
@@ -310,6 +263,8 @@ class MENU(object):
     TANKCAROUSEL_VEHICLESTATES_UNSUITABLETOQUEUE = '#menu:tankCarousel/vehicleStates/unsuitableToQueue'
     TANKCAROUSEL_VEHICLESTATES_FALLOUT_ONLY = '#menu:tankCarousel/vehicleStates/fallout_only'
     TANKCAROUSEL_VEHICLESTATES_DEALISOVER = '#menu:tankCarousel/vehicleStates/dealIsOver'
+    TANKCAROUSEL_VEHICLESTATES_SUBSCRIPTION_SUSPENDED = '#menu:tankCarousel/vehicleStates/subscription_suspended'
+    TANKCAROUSEL_VEHICLESTATES_WOT_PLUS_EXCLUSIVE_VEHICLE_DISABLED = '#menu:tankCarousel/vehicleStates/wot_plus_exclusive_vehicle_disabled'
     TANKCAROUSEL_STATSSTATUS_UNAVAILABLE = '#menu:tankCarousel/statsStatus/unavailable'
     TANKCAROUSEL_VEHICLESTATES_UNSUITABLETOUNIT = '#menu:tankCarousel/vehicleStates/unsuitableToUnit'
     TANKCAROUSEL_VEHICLESTATES_DISABLED = '#menu:tankCarousel/vehicleStates/disabled'
@@ -392,6 +347,8 @@ class MENU(object):
     CURRENTVEHICLESTATUS_ROTATIONGROUPUNLOCKED = '#menu:currentVehicleStatus/rotationGroupUnlocked'
     CURRENTVEHICLESTATUS_ROTATIONGROUPLOCKED = '#menu:currentVehicleStatus/rotationGroupLocked'
     CURRENTVEHICLESTATUS_WILLBEUNLOCKEDINBATTLE = '#menu:currentVehicleStatus/willBeUnlockedInBattle'
+    CURRENTVEHICLESTATUS_SUBSCRIPTION_SUSPENDED = '#menu:currentVehicleStatus/subscription_suspended'
+    CURRENTVEHICLESTATUS_WOT_PLUS_EXCLUSIVE_VEHICLE_DISABLED = '#menu:currentVehicleStatus/wot_plus_exclusive_vehicle_disabled'
     REPAIR_REPAIRSTATUS = '#menu:repair/repairstatus'
     REPAIR_CURIENCY = '#menu:repair/curiency'
     REPAIR_BUTTON = '#menu:repair/button'
@@ -550,6 +507,8 @@ class MENU(object):
     TANK_PARAMS_ROCKETACCELERATIONENGINEPOWER = '#menu:tank_params/rocketAccelerationEnginePower'
     TANK_PARAMS_ROCKETACCELERATIONSPEEDLIMITS = '#menu:tank_params/rocketAccelerationSpeedLimits'
     TANK_PARAMS_ROCKETACCELERATIONREUSEANDDURATION = '#menu:tank_params/rocketAccelerationReuseAndDuration'
+    TANK_PARAMS_DUALACCURACYCOOLINGDELAY = '#menu:tank_params/dualAccuracyCoolingDelay'
+    TANK_PARAMS_DUALACCURACYCOOLINGDELAY_EXTENDEDTITLE = '#menu:tank_params/dualAccuracyCoolingDelay/extendedTitle'
     TANK_PARAMS_TIMEOFREACHING = '#menu:tank_params/timeOfReaching'
     TANK_PARAMS_ATTAINABLESPEED = '#menu:tank_params/attainableSpeed'
     TANK_PARAMS_HULLARMOR = '#menu:tank_params/hullArmor'
@@ -640,7 +599,13 @@ class MENU(object):
     EXTRAPARAMS_DESC = '#menu:extraParams/desc'
     EXTRAPARAMS_NAME_VEHICLEGUNSHOTDISPERSION = '#menu:extraParams/name/vehicleGunShotDispersion'
     EXTRAPARAMS_NAME_VEHICLERELOADTIMEAFTERSHELLCHANGE = '#menu:extraParams/name/vehicleReloadTimeAfterShellChange'
+    EXTRAPARAMS_NAME_EQUIPMENTPREPARATIONTIME = '#menu:extraParams/name/equipmentPreparationTime'
     EXTRAPARAMS_NAME_VEHICLEREPAIRSPEED = '#menu:extraParams/name/vehicleRepairSpeed'
+    EXTRAPARAMS_NAME_FIREEXTINGUISHINGRATE = '#menu:extraParams/name/fireExtinguishingRate'
+    EXTRAPARAMS_NAME_RADIOMANACTIVITYTIMEAFTERVEHICLEDESTROY = '#menu:extraParams/name/radiomanActivityTimeAfterVehicleDestroy'
+    EXTRAPARAMS_NAME_WHEELSROTATIONSPEED = '#menu:extraParams/name/wheelsRotationSpeed'
+    EXTRAPARAMS_NAME_FOLIAGEMASKINGFACTOR = '#menu:extraParams/name/foliageMaskingFactor'
+    EXTRAPARAMS_NAME_VEHICLEOWNSPOTTINGTIME = '#menu:extraParams/name/vehicleOwnSpottingTime'
     EXTRAPARAMS_NAME_VEHICLERAMOREXPLOSIONDAMAGERESISTANCE = '#menu:extraParams/name/vehicleRamOrExplosionDamageResistance'
     EXTRAPARAMS_NAME_CREWHITCHANCE = '#menu:extraParams/name/crewHitChance'
     EXTRAPARAMS_NAME_CREWSTUNDURATION = '#menu:extraParams/name/crewStunDuration'
@@ -653,8 +618,13 @@ class MENU(object):
     EXTRAPARAMS_NAME_VEHPENALTYFORDAMAGEENGINEANDCOMBAT = '#menu:extraParams/name/vehPenaltyForDamageEngineAndCombat'
     EXTRAPARAMS_NAME_VEHICLEFIRECHANCE = '#menu:extraParams/name/vehicleFireChance'
     EXTRAPARAMS_NAME_VEHICLESPEEDGAIN = '#menu:extraParams/name/vehicleSpeedGain'
+    EXTRAPARAMS_NAME_VEHICLEAVERAGESOILRESISTANCE = '#menu:extraParams/name/vehicleAverageSoilResistance'
+    EXTRAPARAMS_NAME_VEHICLEWEAKSOILRESISTANCE = '#menu:extraParams/name/vehicleWeakSoilResistance'
     EXTRAPARAMS_NAME_VEHICLEENEMYSPOTTINGTIME = '#menu:extraParams/name/vehicleEnemySpottingTime'
-    EXTRAPARAMS_NAME_VEHICLEOWNSPOTTINGTIME = '#menu:extraParams/name/vehicleOwnSpottingTime'
+    EXTRAPARAMS_NAME_CIRCULARVISIONRADIUSWHILESURVEYINGDEVICEDAMAGED = '#menu:extraParams/name/circularVisionRadiusWhileSurveyingDeviceDamaged'
+    EXTRAPARAMS_NAME_DAMAGEDMODULESDETECTIONTIME = '#menu:extraParams/name/damagedModulesDetectionTime'
+    EXTRAPARAMS_NAME_VEHICLEALLYRADIODISTANCE = '#menu:extraParams/name/vehicleAllyRadioDistance'
+    EXTRAPARAMS_NAME_ARTNOTIFICATIONDELAYFACTOR = '#menu:extraParams/name/artNotificationDelayFactor'
     EXTRAPARAMS_NAME_DEMASKMOVINGFACTOR = '#menu:extraParams/name/demaskMovingFactor'
     EXTRAPARAMS_NAME_DEMASKFOLIAGEFACTOR = '#menu:extraParams/name/demaskFoliageFactor'
     EXTRAPARAMS_NAME_VEHICLEGUNSHOTDISPERSIONAFTERSHOT = '#menu:extraParams/name/vehicleGunShotDispersionAfterShot'
@@ -663,8 +633,17 @@ class MENU(object):
     EXTRAPARAMS_NAME_VEHICLEGUNSHOTDISPERSIONTURRETROTATION = '#menu:extraParams/name/vehicleGunShotDispersionTurretRotation'
     EXTRAPARAMS_NAME_VEHICLEGUNSHOTDISPERSIONWHILEGUNDAMAGED = '#menu:extraParams/name/vehicleGunShotDispersionWhileGunDamaged'
     EXTRAPARAMS_NAME_VEHICLERAMDAMAGERESISTANCE = '#menu:extraParams/name/vehicleRamDamageResistance'
+    EXTRAPARAMS_NAME_STUNRESISTANCEEFFECTFACTOR = '#menu:extraParams/name/stunResistanceEffectFactor'
+    EXTRAPARAMS_NAME_COMMANDERHITCHANCE = '#menu:extraParams/name/commanderHitChance'
+    EXTRAPARAMS_NAME_RADIOMANHITCHANCE = '#menu:extraParams/name/radiomanHitChance'
+    EXTRAPARAMS_NAME_WOUNDEDCREWEFFICIENCY = '#menu:extraParams/name/woundedCrewEfficiency'
+    EXTRAPARAMS_NAME_VEHICLEFUELTANKLESIONCHANCE = '#menu:extraParams/name/vehicleFuelTankLesionChance'
+    EXTRAPARAMS_NAME_VEHICLERAMCHASSISDAMAGERESISTANCE = '#menu:extraParams/name/vehicleRamChassisDamageResistance'
     EXTRAPARAMS_NAME_DAMAGEENEMIESBYRAMMING = '#menu:extraParams/name/damageEnemiesByRamming'
     EXTRAPARAMS_NAME_VEHICLEINVISIBILITYAFTERSHOT = '#menu:extraParams/name/vehicleInvisibilityAfterShot'
+    EXTRAPARAMS_NAME_DAMAGEANDPIERCINGDISTRIBUTIONLOWERBOUND = '#menu:extraParams/name/damageAndPiercingDistributionLowerBound'
+    EXTRAPARAMS_NAME_DAMAGEANDPIERCINGDISTRIBUTIONUPPERBOUND = '#menu:extraParams/name/damageAndPiercingDistributionUpperBound'
+    EXTRAPARAMS_NAME_ENEMYMODULESCREWCRITCHANCE = '#menu:extraParams/name/enemyModulesCrewCritChance'
     DESCRIPTIONS_VEHICLE = '#menu:descriptions/vehicle'
     DESCRIPTIONS_VEHICLEGUN = '#menu:descriptions/vehicleGun'
     DESCRIPTIONS_VEHICLEGUN_AUTORELOAD = '#menu:descriptions/vehicleGun/autoReload'
@@ -676,6 +655,8 @@ class MENU(object):
     DESCRIPTIONS_VEHICLERADIO = '#menu:descriptions/vehicleRadio'
     DESCRIPTIONS_SHELL = '#menu:descriptions/shell'
     DESCRIPTIONS_SHELLFULL = '#menu:descriptions/shellFull'
+    DESCRIPTIONS_MUTABLEDAMAGESHELL = '#menu:descriptions/mutableDamageShell'
+    DESCRIPTIONS_MUTABLEDAMAGESHELLFULL = '#menu:descriptions/mutableDamageShellFull'
     HEADERBUTTONS_BTNLABEL_PREMIUM = '#menu:headerButtons/btnLabel/premium'
     HEADERBUTTONS_DOLABEL_PREMIUM = '#menu:headerButtons/doLabel/premium'
     HEADERBUTTONS_BTNLABEL_PREMSHOP = '#menu:headerButtons/btnLabel/premShop'
@@ -720,6 +701,7 @@ class MENU(object):
     HEADERBUTTONS_BATTLE_TYPES_BATTLEROYALESQUAD_DESCRIPTION = '#menu:headerButtons/battle/types/battleRoyaleSquad/description'
     HEADERBUTTONS_BATTLE_TYPES_TRAINING = '#menu:headerButtons/battle/types/training'
     HEADERBUTTONS_BATTLE_TYPES_TRAINING_DESCR = '#menu:headerButtons/battle/types/training/descr'
+    HEADERBUTTONS_BATTLE_TYPES_WINBACK = '#menu:headerButtons/battle/types/winback'
     HEADERBUTTONS_BATTLE_TYPES_EPICTRAINING = '#menu:headerButtons/battle/types/epicTraining'
     HEADERBUTTONS_BATTLE_TYPES_EPICTRAINING_DESCR = '#menu:headerButtons/battle/types/epicTraining/descr'
     HEADERBUTTONS_BATTLE_TYPES_LEAVETRAINING_DESCR = '#menu:headerButtons/battle/types/leaveTraining/descr'
@@ -842,6 +824,13 @@ class MENU(object):
     HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7DISABLED_BODY = '#menu:headerButtons/fightBtn/tooltip/comp7Disabled/body'
     HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7BANISSET_HEADER = '#menu:headerButtons/fightBtn/tooltip/comp7BanIsSet/header'
     HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7BANISSET_BODY = '#menu:headerButtons/fightBtn/tooltip/comp7BanIsSet/body'
+    HEADERBUTTONS_FIGHTBTN_TOOLTIP_WOTPLUSEXCLUSIVEUNAVAILABLE_HEADER = '#menu:headerButtons/fightBtn/tooltip/wotPlusExclusiveUnavailable/header'
+    HEADERBUTTONS_FIGHTBTN_TOOLTIP_WOTPLUSEXCLUSIVEUNAVAILABLE_BODY = '#menu:headerButtons/fightBtn/tooltip/wotPlusExclusiveUnavailable/body'
+    HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7RATINGCALCULATION_HEADER = '#menu:headerButtons/fightBtn/tooltip/comp7RatingCalculation/header'
+    HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7RATINGCALCULATION_BODY = '#menu:headerButtons/fightBtn/tooltip/comp7RatingCalculation/body'
+    HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7VEHLEVEL_HEADER = '#menu:headerButtons/fightBtn/tooltip/comp7VehLevel/header'
+    HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7VEHLEVEL_BODY = '#menu:headerButtons/fightBtn/tooltip/comp7VehLevel/body'
+    HEADERBUTTONS_FIGHTBTN_TOOLTIP_COMP7VEHLEVEL_DELIMITER = '#menu:headerButtons/fightBtn/tooltip/comp7VehLevel/delimiter'
     HEADERBUTTONS_DEFAULTCOUNTER = '#menu:headerButtons/defaultCounter'
     HEADERBUTTONS_RATING = '#menu:headerButtons/rating'
     HEADERBUTTONS_PROFILE = '#menu:headerButtons/profile'
@@ -893,6 +882,15 @@ class MENU(object):
     HEADER_VEHICLETYPE_ALLIANCE_GERMANY = '#menu:header/vehicleType/Alliance-Germany'
     HEADER_VEHICLETYPE_ALLIANCE_USA = '#menu:header/vehicleType/Alliance-USA'
     HEADER_VEHICLETYPE_ALLIANCE_FRANCE = '#menu:header/vehicleType/Alliance-France'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_LIGHTTANK = '#menu:header/wotPlusExclusiveVehicleType/lightTank'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_MEDIUMTANK = '#menu:header/wotPlusExclusiveVehicleType/mediumTank'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_HEAVYTANK = '#menu:header/wotPlusExclusiveVehicleType/heavyTank'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_AT_SPG = '#menu:header/wotPlusExclusiveVehicleType/AT-SPG'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_SPG = '#menu:header/wotPlusExclusiveVehicleType/SPG'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_ALLIANCE_USSR = '#menu:header/wotPlusExclusiveVehicleType/Alliance-USSR'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_ALLIANCE_GERMANY = '#menu:header/wotPlusExclusiveVehicleType/Alliance-Germany'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_ALLIANCE_USA = '#menu:header/wotPlusExclusiveVehicleType/Alliance-USA'
+    HEADER_WOTPLUSEXCLUSIVEVEHICLETYPE_ALLIANCE_FRANCE = '#menu:header/wotPlusExclusiveVehicleType/Alliance-France'
     HEADER_DEMONSTRATION_INFO = '#menu:header/demonstration/info'
     HEADER_DEMONSTRATION_BTNLABEL = '#menu:header/demonstration/btnLabel'
     HEADER_ACCOUNT_POPOVER_BOOSTERS_BLOCKTITLE = '#menu:header/account/popover/boosters/blockTitle'
@@ -980,15 +978,6 @@ class MENU(object):
     EXCHANGEXP_CANCEL = '#menu:exchangeXP/cancel'
     EXCHANGEXP_AVAILABLE_FORFREE_LABEL = '#menu:exchangeXP/available/forFree/label'
     EXCHANGEXP_AVAILABLE_FORFREE_VALUE = '#menu:exchangeXP/available/forFree/value'
-    TEACHINGSKILL_TITLE = '#menu:teachingSkill/title'
-    TEACHINGSKILL_BEFORE = '#menu:teachingSkill/before'
-    TEACHINGSKILL_COST = '#menu:teachingSkill/cost'
-    TEACHINGSKILL_AFTER = '#menu:teachingSkill/after'
-    TEACHINGSKILL_SUBMIT = '#menu:teachingSkill/submit'
-    TEACHINGSKILL_CANCEL = '#menu:teachingSkill/cancel'
-    TEACHINGSKILL_TEACHTOLEVEL = '#menu:teachingSkill/teachToLevel'
-    TEACHINGSKILL_TOTALPAY = '#menu:teachingSkill/totalPay'
-    TEACHINGSKILL_FREEXPISTIGHT = '#menu:teachingSkill/freeXpIsTight'
     PROFILE_HEADER_REGISTRATIONDATETITLE = '#menu:profile/header/registrationDateTitle'
     PROFILE_HEADER_LASTBATTLEDATETITLE = '#menu:profile/header/lastBattleDateTitle'
     PROFILE_CLAN_LABEL = '#menu:profile/clan/label'
@@ -1111,6 +1100,8 @@ class MENU(object):
     MODULEINFO_AUTORELOADGUNLABEL = '#menu:moduleInfo/autoReloadGunLabel'
     MODULEINFO_AUTORELOADGUNLABEL_BOOST = '#menu:moduleInfo/autoReloadGunLabel/boost'
     MODULEINFO_DUALGUNLABEL = '#menu:moduleInfo/dualGunLabel'
+    MODULEINFO_DUALACCURACYGUNLABEL = '#menu:moduleInfo/dualAccuracyGunLabel'
+    MODULEINFO_DAMAGEMUTABLEGUNLABEL = '#menu:moduleInfo/damageMutableGunLabel'
     MODULEINFO_TRACKWITHINTRACKCHASSISLABEL = '#menu:moduleInfo/trackWithinTrackChassisLabel'
     MODULEINFO_HYDRAULICCHASSISLABEL = '#menu:moduleInfo/hydraulicChassisLabel'
     MODULEINFO_HYDRAULICAUTOSIEGECHASSISLABEL = '#menu:moduleInfo/hydraulicAutoSiegeChassisLabel'
@@ -1142,6 +1133,9 @@ class MENU(object):
     MODULEINFO_PARAMS_SHELLSCOUNT = '#menu:moduleInfo/params/shellsCount'
     MODULEINFO_PARAMS_SHELLRELOADINGTIME = '#menu:moduleInfo/params/shellReloadingTime'
     MODULEINFO_PARAMS_RELOADMAGAZINETIME = '#menu:moduleInfo/params/reloadMagazineTime'
+    MODULEINFO_PARAMS_BURSTTIMEINTERVAL = '#menu:moduleInfo/params/burstTimeInterval'
+    MODULEINFO_PARAMS_BURSTCOUNT = '#menu:moduleInfo/params/burstCount'
+    MODULEINFO_PARAMS_BURSTSIZE = '#menu:moduleInfo/params/burstSize'
     MODULEINFO_PARAMS_AUTORELOADTIME = '#menu:moduleInfo/params/autoReloadTime'
     MODULEINFO_PARAMS_AUTORELOADTIME_BOOST = '#menu:moduleInfo/params/autoReloadTime/boost'
     MODULEINFO_PARAMS_RELOADTIME = '#menu:moduleInfo/params/reloadTime'
@@ -1153,11 +1147,16 @@ class MENU(object):
     MODULEINFO_PARAMS_DAMAGE = '#menu:moduleInfo/params/damage'
     MODULEINFO_PARAMS_AVGPIERCINGPOWER = '#menu:moduleInfo/params/avgPiercingPower'
     MODULEINFO_PARAMS_AVGDAMAGELIST = '#menu:moduleInfo/params/avgDamageList'
+    MODULEINFO_PARAMS_MAXAVGMUTABLEDAMAGELIST = '#menu:moduleInfo/params/maxAvgMutableDamageList'
+    MODULEINFO_PARAMS_MINAVGMUTABLEDAMAGELIST = '#menu:moduleInfo/params/minAvgMutableDamageList'
     MODULEINFO_PARAMS_AVGDAMAGE = '#menu:moduleInfo/params/avgDamage'
+    MODULEINFO_PARAMS_AVGMUTABLEDAMAGE = '#menu:moduleInfo/params/avgMutableDamage'
     MODULEINFO_PARAMS_AVGDAMAGEPERMINUTE = '#menu:moduleInfo/params/avgDamagePerMinute'
     MODULEINFO_PARAMS_ARMOR = '#menu:moduleInfo/params/armor'
     MODULEINFO_PARAMS_ROTATIONSPEED = '#menu:moduleInfo/params/rotationSpeed'
     MODULEINFO_PARAMS_DISPERTIONRADIUS = '#menu:moduleInfo/params/dispertionRadius'
+    MODULEINFO_PARAMS_DUALACCURACYCOOLINGDELAY = '#menu:moduleInfo/params/dualAccuracyCoolingDelay'
+    MODULEINFO_PARAMS_BURSTFIRERATE = '#menu:moduleInfo/params/burstFireRate'
     MODULEINFO_PARAMS_AIMINGTIME = '#menu:moduleInfo/params/aimingTime'
     MODULEINFO_PARAMS_FIRESTARTINGCHANCE = '#menu:moduleInfo/params/fireStartingChance'
     MODULEINFO_PARAMS_RADIODISTANCE = '#menu:moduleInfo/params/radioDistance'
@@ -1222,6 +1221,7 @@ class MENU(object):
     VEHICLEINFO_PARAMS_GUNYAWLIMITS = '#menu:vehicleInfo/params/gunYawLimits'
     VEHICLEINFO_PARAMS_AIMINGTIME = '#menu:vehicleInfo/params/aimingTime'
     VEHICLEINFO_PARAMS_SHOTDISPERSIONANGLE = '#menu:vehicleInfo/params/shotDispersionAngle'
+    VEHICLEINFO_PARAMS_DUALACCURACYCOOLINGDELAY = '#menu:vehicleInfo/params/dualAccuracyCoolingDelay'
     VEHICLEINFO_PARAMS_AVGDAMAGEPERMINUTE = '#menu:vehicleInfo/params/avgDamagePerMinute'
     VEHICLEINFO_PARAMS_ENGINEPOWERPERTON = '#menu:vehicleInfo/params/enginePowerPerTon'
     VEHICLEINFO_PARAMS_CLIPFIRERATE = '#menu:vehicleInfo/params/clipFireRate'
@@ -1288,41 +1288,9 @@ class MENU(object):
     RESEARCH_LABELS_BUTTON_RENT = '#menu:research/labels/button/rent'
     RESEARCH_LABELS_BUTTON_TOCOLLECTION = '#menu:research/labels/button/toCollection'
     TRADE_IN = '#menu:trade/in'
-    BARRACKS_MENU_ROLEFILTER_TEXTFIELD = '#menu:barracks/menu/roleFilter/textfield'
-    BARRACKS_BTNBUYTANKMAN = '#menu:barracks/btnBuyTankman'
-    BARRACKS_BTNBUYBERTH = '#menu:barracks/btnBuyBerth'
-    BARRACKS_BTNBUYBERTHDECS = '#menu:barracks/btnBuyBerthDecs'
-    BARRACKS_MENU_ROLEFILTER_ALL = '#menu:barracks/menu/roleFilter/all'
-    BARRACKS_MENU_ROLEFILTER_COMMANDER = '#menu:barracks/menu/roleFilter/commander'
-    BARRACKS_MENU_ROLEFILTER_RADIOMAN = '#menu:barracks/menu/roleFilter/radioman'
-    BARRACKS_MENU_ROLEFILTER_GUNNER = '#menu:barracks/menu/roleFilter/gunner'
-    BARRACKS_MENU_ROLEFILTER_LOADER = '#menu:barracks/menu/roleFilter/loader'
-    BARRACKS_MENU_ROLEFILTER_DRIVER = '#menu:barracks/menu/roleFilter/driver'
-    BARRACKS_MENU_TANKTYPEFILTER_TEXTFIELD = '#menu:barracks/menu/tankTypeFilter/textfield'
-    BARRACKS_MENU_LOCATIONFILTER_TEXTFIELD = '#menu:barracks/menu/locationFilter/textfield'
-    BARRACKS_MENU_LOCATIONFILTER_TANKS = '#menu:barracks/menu/locationFilter/tanks'
-    BARRACKS_MENU_LOCATIONFILTER_BARRACKS = '#menu:barracks/menu/locationFilter/barracks'
-    BARRACKS_MENU_LOCATIONFILTER_BARRACKSANDTANKS = '#menu:barracks/menu/locationFilter/barracksAndTanks'
-    BARRACKS_MENU_LOCATIONFILTER_DISMISSED = '#menu:barracks/menu/locationFilter/dismissed'
-    BARRACKS_MENU_LOCATIONFILTER_NOTRECRUITED = '#menu:barracks/menu/locationFilter/notRecruited'
-    BARRACKS_DISMISSEDTANKMENCOUNT = '#menu:barracks/dismissedTankmenCount'
-    BARRACKS_TANKMENCOUNT = '#menu:barracks/tankmenCount'
-    BARRACKS_BTNRECRUIT = '#menu:barracks/btnRecruit'
     BARRACKS_NOTRECRUITEDACTIVATEBEFORE = '#menu:barracks/notRecruitedActivateBefore'
-    BARRACKS_PLACESCOUNT = '#menu:barracks/placesCount'
-    BARRACKS_NOTRECRUITEDCOUNT = '#menu:barracks/notRecruitedCount'
-    BARRACKS_RECOVERYCOUNT = '#menu:barracks/recoveryCount'
-    BARRACKS_BARRACKSRENDERER_PLACESCOUNT = '#menu:barracks/barracksRenderer/placesCount'
-    BARRACKS_BTNNEWPLACE = '#menu:barracks/btnNewPlace'
     BARRACKS_BTNUNLOAD = '#menu:barracks/btnUnload'
     BARRACKS_BTNDISSMISS = '#menu:barracks/btnDissmiss'
-    BARRACKS_BTNRECRUITNOTRECRUITED = '#menu:barracks/btnRecruitNotRecruited'
-    BARRACKS_BTNRECOVERY = '#menu:barracks/btnRecovery'
-    BARRACKS_NORECOVERYTANKMEN_TITLE = '#menu:barracks/noRecoveryTankmen/title'
-    BARRACKS_NORECOVERYTANKMEN_MESSAGE = '#menu:barracks/noRecoveryTankmen/message'
-    BARRACKS_NOFILTEREDRECOVERYTANKMEN_MESSAGE = '#menu:barracks/noFilteredRecoveryTankmen/message'
-    BARRACKS_NONOTRECRUITEDTANKMEN_TITLE = '#menu:barracks/noNotRecruitedTankmen/title'
-    BARRACKS_NONOTRECRUITEDTANKMEN_MESSAGE = '#menu:barracks/noNotRecruitedTankmen/message'
     STORE_MENU_NOITEMS = '#menu:store/menu/noItems'
     STORE_BACKBUTTON_LABEL = '#menu:store/backButton/label'
     STORE_BACKBUTTON_DESCRIPTION = '#menu:store/backButton/description'
@@ -1535,6 +1503,7 @@ class MENU(object):
     TRAINING_INFO_USESEPARATEVOIPCHAT = '#menu:training/info/useSeparateVoipChat'
     TRAINING_INFO_NOTUSECHAT = '#menu:training/info/notUseChat'
     TRAINING_INVITATIONS_TITLE = '#menu:training/invitations/title'
+    TRAINING_ALERTTEXT_ONLYTIERX = '#menu:training/alertText/onlyTierX'
     TANKMANRETRAININGBTN_FREE = '#menu:tankmanRetrainingBtn/free'
     VEHICLESCAROUSEL_CONTEXTMENU_VEHICLEINFO = '#menu:vehiclesCarousel/contextMenu/vehicleInfo'
     VEHICLESCAROUSEL_CONTEXTMENU_VEHICLESELL = '#menu:vehiclesCarousel/contextMenu/vehicleSell'
@@ -1593,7 +1562,7 @@ class MENU(object):
     CONTEXTMENU_MONEYTRANSFER = '#menu:contextMenu/moneyTransfer'
     CONTEXTMENU_CREATEPRIVATECHANNEL = '#menu:contextMenu/createPrivateChannel'
     CONTEXTMENU_ADDTOFRIENDS = '#menu:contextMenu/addToFriends'
-    CONTEXTMENU_ADDTOFRIENDSAGAIN = '#menu:contextMenu/addToFriendsAgain'
+    CONTEXTMENU_REQUESTFRIENDSHIP = '#menu:contextMenu/requestFriendship'
     CONTEXTMENU_REJECTFRIENDSHIP = '#menu:contextMenu/rejectFriendship'
     CONTEXTMENU_REMOVEFROMFRIENDS = '#menu:contextMenu/removeFromFriends'
     CONTEXTMENU_ADDTOIGNORED = '#menu:contextMenu/addToIgnored'
@@ -1640,13 +1609,7 @@ class MENU(object):
     CONTEXTMENU_BOT = '#menu:contextMenu/bot'
     CONTEXTMENU_ASSIGNPRIVATE = '#menu:contextMenu/assignPrivate'
     CONTEXTMENU_ASSIGNOFFICER = '#menu:contextMenu/assignOfficer'
-    CONTEXTMENU_PERSONALCASE = '#menu:contextMenu/personalCase'
     CONTEXTMENU_PERSONALCASE_STATSBLOCKTITLE = '#menu:contextMenu/personalCase/statsBlockTitle'
-    CONTEXTMENU_PERSONALCASE_STATS_FIRSTINFO = '#menu:contextMenu/personalCase/stats/firstInfo'
-    CONTEXTMENU_PERSONALCASE_STATS_SECONDINFO = '#menu:contextMenu/personalCase/stats/secondInfo'
-    CONTEXTMENU_PERSONALCASE_STATS_WOTPLUS = '#menu:contextMenu/personalCase/stats/wotPlus'
-    CONTEXTMENU_TANKMANUNLOAD = '#menu:contextMenu/tankmanUnload'
-    CONTEXTMENU_TANKMANUNLOADALL = '#menu:contextMenu/tankmanUnloadAll'
     CONTEXTMENU_DISMISS = '#menu:contextMenu/dismiss'
     CONTEXTMENU_LOCKSLOT = '#menu:contextMenu/lockSlot'
     CONTEXTMENU_UNLOCKSLOT = '#menu:contextMenu/unlockSlot'
@@ -1654,8 +1617,6 @@ class MENU(object):
     CONTEXTMENU_MESSENGER_CLOSECURRENT = '#menu:contextMenu/messenger/closeCurrent'
     CONTEXTMENU_MESSENGER_CLOSEALLEXCEPTCURRENT = '#menu:contextMenu/messenger/closeAllExceptCurrent'
     CONTEXTMENU_CREATECONTACTNOTE = '#menu:contextMenu/createContactNote'
-    BATTLEROYALE_CONTEXTMENU_TAKETESTDRIVE = '#menu:battleRoyale/contextMenu/takeTestDrive'
-    BATTLEROYALE_CONTEXTMENU_TAKERENT = '#menu:battleRoyale/contextMenu/takeRent'
     CONTEXTMENU_EDITCONTACTNOTE = '#menu:contextMenu/editContactNote'
     CONTEXTMENU_REMOVECONTACTNOTE = '#menu:contextMenu/removeContactNote'
     CONTEXTMENU_BOTNOACTIONS = '#menu:contextMenu/botNoActions'
@@ -1680,22 +1641,6 @@ class MENU(object):
     STEAM_OTHERMETHODS = '#menu:steam/otherMethods'
     STEAM_SUBMIT = '#menu:steam/submit'
     STEAM_CANCEL = '#menu:steam/cancel'
-    SKILLDROPWINDOW_TITLE = '#menu:skillDropWindow/title'
-    SKILLDROPWINDOW_BEFORE = '#menu:skillDropWindow/before'
-    SKILLDROPWINDOW_MULTIPLIER = '#menu:skillDropWindow/multiplier'
-    SKILLDROPWINDOW_INSTORAGE = '#menu:skillDropWindow/inStorage'
-    SKILLDROPWINDOW_NOTAVAILABLE = '#menu:skillDropWindow/notAvailable'
-    SKILLDROPWINDOW_DIRECTION = '#menu:skillDropWindow/direction'
-    SKILLDROPWINDOW_TRAINING = '#menu:skillDropWindow/training'
-    SKILLDROPWINDOW_AFTER = '#menu:skillDropWindow/after'
-    SKILLDROPWINDOW_STUDY_ACADEMY = '#menu:skillDropWindow/study/academy'
-    SKILLDROPWINDOW_STUDY_SCOOL = '#menu:skillDropWindow/study/scool'
-    SKILLDROPWINDOW_STUDY_FREE = '#menu:skillDropWindow/study/free'
-    SKILLDROPWINDOW_APPLYBTN = '#menu:skillDropWindow/applyBtn'
-    SKILLDROPWINDOW_CANCELBTN = '#menu:skillDropWindow/cancelBtn'
-    SKILLDROPWINDOW_FREEDROPLABEL = '#menu:skillDropWindow/freeDropLabel'
-    SKILLDROPWINDOW_FREEDROPPERCENT = '#menu:skillDropWindow/freeDropPercent'
-    SKILLDROPWINDOW_TOOLTIP_VISIBLEDISABLED = '#menu:skillDropWindow/tooltip/visibleDisabled'
     CENTERISAVAILABLE = '#menu:centerIsAvailable'
     CENTERISUNAVAILABLE = '#menu:centerIsUnAvailable'
     ACCOUNT_PROFILE_EMPTYBATTLELIST = '#menu:account/profile/emptyBattleList'
@@ -1769,6 +1714,7 @@ class MENU(object):
     BONUSTYPE_38 = '#menu:bonusType/38'
     BONUSTYPE_42 = '#menu:bonusType/42'
     BONUSTYPE_43 = '#menu:bonusType/43'
+    BONUSTYPE_44 = '#menu:bonusType/44'
     FORTIFICATIONCTX_ASSIGNEDPLAYERS = '#menu:fortificationCtx/assignedPlayers'
     FORTIFICATIONCTX_PREPAREORDER = '#menu:fortificationCtx/prepareOrder'
     FORTIFICATIONCTX_CLANDESCRIPTION_OPENCLANCARD = '#menu:fortificationCtx/clanDescription/openClanCard'
@@ -1818,6 +1764,18 @@ class MENU(object):
     DATETIME_MONTHS_10 = '#menu:dateTime/months/10'
     DATETIME_MONTHS_11 = '#menu:dateTime/months/11'
     DATETIME_MONTHS_12 = '#menu:dateTime/months/12'
+    DATETIME_MONTHS_FULLSMALL_1 = '#menu:dateTime/months/fullSmall/1'
+    DATETIME_MONTHS_FULLSMALL_2 = '#menu:dateTime/months/fullSmall/2'
+    DATETIME_MONTHS_FULLSMALL_3 = '#menu:dateTime/months/fullSmall/3'
+    DATETIME_MONTHS_FULLSMALL_4 = '#menu:dateTime/months/fullSmall/4'
+    DATETIME_MONTHS_FULLSMALL_5 = '#menu:dateTime/months/fullSmall/5'
+    DATETIME_MONTHS_FULLSMALL_6 = '#menu:dateTime/months/fullSmall/6'
+    DATETIME_MONTHS_FULLSMALL_7 = '#menu:dateTime/months/fullSmall/7'
+    DATETIME_MONTHS_FULLSMALL_8 = '#menu:dateTime/months/fullSmall/8'
+    DATETIME_MONTHS_FULLSMALL_9 = '#menu:dateTime/months/fullSmall/9'
+    DATETIME_MONTHS_FULLSMALL_10 = '#menu:dateTime/months/fullSmall/10'
+    DATETIME_MONTHS_FULLSMALL_11 = '#menu:dateTime/months/fullSmall/11'
+    DATETIME_MONTHS_FULLSMALL_12 = '#menu:dateTime/months/fullSmall/12'
     DATETIME_FROMTOWITHYEAR = '#menu:dateTime/fromToWithYear'
     DATETIME_ORDER = '#menu:dateTime/order'
     DATETIME_UNLIMITED = '#menu:dateTime/unlimited'
@@ -1834,7 +1792,23 @@ class MENU(object):
     DATETIME_MONTHS_SHORT_10 = '#menu:dateTime/months/short/10'
     DATETIME_MONTHS_SHORT_11 = '#menu:dateTime/months/short/11'
     DATETIME_MONTHS_SHORT_12 = '#menu:dateTime/months/short/12'
+    DATETIME_MONTHS_SHORTSMALL_1 = '#menu:dateTime/months/shortSmall/1'
+    DATETIME_MONTHS_SHORTSMALL_2 = '#menu:dateTime/months/shortSmall/2'
+    DATETIME_MONTHS_SHORTSMALL_3 = '#menu:dateTime/months/shortSmall/3'
+    DATETIME_MONTHS_SHORTSMALL_4 = '#menu:dateTime/months/shortSmall/4'
+    DATETIME_MONTHS_SHORTSMALL_5 = '#menu:dateTime/months/shortSmall/5'
+    DATETIME_MONTHS_SHORTSMALL_6 = '#menu:dateTime/months/shortSmall/6'
+    DATETIME_MONTHS_SHORTSMALL_7 = '#menu:dateTime/months/shortSmall/7'
+    DATETIME_MONTHS_SHORTSMALL_8 = '#menu:dateTime/months/shortSmall/8'
+    DATETIME_MONTHS_SHORTSMALL_9 = '#menu:dateTime/months/shortSmall/9'
+    DATETIME_MONTHS_SHORTSMALL_10 = '#menu:dateTime/months/shortSmall/10'
+    DATETIME_MONTHS_SHORTSMALL_11 = '#menu:dateTime/months/shortSmall/11'
+    DATETIME_MONTHS_SHORTSMALL_12 = '#menu:dateTime/months/shortSmall/12'
     DATETIME_SHORTDATEFORMATWITHOUTYEAR = '#menu:dateTime/shortDateFormatWithoutYear'
+    DATERANGE_DASHDIVIDER_FULL = '#menu:dateRange/dashDivider/full'
+    DATERANGE_DASHDIVIDER_SHORT = '#menu:dateRange/dashDivider/short'
+    DATERANGE_TEXTDIVIDER_DATE = '#menu:dateRange/textDivider/date'
+    DATERANGE_TEXTDIVIDER_TIME = '#menu:dateRange/textDivider/time'
     VALIDATION_PUBLICINFO_ABBREV_INVALID = '#menu:validation/publicInfo/abbrev/invalid'
     VALIDATION_PUBLICINFO_ABBREV_INVALID_CN = '#menu:validation/publicInfo/abbrev/invalid/CN'
     VALIDATION_PUBLICINFO_ABBREV_INVALID_KR = '#menu:validation/publicInfo/abbrev/invalid/KR'
@@ -1845,7 +1819,6 @@ class MENU(object):
     AWARDWINDOW_TITLE_CREDITS = '#menu:awardWindow/title/credits'
     AWARDWINDOW_TITLE_TOKENS = '#menu:awardWindow/title/tokens'
     AWARDWINDOW_TITLE_TASKCOMPLETE = '#menu:awardWindow/title/taskComplete'
-    AWARDWINDOW_TITLE_SPECIALACHIEVEMENT = '#menu:awardWindow/title/specialAchievement'
     AWARDWINDOW_OKBUTTON = '#menu:awardWindow/okButton'
     AWARDWINDOW_TAKENEXTBUTTON = '#menu:awardWindow/takeNextButton'
     AWARDWINDOW_CLOSEBUTTON = '#menu:awardWindow/closeButton'
@@ -1860,19 +1833,6 @@ class MENU(object):
     AWARDWINDOW_QUESTS_MEDALS_HEADER = '#menu:awardWindow/quests/medals/header'
     AWARDWINDOW_QUESTS_VEHICLE_HEADER = '#menu:awardWindow/quests/vehicle/header'
     AWARDWINDOW_QUESTS_VEHICLE_DESCRIPTION = '#menu:awardWindow/quests/vehicle/description'
-    AWARDWINDOW_SPECIALACHIEVEMENT_RESEARCH_DESCRIPTION1 = '#menu:awardWindow/specialAchievement/research/description1'
-    AWARDWINDOW_SPECIALACHIEVEMENT_RESEARCH_DESCRIPTION2 = '#menu:awardWindow/specialAchievement/research/description2'
-    AWARDWINDOW_SPECIALACHIEVEMENT_RESEARCH_DESCRIPTION3 = '#menu:awardWindow/specialAchievement/research/description3'
-    AWARDWINDOW_SPECIALACHIEVEMENT_RESEARCH_DESCRIPTION4 = '#menu:awardWindow/specialAchievement/research/description4'
-    AWARDWINDOW_SPECIALACHIEVEMENT_VICTORY_DESCRIPTION1 = '#menu:awardWindow/specialAchievement/victory/description1'
-    AWARDWINDOW_SPECIALACHIEVEMENT_VICTORY_DESCRIPTION2 = '#menu:awardWindow/specialAchievement/victory/description2'
-    AWARDWINDOW_SPECIALACHIEVEMENT_VICTORY_DESCRIPTION3 = '#menu:awardWindow/specialAchievement/victory/description3'
-    AWARDWINDOW_SPECIALACHIEVEMENT_VICTORY_DESCRIPTION4 = '#menu:awardWindow/specialAchievement/victory/description4'
-    AWARDWINDOW_SPECIALACHIEVEMENT_BATTLE_DESCRIPTION1 = '#menu:awardWindow/specialAchievement/battle/description1'
-    AWARDWINDOW_SPECIALACHIEVEMENT_BATTLE_DESCRIPTION2 = '#menu:awardWindow/specialAchievement/battle/description2'
-    AWARDWINDOW_SPECIALACHIEVEMENT_BATTLE_DESCRIPTION3 = '#menu:awardWindow/specialAchievement/battle/description3'
-    AWARDWINDOW_SPECIALACHIEVEMENT_BATTLE_DESCRIPTION4 = '#menu:awardWindow/specialAchievement/battle/description4'
-    AWARDWINDOW_SPECIALACHIEVEMENT_HEADER = '#menu:awardWindow/specialAchievement/header'
     AWARDWINDOW_TITLE_BOOSTERAWARD = '#menu:awardWindow/title/boosterAward'
     AWARDWINDOW_BOOSTERAWARD_HEADER = '#menu:awardWindow/boosterAward/header'
     AWARDWINDOW_BOOSTERAWARD_DESCRIPTION_TILLTIME = '#menu:awardWindow/boosterAward/description/tillTime'
@@ -2050,7 +2010,7 @@ class MENU(object):
     DISCOUNT_DESCRIPTION_VEHICLE = '#menu:discount/description/vehicle'
     CONTEXTMENU_VIEWCLANPROFILE = '#menu:contextMenu/viewClanProfile'
     CONTEXTMENU_COPYCLANNAME = '#menu:contextMenu/copyClanName'
-    CONTEXTMENU_WOTPLUSRENT = '#menu:contextMenu/wotPlusRent'
+    CONTEXTMENU_TELECOMRENT = '#menu:contextMenu/telecomRent'
     INFINITYSYMBOL = '#menu:infinitySymbol'
     HEADERBUTTONS_BATTLE_TYPES_EPICBATTLE = '#menu:headerButtons/battle/types/epicBattle'
     HEADERBUTTONS_BATTLE_TYPES_EPICBATTLE_DESCR = '#menu:headerButtons/battle/types/epicBattle/descr'
@@ -2162,12 +2122,12 @@ class MENU(object):
     VIEWHEADER_BACKBTN_DESCRLABEL_TECHTREE_SWEDEN_BLUEPRINTS = '#menu:viewHeader/backBtn/descrLabel/techtree/sweden/blueprints'
     VIEWHEADER_BACKBTN_DESCRLABEL_TECHTREE_POLAND_BLUEPRINTS = '#menu:viewHeader/backBtn/descrLabel/techtree/poland/blueprints'
     VIEWHEADER_BACKBTN_DESCRLABEL_TECHTREE_ITALY_BLUEPRINTS = '#menu:viewHeader/backBtn/descrLabel/techtree/italy/blueprints'
-    INTERNET_PROVIDER_ROSTELECOM_NAME = '#menu:internet_provider/Rostelecom/name'
-    INTERNET_PROVIDER_ROSTELECOM_TARIFF = '#menu:internet_provider/Rostelecom/tariff'
-    INTERNET_PROVIDER_BELTELECOM_NAME = '#menu:internet_provider/Beltelecom/name'
-    INTERNET_PROVIDER_BELTELECOM_TARIFF = '#menu:internet_provider/Beltelecom/tariff'
-    INTERNET_PROVIDER_KYIVSTAR_NAME = '#menu:internet_provider/Kyivstar/name'
-    INTERNET_PROVIDER_KYIVSTAR_TARIFF = '#menu:internet_provider/Kyivstar/tariff'
+    INTERNET_PROVIDER_LOCALPARTNER2_NAME = '#menu:internet_provider/LocalPartner2/name'
+    INTERNET_PROVIDER_LOCALPARTNER2_TARIFF = '#menu:internet_provider/LocalPartner2/tariff'
+    INTERNET_PROVIDER_LOCALPARTNER3_NAME = '#menu:internet_provider/LocalPartner3/name'
+    INTERNET_PROVIDER_LOCALPARTNER3_TARIFF = '#menu:internet_provider/LocalPartner3/tariff'
+    INTERNET_PROVIDER_LOCALPARTNER4_NAME = '#menu:internet_provider/LocalPartner4/name'
+    INTERNET_PROVIDER_LOCALPARTNER4_TARIFF = '#menu:internet_provider/LocalPartner4/tariff'
     INTERNET_PROVIDER_KAZAKHTELECOM_NAME = '#menu:internet_provider/Kazakhtelecom/name'
     INTERNET_PROVIDER_KAZAKHTELECOM_TARIFF = '#menu:internet_provider/Kazakhtelecom/tariff'
     INTERNET_PROVIDER_BEELINEKZ_NAME = '#menu:internet_provider/BeelineKZ/name'
@@ -2202,7 +2162,6 @@ class MENU(object):
     CRYSTALS_INFO_TAB_EARN_LEVEL_DESCRIPTIONCONTENT_LEVEL9 = '#menu:crystals/info/tab/earn/level/descriptionContent/level9'
     CRYSTALS_INFO_TAB_EARN_LEVEL_MOD_0 = '#menu:crystals/info/tab/earn/level/mod/0'
     CRYSTALS_INFO_TAB_EARN_LEVEL_MOD_1 = '#menu:crystals/info/tab/earn/level/mod/1'
-    CRYSTALS_INFO_TAB_EARN_LEVEL_MOD_2 = '#menu:crystals/info/tab/earn/level/mod/2'
     CRYSTALS_INFO_TAB_EARN_MARKER_TITLE = '#menu:crystals/info/tab/earn/marker/title'
     CRYSTALS_INFO_TAB_EARN_MARKER_DESCRIPTION_1 = '#menu:crystals/info/tab/earn/marker/description/1'
     CRYSTALS_INFO_TAB_EARN_MARKER_DESCRIPTION_2 = '#menu:crystals/info/tab/earn/marker/description/2'
@@ -2272,7 +2231,6 @@ class MENU(object):
     CRYSTALS_INFO_TAB_GET_DESCRIPTION = '#menu:crystals/info/tab/get/description'
     CRYSTALS_INFO_TAB_GET_RANDOM = '#menu:crystals/info/tab/get/random'
     CRYSTALS_INFO_TAB_GET_GENERAL = '#menu:crystals/info/tab/get/general'
-    CRYSTALS_INFO_TAB_GET_RANKED = '#menu:crystals/info/tab/get/ranked'
     CRYSTALS_INFO_TAB_GET_CARD_CONDITION = '#menu:crystals/info/tab/get/card/condition'
     CRYSTALS_INFO_TAB_GET_CARD_WIN = '#menu:crystals/info/tab/get/card/win'
     CRYSTALS_INFO_TAB_GET_CARD_DEFEAT = '#menu:crystals/info/tab/get/card/defeat'
@@ -2288,6 +2246,13 @@ class MENU(object):
     CRYSTALS_INFO_TAB_SPEND_CARD_PRICE = '#menu:crystals/info/tab/spend/card/price'
     BADGE_NEW = '#menu:badge/new'
     BADGE_CONFIRM = '#menu:badge/confirm'
+    CONTEXTMENU_CREWWIDGETPERSONALFILE = '#menu:contextMenu/crewWidgetPersonalFile'
+    CONTEXTMENU_CREWWIDGETRETRAIN = '#menu:contextMenu/crewWidgetRetrain'
+    CONTEXTMENU_CREWWIDGETCHANGECREWMEMBER = '#menu:contextMenu/crewWidgetChangeCrewMember'
+    CONTEXTMENU_CREWWIDGETSENDTOTOBARRACKS = '#menu:contextMenu/crewWidgetSendToToBarracks'
+    CONTEXTMENU_CREWWIDGETDISMISS = '#menu:contextMenu/crewWidgetDismiss'
+    CONTEXTMENU_CREWWIDGETQUICKTRAINING = '#menu:contextMenu/crewWidgetQuickTraining'
+    CONTEXTMENU_CREWWIDGETCHANGESPECIALIZATION = '#menu:contextMenu/crewWidgetChangeSpecialization'
     CONTEXTMENU_ENUM = (CONTEXTMENU_EXCHANGE,
      CONTEXTMENU_VEHICLEINFO,
      CONTEXTMENU_VEHICLEINFOEX,
@@ -2308,7 +2273,7 @@ class MENU(object):
      CONTEXTMENU_MONEYTRANSFER,
      CONTEXTMENU_CREATEPRIVATECHANNEL,
      CONTEXTMENU_ADDTOFRIENDS,
-     CONTEXTMENU_ADDTOFRIENDSAGAIN,
+     CONTEXTMENU_REQUESTFRIENDSHIP,
      CONTEXTMENU_REJECTFRIENDSHIP,
      CONTEXTMENU_REMOVEFROMFRIENDS,
      CONTEXTMENU_ADDTOIGNORED,
@@ -2355,13 +2320,7 @@ class MENU(object):
      CONTEXTMENU_BOT,
      CONTEXTMENU_ASSIGNPRIVATE,
      CONTEXTMENU_ASSIGNOFFICER,
-     CONTEXTMENU_PERSONALCASE,
      CONTEXTMENU_PERSONALCASE_STATSBLOCKTITLE,
-     CONTEXTMENU_PERSONALCASE_STATS_FIRSTINFO,
-     CONTEXTMENU_PERSONALCASE_STATS_SECONDINFO,
-     CONTEXTMENU_PERSONALCASE_STATS_WOTPLUS,
-     CONTEXTMENU_TANKMANUNLOAD,
-     CONTEXTMENU_TANKMANUNLOADALL,
      CONTEXTMENU_DISMISS,
      CONTEXTMENU_LOCKSLOT,
      CONTEXTMENU_UNLOCKSLOT,
@@ -2386,7 +2345,14 @@ class MENU(object):
      CONTEXTMENU_GOTOBLUEPRINT,
      CONTEXTMENU_VIEWCLANPROFILE,
      CONTEXTMENU_COPYCLANNAME,
-     CONTEXTMENU_WOTPLUSRENT)
+     CONTEXTMENU_TELECOMRENT,
+     CONTEXTMENU_CREWWIDGETPERSONALFILE,
+     CONTEXTMENU_CREWWIDGETRETRAIN,
+     CONTEXTMENU_CREWWIDGETCHANGECREWMEMBER,
+     CONTEXTMENU_CREWWIDGETSENDTOTOBARRACKS,
+     CONTEXTMENU_CREWWIDGETDISMISS,
+     CONTEXTMENU_CREWWIDGETQUICKTRAINING,
+     CONTEXTMENU_CREWWIDGETCHANGESPECIALIZATION)
     NATIONS_ENUM = (NATIONS_TITLE,
      NATIONS_USSR,
      NATIONS_GERMANY,
@@ -2446,6 +2412,8 @@ class MENU(object):
      TANKCAROUSEL_VEHICLESTATES_UNSUITABLETOQUEUE,
      TANKCAROUSEL_VEHICLESTATES_FALLOUT_ONLY,
      TANKCAROUSEL_VEHICLESTATES_DEALISOVER,
+     TANKCAROUSEL_VEHICLESTATES_SUBSCRIPTION_SUSPENDED,
+     TANKCAROUSEL_VEHICLESTATES_WOT_PLUS_EXCLUSIVE_VEHICLE_DISABLED,
      TANKCAROUSEL_VEHICLESTATES_UNSUITABLETOUNIT,
      TANKCAROUSEL_VEHICLESTATES_DISABLED,
      TANKCAROUSEL_VEHICLESTATES_TOOHEAVY,
@@ -2515,6 +2483,18 @@ class MENU(object):
      DATETIME_MONTHS_10,
      DATETIME_MONTHS_11,
      DATETIME_MONTHS_12,
+     DATETIME_MONTHS_FULLSMALL_1,
+     DATETIME_MONTHS_FULLSMALL_2,
+     DATETIME_MONTHS_FULLSMALL_3,
+     DATETIME_MONTHS_FULLSMALL_4,
+     DATETIME_MONTHS_FULLSMALL_5,
+     DATETIME_MONTHS_FULLSMALL_6,
+     DATETIME_MONTHS_FULLSMALL_7,
+     DATETIME_MONTHS_FULLSMALL_8,
+     DATETIME_MONTHS_FULLSMALL_9,
+     DATETIME_MONTHS_FULLSMALL_10,
+     DATETIME_MONTHS_FULLSMALL_11,
+     DATETIME_MONTHS_FULLSMALL_12,
      DATETIME_MONTHS_SHORT_1,
      DATETIME_MONTHS_SHORT_2,
      DATETIME_MONTHS_SHORT_3,
@@ -2526,7 +2506,19 @@ class MENU(object):
      DATETIME_MONTHS_SHORT_9,
      DATETIME_MONTHS_SHORT_10,
      DATETIME_MONTHS_SHORT_11,
-     DATETIME_MONTHS_SHORT_12)
+     DATETIME_MONTHS_SHORT_12,
+     DATETIME_MONTHS_SHORTSMALL_1,
+     DATETIME_MONTHS_SHORTSMALL_2,
+     DATETIME_MONTHS_SHORTSMALL_3,
+     DATETIME_MONTHS_SHORTSMALL_4,
+     DATETIME_MONTHS_SHORTSMALL_5,
+     DATETIME_MONTHS_SHORTSMALL_6,
+     DATETIME_MONTHS_SHORTSMALL_7,
+     DATETIME_MONTHS_SHORTSMALL_8,
+     DATETIME_MONTHS_SHORTSMALL_9,
+     DATETIME_MONTHS_SHORTSMALL_10,
+     DATETIME_MONTHS_SHORTSMALL_11,
+     DATETIME_MONTHS_SHORTSMALL_12)
     LEVELS_ENUM = (LEVELS_1,
      LEVELS_2,
      LEVELS_3,
@@ -2637,6 +2629,8 @@ class MENU(object):
      TANK_PARAMS_ROCKETACCELERATIONENGINEPOWER,
      TANK_PARAMS_ROCKETACCELERATIONSPEEDLIMITS,
      TANK_PARAMS_ROCKETACCELERATIONREUSEANDDURATION,
+     TANK_PARAMS_DUALACCURACYCOOLINGDELAY,
+     TANK_PARAMS_DUALACCURACYCOOLINGDELAY_EXTENDEDTITLE,
      TANK_PARAMS_TIMEOFREACHING,
      TANK_PARAMS_ATTAINABLESPEED,
      TANK_PARAMS_HULLARMOR,
@@ -2750,7 +2744,10 @@ class MENU(object):
      LOADING_BATTLETYPES_DESC_26,
      LOADING_BATTLETYPES_DESC_28,
      LOADING_BATTLETYPES_DESC_29,
-     LOADING_BATTLETYPES_DESC_30)
+     LOADING_BATTLETYPES_DESC_30,
+     LOADING_BATTLETYPES_DESC_31,
+     LOADING_BATTLETYPES_DESC_33,
+     LOADING_BATTLETYPES_DESC_34)
     LOADING_BATTLETYPES_ENUM = (LOADING_BATTLETYPES_0,
      LOADING_BATTLETYPES_DESC_0,
      LOADING_BATTLETYPES_1,
@@ -2806,7 +2803,13 @@ class MENU(object):
      LOADING_BATTLETYPES_29,
      LOADING_BATTLETYPES_DESC_29,
      LOADING_BATTLETYPES_30,
-     LOADING_BATTLETYPES_DESC_30)
+     LOADING_BATTLETYPES_DESC_30,
+     LOADING_BATTLETYPES_31,
+     LOADING_BATTLETYPES_DESC_31,
+     LOADING_BATTLETYPES_33,
+     LOADING_BATTLETYPES_DESC_33,
+     LOADING_BATTLETYPES_34,
+     LOADING_BATTLETYPES_DESC_34)
     CST_ITEM_CTX_MENU_ENUM = (CST_ITEM_CTX_MENU_BUY,
      CST_ITEM_CTX_MENU_EXCHANGE,
      CST_ITEM_CTX_MENU_BUYMORE,
@@ -2850,14 +2853,14 @@ class MENU(object):
      CST_ITEM_CTX_MENU_PUTONTHIRD,
      CST_ITEM_CTX_MENU_UNLOAD,
      CST_ITEM_CTX_MENU_DECONSTRUCT)
-    INTERNET_PROVIDER_ALL_NAME_ENUM = (INTERNET_PROVIDER_ROSTELECOM_NAME,
-     INTERNET_PROVIDER_BELTELECOM_NAME,
-     INTERNET_PROVIDER_KYIVSTAR_NAME,
+    INTERNET_PROVIDER_ALL_NAME_ENUM = (INTERNET_PROVIDER_LOCALPARTNER2_NAME,
+     INTERNET_PROVIDER_LOCALPARTNER3_NAME,
+     INTERNET_PROVIDER_LOCALPARTNER4_NAME,
      INTERNET_PROVIDER_KAZAKHTELECOM_NAME,
      INTERNET_PROVIDER_BEELINEKZ_NAME)
-    INTERNET_PROVIDER_ALL_TARIFF_ENUM = (INTERNET_PROVIDER_ROSTELECOM_TARIFF,
-     INTERNET_PROVIDER_BELTELECOM_TARIFF,
-     INTERNET_PROVIDER_KYIVSTAR_TARIFF,
+    INTERNET_PROVIDER_ALL_TARIFF_ENUM = (INTERNET_PROVIDER_LOCALPARTNER2_TARIFF,
+     INTERNET_PROVIDER_LOCALPARTNER3_TARIFF,
+     INTERNET_PROVIDER_LOCALPARTNER4_TARIFF,
      INTERNET_PROVIDER_KAZAKHTELECOM_TARIFF,
      INTERNET_PROVIDER_BEELINEKZ_TARIFF)
     BOOSTER_USERNAME_ENUM = (BOOSTER_USERNAME_BOOSTER_XP,

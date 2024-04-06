@@ -12,6 +12,7 @@ from fun_random.gui.prb_control.entities.squad.actions_validator import FunRando
 from fun_random.gui.prb_control.entities.squad.ctx import FunSquadSettingsCtx, FunSquadChangeSubModeCtx
 from fun_random.gui.prb_control.entities.squad.scheduler import FunRandomSquadScheduler
 from gui.ClientUpdateManager import g_clientUpdateManager
+from gui.Scaleform.daapi.view.lobby.header.fight_btn_tooltips import getFunRandomFightBtnTooltipData
 from gui.prb_control.ctrl_events import g_prbCtrlEvents
 from gui.prb_control.entities.base.squad.components import RestrictedSPGDataProvider, RestrictedScoutDataProvider
 from gui.prb_control.entities.base.squad.entity import SquadEntryPoint, SquadEntity
@@ -49,7 +50,7 @@ class FunRandomSquadEntryPoint(SquadEntryPoint):
         elif desiredSubModeID == UNKNOWN_EVENT_ID or desiredSubMode is None:
             _logger.error('Trying to create fun random squad of invalid fun random sub mode %s.', desiredSubModeID)
             self.__abortSelection(UNIT_ERROR.BAD_PARAMS, callback)
-        elif not desiredSubMode.isAvailable():
+        elif not desiredSubMode.isSquadAvailable():
             _logger.debug('Trying to create fun random squad of unavailable fun random sub mode %s.', desiredSubModeID)
             self.__abortSelection(UNIT_ERROR.SORTIES_FORBIDDEN, callback)
         else:
@@ -61,7 +62,7 @@ class FunRandomSquadEntryPoint(SquadEntryPoint):
 
     def __abortSelection(self, reason, callback=None):
         self.__desiredSubModeID = UNKNOWN_EVENT_ID
-        self.__funRandomController.subModesHolder.setDesiredSubModeID(UNKNOWN_EVENT_ID)
+        self.__funRandomController.setDesiredSubModeID(UNKNOWN_EVENT_ID)
         notifyCaller(callback, False)
         g_prbCtrlEvents.onUnitCreationFailure(reason)
 
@@ -85,7 +86,7 @@ class FunRandomSquadEntity(SquadEntity):
         self._isBalancedSquad = self.isBalancedSquadEnabled()
         self.__restrictedSPGDataProvider.init(self)
         self.__restrictedScoutDataProvider.init(self)
-        self.__funRandomController.subModesHolder.setDesiredSubModeID(self.__getUnitSubModeID(), trustedSource=True)
+        self.__funRandomController.setDesiredSubModeID(self.__getUnitSubModeID(), trustedSource=True)
         funRandomSquadEntity = super(FunRandomSquadEntity, self).init(ctx)
         self._switchActionsValidator()
         self._switchRosterSettings()
@@ -123,6 +124,9 @@ class FunRandomSquadEntity(SquadEntity):
     def getConfirmDialogMeta(self, ctx):
         desiredSubMode = self.__funRandomController.subModesHolder.getDesiredSubMode()
         return None if desiredSubMode is None or not desiredSubMode.isAvailable() else super(FunRandomSquadEntity, self).getConfirmDialogMeta(ctx)
+
+    def getFightBtnTooltipData(self, isStateDisabled):
+        return (getFunRandomFightBtnTooltipData(self.canPlayerDoAction(), True), False) if isStateDisabled else super(FunRandomSquadEntity, self).getFightBtnTooltipData(isStateDisabled)
 
     def getCurrentSPGCount(self):
         return self.__restrictedSPGDataProvider.getCurrentVehiclesCount()
@@ -167,13 +171,13 @@ class FunRandomSquadEntity(SquadEntity):
 
     def leave(self, ctx, callback=None):
         if ctx.hasFlags(FUNCTIONAL_FLAG.SWITCH):
-            self.__funRandomController.subModesHolder.setDesiredSubModeID(UNKNOWN_EVENT_ID)
+            self.__funRandomController.setDesiredSubModeID(UNKNOWN_EVENT_ID)
         super(FunRandomSquadEntity, self).leave(ctx, callback)
 
     def unit_onUnitExtraChanged(self, extras):
         super(FunRandomSquadEntity, self).unit_onUnitExtraChanged(extras)
         self.__notifySubModeSwitching(self.__getUnitSubModeID())
-        self.__funRandomController.subModesHolder.setDesiredSubModeID(self.__getUnitSubModeID(), trustedSource=True)
+        self.__funRandomController.setDesiredSubModeID(self.__getUnitSubModeID(), trustedSource=True)
         self.invalidateVehicleStates()
 
     def unit_onUnitPlayerRemoved(self, playerID, playerData):

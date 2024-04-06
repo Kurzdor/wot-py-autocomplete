@@ -9,7 +9,7 @@ from PlayerEvents import g_playerEvents
 from account_helpers import AccountSettings
 from account_helpers.AccountSettings import OFFERS_DISABLED_MSG_SEEN
 from account_helpers.offers import events_data
-from account_helpers.offers.cache import CachePrefetchResult, CdnResourcesCache
+from account_helpers.offers.cache import CdnResourcesCache
 from constants import EVENT_CLIENT_DATA, OFFERS_ENABLED_KEY, OFFER_TOKEN_PREFIX
 from gui import SystemMessages
 from gui.Scaleform.locale.SYSTEM_MESSAGES import SYSTEM_MESSAGES
@@ -22,6 +22,7 @@ from skeletons.connection_mgr import IConnectionManager
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.offers import IOffersDataProvider
 from skeletons.gui.shared import IItemsCache
+from web.cache.web_cache import CachePrefetchResult
 if typing.TYPE_CHECKING:
     from typing import Callable, Optional, Set, Union
 _logger = logging.getLogger(__name__)
@@ -178,6 +179,31 @@ class OffersDataProvider(IOffersDataProvider):
 
         return False
 
+    @_ifFeatureDisabled(())
+    @_ifNotSynced(())
+    def iUnlockedOffers(self, onlyVisible=True, includeAllOffers=True):
+        for offer in self._ioffers():
+            if onlyVisible and not offer.showInGUI:
+                continue
+            if includeAllOffers:
+                if offer.isOfferUnlocked:
+                    yield offer
+            if offer.showWhenZeroCurrency:
+                if offer.isOfferUnlocked:
+                    yield offer
+            if offer.isOfferAvailable:
+                yield offer
+
+    def getUnlockedOffers(self, onlyVisible=True, includeAllOffers=True):
+        return list(self.iUnlockedOffers(onlyVisible, includeAllOffers))
+
+    def isOfferUnlocked(self, tokenID):
+        for offer in self.iUnlockedOffers():
+            if offer.token == tokenID:
+                return True
+
+        return False
+
     def getAmountOfGiftsGenerated(self, tokenID, mainTokenCount):
         offerData = self.getOfferByToken(tokenID)
         if offerData is not None:
@@ -267,5 +293,5 @@ class OffersDataProvider(IOffersDataProvider):
     @_ifNotSynced(())
     def __iAvailableOffersByToken(self, token):
         for offer in self._ioffers():
-            if offer.isOfferAvailable and offer.token == token:
+            if offer.token == token and offer.isOfferAvailable:
                 yield offer

@@ -54,7 +54,6 @@ class _SpeedStateHandler(_StateHandler):
         self.__isOwnVehicle = False
 
     def _invalidate(self, vehicle):
-        fwdSpeedLimit, bckwdSpeedLimit = vehicle.typeDescriptor.physics['speedLimits']
         player = BigWorld.player()
         if self.__isOwnVehicle or player.isObserver():
             if player is None:
@@ -65,12 +64,11 @@ class _SpeedStateHandler(_StateHandler):
                 speed = 0
         else:
             try:
-                speed = vehicle.speedInfo.value[0]
+                speed, _ = player.getOwnVehicleSpeeds(isAttached=True)
             except (AttributeError, IndexError, ValueError):
                 LOG_CURRENT_EXCEPTION()
                 return ()
 
-            speed = max(min(speed, fwdSpeedLimit), -bckwdSpeedLimit)
         speed = self._formatSpeed(speed)
         states = []
         if self.__speed != speed:
@@ -166,6 +164,9 @@ class _VehicleUpdater(object):
                     states.append((VEHICLE_VIEW_STATE.CREW_DEACTIVATED, 0))
                 else:
                     states.append((VEHICLE_VIEW_STATE.DESTROYED, 0))
+            elif vehicle.isAlive() and not self.__isAlive:
+                self.__isAlive = True
+                self.__ctrl.switchToOther(vehicle.id, True)
             for handler in self.__handlers:
                 newStates = handler(vehicle)
                 states.extend(newStates)
@@ -309,14 +310,15 @@ class VehicleStateController(IBattleController):
         self.onPostMortemSwitched(noRespawnPossible, respawnAvailable)
         return
 
-    def switchToOther(self, vehicleID):
+    def switchToOther(self, vehicleID, needInvalidate=False):
         if vehicleID is None:
             self.notifyStateChanged(VEHICLE_VIEW_STATE.SWITCHING, 0)
             self.__needInvalidate = True
             return
-        elif self.__vehicleID == vehicleID and not self.__needInvalidate:
-            return
         else:
+            self.__needInvalidate = needInvalidate or self.__needInvalidate
+            if self.__vehicleID == vehicleID and not self.__needInvalidate:
+                return
             self.__needInvalidate = False
             self.notifyStateChanged(VEHICLE_VIEW_STATE.SWITCHING, vehicleID)
             self.__waitingTI.stop()

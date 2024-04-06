@@ -12,6 +12,8 @@ class SpawnKeyPointTeamInfo(SpawnKeyPointTeamInfoBase, DynamicScriptComponent):
     guiSessionProvider = dependency.descriptor(IBattleSessionProvider)
 
     def _onAvatarReady(self):
+        if BigWorld.player().isObserver():
+            return
         if self.placed:
             return
         self.onReceiveTeamSpawnKeyPoints += self.__onReceiveTeamSpawnKeyPoints
@@ -25,6 +27,10 @@ class SpawnKeyPointTeamInfo(SpawnKeyPointTeamInfoBase, DynamicScriptComponent):
     def set_spawnKeyPointsCloseTime(self, prev):
         spawnCtrl = self.guiSessionProvider.dynamic.spawn
         spawnCtrl.setupCloseTime(self.spawnKeyPointsCloseTime)
+
+    def onDestroy(self):
+        SpawnKeyPointTeamInfoBase.onDestroy(self)
+        DynamicScriptComponent.onDestroy(self)
 
     def __onReceiveTeamSpawnKeyPoints(self, points):
         if not self._isAvatarReady:

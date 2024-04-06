@@ -2,7 +2,8 @@
 # Embedded file name: scripts/client/skeletons/gui/battle_session.py
 import typing
 if typing.TYPE_CHECKING:
-    from gui.battle_control.arena_info.interfaces import IAppearanceCacheController, IPointsOfInterestController, IComp7PrebattleSetupController, IComp7VOIPController
+    from gui.battle_control.arena_info.interfaces import IAppearanceCacheController, IPointsOfInterestController, IComp7PrebattleSetupController, IComp7VOIPController, IMapZonesController, IProgressionController, IRadarController, ISpawnController, IArenaVehiclesController, IVehicleCountController, IOverrideSettingsController, IVSEHUDSettingsController
+    from gui.battle_control.controllers.consumables.equipment_ctrl import EquipmentsController
 
 class ISharedControllersLocator(object):
     __slots__ = ()
@@ -84,6 +85,10 @@ class ISharedControllersLocator(object):
         raise NotImplementedError
 
     @property
+    def spectator(self):
+        raise NotImplementedError
+
+    @property
     def areaMarker(self):
         return NotImplementedError
 
@@ -99,9 +104,24 @@ class ISharedControllersLocator(object):
     def ingameHelp(self):
         raise NotImplementedError
 
+    @property
+    def mapZones(self):
+        raise NotImplementedError
+
+    @property
+    def killCamCtrl(self):
+        raise NotImplementedError
+
+    @property
+    def aimingSounds(self):
+        raise NotImplementedError
+
 
 class IDynamicControllersLocator(object):
     __slots__ = ()
+
+    def getControllerByID(self, ctrlID):
+        raise NotImplementedError
 
     @property
     def debug(self):
@@ -121,10 +141,6 @@ class IDynamicControllersLocator(object):
 
     @property
     def maps(self):
-        raise NotImplementedError
-
-    @property
-    def spectator(self):
         raise NotImplementedError
 
     @property
@@ -176,6 +192,10 @@ class IDynamicControllersLocator(object):
         raise NotImplementedError
 
     @property
+    def soundPlayers(self):
+        raise NotImplementedError
+
+    @property
     def gameNotifications(self):
         raise NotImplementedError
 
@@ -193,6 +213,18 @@ class IDynamicControllersLocator(object):
 
     @property
     def comp7VOIPController(self):
+        raise NotImplementedError
+
+    @property
+    def overrideSettingsController(self):
+        raise NotImplementedError
+
+    @property
+    def vseHUDSettings(self):
+        raise NotImplementedError
+
+    @property
+    def vehicleHitSound(self):
         raise NotImplementedError
 
 
@@ -278,6 +310,9 @@ class IClientArenaVisitor(object):
     def getVisibilityMinRadius(self):
         raise NotImplementedError
 
+    def getVehicleCircularAoiRadius(self):
+        raise NotImplementedError
+
     def getArenaSubscription(self):
         raise NotImplementedError
 
@@ -342,6 +377,12 @@ class IClientArenaVisitor(object):
         raise NotImplementedError
 
     def hasPointsOfInterest(self):
+        raise NotImplementedError
+
+    def isEnableExternalRespawn(self):
+        raise NotImplementedError
+
+    def isArenaLeaveAllowed(self):
         raise NotImplementedError
 
 
@@ -582,6 +623,12 @@ class IBattleContext(object):
     def getArenaFrameLabel(self):
         raise NotImplementedError
 
+    def getBattleTypeIconPathBig(self):
+        raise NotImplementedError
+
+    def getBattleTypeIconPathSmall(self):
+        raise NotImplementedError
+
     def getGuiEventType(self):
         raise NotImplementedError
 
@@ -617,7 +664,7 @@ class IBattleContext(object):
 
 
 class IBattleSessionProvider(object):
-    __slots__ = ('onBattleSessionStart', 'onBattleSessionStop')
+    __slots__ = ('onBattleSessionStart', 'onBattleSessionStop', 'onUpdateObservedVehicleData')
 
     @property
     def shared(self):

@@ -368,7 +368,8 @@ class BattleStatisticsDataController(BattleStatisticDataControllerMeta, IVehicle
          'winText': battleCtx.getArenaWinString(),
          'winTextShort': self._getArenaWinTextShort(),
          'battleTypeLocaleStr': battleCtx.getArenaDescriptionString(isInBattle=False),
-         'battleTypeFrameLabel': battleCtx.getFrameLabel(),
+         'battleTypeIconPathBig': battleCtx.getBattleTypeIconPathBig(),
+         'battleTypeIconPathSmall': battleCtx.getBattleTypeIconPathSmall(),
          'allyTeamName': battleCtx.getTeamName(enemy=False),
          'enemyTeamName': battleCtx.getTeamName(enemy=True)}
         self.as_setArenaInfoS(arenaInfoData)
@@ -415,7 +416,7 @@ class BattleStatisticsDataController(BattleStatisticDataControllerMeta, IVehicle
             self.as_updatePersonalStatusS(added, removed)
 
     def __onVehicleStateUpdated(self, state, value):
-        if state == VEHICLE_VIEW_STATE.PLAYER_INFO:
+        if state == VEHICLE_VIEW_STATE.PLAYER_INFO or state == VEHICLE_VIEW_STATE.SWITCHING and value != 0:
             arenaDP = self._battleCtx.getArenaDP()
             previousID = self._personalInfo.changeSelected(value)
             self.invalidatePlayerStatus(0, arenaDP.getVehicleInfo(previousID), arenaDP)

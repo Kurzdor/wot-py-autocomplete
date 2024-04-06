@@ -62,65 +62,38 @@ class ITEM_TYPES(object):
     TANKMAN_ROLES_FEMALE_RADIOMAN = '#item_types:tankman/roles/female/radioman'
     TANKMAN_ROLES_FEMALE_GUNNER = '#item_types:tankman/roles/female/gunner'
     TANKMAN_ROLES_FEMALE_LOADER = '#item_types:tankman/roles/female/loader'
+    TANKMAN_ROLES_POSSESSIVECASE_COMMANDER = '#item_types:tankman/roles/possessiveCase/commander'
+    TANKMAN_ROLES_POSSESSIVECASE_DRIVER = '#item_types:tankman/roles/possessiveCase/driver'
+    TANKMAN_ROLES_POSSESSIVECASE_RADIOMAN = '#item_types:tankman/roles/possessiveCase/radioman'
+    TANKMAN_ROLES_POSSESSIVECASE_GUNNER = '#item_types:tankman/roles/possessiveCase/gunner'
+    TANKMAN_ROLES_POSSESSIVECASE_LOADER = '#item_types:tankman/roles/possessiveCase/loader'
+    TANKMAN_ROLES_FEMALE_POSSESSIVECASE_COMMANDER = '#item_types:tankman/roles/female/possessiveCase/commander'
+    TANKMAN_ROLES_FEMALE_POSSESSIVECASE_DRIVER = '#item_types:tankman/roles/female/possessiveCase/driver'
+    TANKMAN_ROLES_FEMALE_POSSESSIVECASE_RADIOMAN = '#item_types:tankman/roles/female/possessiveCase/radioman'
+    TANKMAN_ROLES_FEMALE_POSSESSIVECASE_GUNNER = '#item_types:tankman/roles/female/possessiveCase/gunner'
+    TANKMAN_ROLES_FEMALE_POSSESSIVECASE_LOADER = '#item_types:tankman/roles/female/possessiveCase/loader'
+    TANKMAN_ROLES_OBJECTIVECASE_COMMANDER = '#item_types:tankman/roles/objectiveCase/commander'
+    TANKMAN_ROLES_OBJECTIVECASE_DRIVER = '#item_types:tankman/roles/objectiveCase/driver'
+    TANKMAN_ROLES_OBJECTIVECASE_RADIOMAN = '#item_types:tankman/roles/objectiveCase/radioman'
+    TANKMAN_ROLES_OBJECTIVECASE_GUNNER = '#item_types:tankman/roles/objectiveCase/gunner'
+    TANKMAN_ROLES_OBJECTIVECASE_LOADER = '#item_types:tankman/roles/objectiveCase/loader'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_COMMANDER = '#item_types:tankman/roles/female/objectiveCase/commander'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_DRIVER = '#item_types:tankman/roles/female/objectiveCase/driver'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_RADIOMAN = '#item_types:tankman/roles/female/objectiveCase/radioman'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_GUNNER = '#item_types:tankman/roles/female/objectiveCase/gunner'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_LOADER = '#item_types:tankman/roles/female/objectiveCase/loader'
+    TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_COMMANDER = '#item_types:tankman/roles/objectiveCase/upperCase/commander'
+    TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_DRIVER = '#item_types:tankman/roles/objectiveCase/upperCase/driver'
+    TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_RADIOMAN = '#item_types:tankman/roles/objectiveCase/upperCase/radioman'
+    TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_GUNNER = '#item_types:tankman/roles/objectiveCase/upperCase/gunner'
+    TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_LOADER = '#item_types:tankman/roles/objectiveCase/upperCase/loader'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_COMMANDER = '#item_types:tankman/roles/female/objectiveCase/upperCase/commander'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_DRIVER = '#item_types:tankman/roles/female/objectiveCase/upperCase/driver'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_RADIOMAN = '#item_types:tankman/roles/female/objectiveCase/upperCase/radioman'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_GUNNER = '#item_types:tankman/roles/female/objectiveCase/upperCase/gunner'
+    TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_LOADER = '#item_types:tankman/roles/female/objectiveCase/upperCase/loader'
     TANKMAN_SKILL_NOT_BE_USED = '#item_types:tankman/Skill_not_be_used'
-    TANKMAN_SKILLS_REPAIR = '#item_types:tankman/skills/repair'
-    TANKMAN_SKILLS_REPAIR_DESCR = '#item_types:tankman/skills/repair_descr'
-    TANKMAN_SKILLS_FIRE_FIGHTING = '#item_types:tankman/skills/fire_fighting'
-    TANKMAN_SKILLS_FIREFIGHTING = '#item_types:tankman/skills/fireFighting'
-    TANKMAN_SKILLS_FIRE_FIGHTING_DESCR = '#item_types:tankman/skills/fire_fighting_descr'
-    TANKMAN_SKILLS_CAMOUFLAGE = '#item_types:tankman/skills/camouflage'
-    TANKMAN_SKILLS_CAMOUFLAGE_DESCR = '#item_types:tankman/skills/camouflage_descr'
     TANKMAN_SKILLS_PERMANENT_DESCR = '#item_types:tankman/skills/permanent_descr'
-    TANKMAN_SKILLS_BROTHERHOOD = '#item_types:tankman/skills/brotherhood'
-    TANKMAN_SKILLS_BROTHERHOOD_DESCR = '#item_types:tankman/skills/brotherhood_descr'
-    TANKMAN_SKILLS_BROTHERHOOD_SABATON = '#item_types:tankman/skills/brotherhood_sabaton'
-    TANKMAN_SKILLS_BROTHERHOOD_OFFSPRING = '#item_types:tankman/skills/brotherhood_offspring'
-    TANKMAN_SKILLS_BROTHERHOOD_YHA = '#item_types:tankman/skills/brotherhood_yha'
-    TANKMAN_SKILLS_BROTHERHOOD_WITCHES = '#item_types:tankman/skills/brotherhood_witches'
-    TANKMAN_SKILLS_COMMANDER_TUTOR = '#item_types:tankman/skills/commander_tutor'
-    TANKMAN_SKILLS_COMMANDER_TUTOR_DESCR = '#item_types:tankman/skills/commander_tutor_descr'
-    TANKMAN_SKILLS_COMMANDER_EXPERT = '#item_types:tankman/skills/commander_expert'
-    TANKMAN_SKILLS_COMMANDER_EXPERT_DESCR = '#item_types:tankman/skills/commander_expert_descr'
-    TANKMAN_SKILLS_COMMANDER_ENEMYSHOTPREDICTOR = '#item_types:tankman/skills/commander_enemyShotPredictor'
-    TANKMAN_SKILLS_COMMANDER_ENEMYSHOTPREDICTOR_DESCR = '#item_types:tankman/skills/commander_enemyShotPredictor_descr'
-    TANKMAN_SKILLS_COMMANDER_UNIVERSALIST = '#item_types:tankman/skills/commander_universalist'
-    TANKMAN_SKILLS_COMMANDER_UNIVERSALIST_DESCR = '#item_types:tankman/skills/commander_universalist_descr'
-    TANKMAN_SKILLS_COMMANDER_SIXTHSENSE = '#item_types:tankman/skills/commander_sixthSense'
-    TANKMAN_SKILLS_COMMANDER_SIXTHSENSE_DESCR = '#item_types:tankman/skills/commander_sixthSense_descr'
-    TANKMAN_SKILLS_COMMANDER_EAGLEEYE = '#item_types:tankman/skills/commander_eagleEye'
-    TANKMAN_SKILLS_COMMANDER_EAGLEEYE_DESCR = '#item_types:tankman/skills/commander_eagleEye_descr'
-    TANKMAN_SKILLS_DRIVER_TIDYPERSON = '#item_types:tankman/skills/driver_tidyPerson'
-    TANKMAN_SKILLS_DRIVER_TIDYPERSON_DESCR = '#item_types:tankman/skills/driver_tidyPerson_descr'
-    TANKMAN_SKILLS_DRIVER_SMOOTHDRIVING = '#item_types:tankman/skills/driver_smoothDriving'
-    TANKMAN_SKILLS_DRIVER_SMOOTHDRIVING_DESCR = '#item_types:tankman/skills/driver_smoothDriving_descr'
-    TANKMAN_SKILLS_DRIVER_VIRTUOSO = '#item_types:tankman/skills/driver_virtuoso'
-    TANKMAN_SKILLS_DRIVER_VIRTUOSO_DESCR = '#item_types:tankman/skills/driver_virtuoso_descr'
-    TANKMAN_SKILLS_DRIVER_BADROADSKING = '#item_types:tankman/skills/driver_badRoadsKing'
-    TANKMAN_SKILLS_DRIVER_BADROADSKING_DESCR = '#item_types:tankman/skills/driver_badRoadsKing_descr'
-    TANKMAN_SKILLS_DRIVER_RAMMINGMASTER = '#item_types:tankman/skills/driver_rammingMaster'
-    TANKMAN_SKILLS_DRIVER_RAMMINGMASTER_DESCR = '#item_types:tankman/skills/driver_rammingMaster_descr'
-    TANKMAN_SKILLS_GUNNER_SMOOTHTURRET = '#item_types:tankman/skills/gunner_smoothTurret'
-    TANKMAN_SKILLS_GUNNER_SMOOTHTURRET_DESCR = '#item_types:tankman/skills/gunner_smoothTurret_descr'
-    TANKMAN_SKILLS_GUNNER_GUNSMITH = '#item_types:tankman/skills/gunner_gunsmith'
-    TANKMAN_SKILLS_GUNNER_GUNSMITH_DESCR = '#item_types:tankman/skills/gunner_gunsmith_descr'
-    TANKMAN_SKILLS_GUNNER_SNIPER = '#item_types:tankman/skills/gunner_sniper'
-    TANKMAN_SKILLS_GUNNER_SNIPER_DESCR = '#item_types:tankman/skills/gunner_sniper_descr'
-    TANKMAN_SKILLS_GUNNER_RANCOROUS = '#item_types:tankman/skills/gunner_rancorous'
-    TANKMAN_SKILLS_GUNNER_RANCOROUS_DESCR = '#item_types:tankman/skills/gunner_rancorous_descr'
-    TANKMAN_SKILLS_LOADER_PEDANT = '#item_types:tankman/skills/loader_pedant'
-    TANKMAN_SKILLS_LOADER_PEDANT_DESCR = '#item_types:tankman/skills/loader_pedant_descr'
-    TANKMAN_SKILLS_LOADER_DESPERADO = '#item_types:tankman/skills/loader_desperado'
-    TANKMAN_SKILLS_LOADER_DESPERADO_DESCR = '#item_types:tankman/skills/loader_desperado_descr'
-    TANKMAN_SKILLS_LOADER_INTUITION = '#item_types:tankman/skills/loader_intuition'
-    TANKMAN_SKILLS_LOADER_INTUITION_DESCR = '#item_types:tankman/skills/loader_intuition_descr'
-    TANKMAN_SKILLS_RADIOMAN_FINDER = '#item_types:tankman/skills/radioman_finder'
-    TANKMAN_SKILLS_RADIOMAN_FINDER_DESCR = '#item_types:tankman/skills/radioman_finder_descr'
-    TANKMAN_SKILLS_RADIOMAN_INVENTOR = '#item_types:tankman/skills/radioman_inventor'
-    TANKMAN_SKILLS_RADIOMAN_INVENTOR_DESCR = '#item_types:tankman/skills/radioman_inventor_descr'
-    TANKMAN_SKILLS_RADIOMAN_LASTEFFORT = '#item_types:tankman/skills/radioman_lastEffort'
-    TANKMAN_SKILLS_RADIOMAN_LASTEFFORT_DESCR = '#item_types:tankman/skills/radioman_lastEffort_descr'
-    TANKMAN_SKILLS_RADIOMAN_RETRANSMITTER = '#item_types:tankman/skills/radioman_retransmitter'
-    TANKMAN_SKILLS_RADIOMAN_RETRANSMITTER_DESCR = '#item_types:tankman/skills/radioman_retransmitter_descr'
     TANKMAN_SKILLS_TYPE_SKILL = '#item_types:tankman/skills/type/skill'
     TANKMAN_SKILLS_TYPE_SKILL_SHORT = '#item_types:tankman/skills/type/skill_short'
     TANKMAN_SKILLS_TYPE_PERK = '#item_types:tankman/skills/type/perk'
@@ -174,64 +147,7 @@ class ITEM_TYPES(object):
      SHELL_KINDSABBREVIATION_HOLLOW_CHARGE,
      SHELL_KINDSABBREVIATION_HIGH_EXPLOSIVE)
     TANKMAN_SKILLS_ENUM = (TANKMAN_SKILLS_MAIN,
-     TANKMAN_SKILLS_REPAIR,
-     TANKMAN_SKILLS_REPAIR_DESCR,
-     TANKMAN_SKILLS_FIRE_FIGHTING,
-     TANKMAN_SKILLS_FIREFIGHTING,
-     TANKMAN_SKILLS_FIRE_FIGHTING_DESCR,
-     TANKMAN_SKILLS_CAMOUFLAGE,
-     TANKMAN_SKILLS_CAMOUFLAGE_DESCR,
      TANKMAN_SKILLS_PERMANENT_DESCR,
-     TANKMAN_SKILLS_BROTHERHOOD,
-     TANKMAN_SKILLS_BROTHERHOOD_DESCR,
-     TANKMAN_SKILLS_BROTHERHOOD_SABATON,
-     TANKMAN_SKILLS_BROTHERHOOD_OFFSPRING,
-     TANKMAN_SKILLS_BROTHERHOOD_YHA,
-     TANKMAN_SKILLS_BROTHERHOOD_WITCHES,
-     TANKMAN_SKILLS_COMMANDER_TUTOR,
-     TANKMAN_SKILLS_COMMANDER_TUTOR_DESCR,
-     TANKMAN_SKILLS_COMMANDER_EXPERT,
-     TANKMAN_SKILLS_COMMANDER_EXPERT_DESCR,
-     TANKMAN_SKILLS_COMMANDER_ENEMYSHOTPREDICTOR,
-     TANKMAN_SKILLS_COMMANDER_ENEMYSHOTPREDICTOR_DESCR,
-     TANKMAN_SKILLS_COMMANDER_UNIVERSALIST,
-     TANKMAN_SKILLS_COMMANDER_UNIVERSALIST_DESCR,
-     TANKMAN_SKILLS_COMMANDER_SIXTHSENSE,
-     TANKMAN_SKILLS_COMMANDER_SIXTHSENSE_DESCR,
-     TANKMAN_SKILLS_COMMANDER_EAGLEEYE,
-     TANKMAN_SKILLS_COMMANDER_EAGLEEYE_DESCR,
-     TANKMAN_SKILLS_DRIVER_TIDYPERSON,
-     TANKMAN_SKILLS_DRIVER_TIDYPERSON_DESCR,
-     TANKMAN_SKILLS_DRIVER_SMOOTHDRIVING,
-     TANKMAN_SKILLS_DRIVER_SMOOTHDRIVING_DESCR,
-     TANKMAN_SKILLS_DRIVER_VIRTUOSO,
-     TANKMAN_SKILLS_DRIVER_VIRTUOSO_DESCR,
-     TANKMAN_SKILLS_DRIVER_BADROADSKING,
-     TANKMAN_SKILLS_DRIVER_BADROADSKING_DESCR,
-     TANKMAN_SKILLS_DRIVER_RAMMINGMASTER,
-     TANKMAN_SKILLS_DRIVER_RAMMINGMASTER_DESCR,
-     TANKMAN_SKILLS_GUNNER_SMOOTHTURRET,
-     TANKMAN_SKILLS_GUNNER_SMOOTHTURRET_DESCR,
-     TANKMAN_SKILLS_GUNNER_GUNSMITH,
-     TANKMAN_SKILLS_GUNNER_GUNSMITH_DESCR,
-     TANKMAN_SKILLS_GUNNER_SNIPER,
-     TANKMAN_SKILLS_GUNNER_SNIPER_DESCR,
-     TANKMAN_SKILLS_GUNNER_RANCOROUS,
-     TANKMAN_SKILLS_GUNNER_RANCOROUS_DESCR,
-     TANKMAN_SKILLS_LOADER_PEDANT,
-     TANKMAN_SKILLS_LOADER_PEDANT_DESCR,
-     TANKMAN_SKILLS_LOADER_DESPERADO,
-     TANKMAN_SKILLS_LOADER_DESPERADO_DESCR,
-     TANKMAN_SKILLS_LOADER_INTUITION,
-     TANKMAN_SKILLS_LOADER_INTUITION_DESCR,
-     TANKMAN_SKILLS_RADIOMAN_FINDER,
-     TANKMAN_SKILLS_RADIOMAN_FINDER_DESCR,
-     TANKMAN_SKILLS_RADIOMAN_INVENTOR,
-     TANKMAN_SKILLS_RADIOMAN_INVENTOR_DESCR,
-     TANKMAN_SKILLS_RADIOMAN_LASTEFFORT,
-     TANKMAN_SKILLS_RADIOMAN_LASTEFFORT_DESCR,
-     TANKMAN_SKILLS_RADIOMAN_RETRANSMITTER,
-     TANKMAN_SKILLS_RADIOMAN_RETRANSMITTER_DESCR,
      TANKMAN_SKILLS_TYPE_SKILL,
      TANKMAN_SKILLS_TYPE_SKILL_SHORT,
      TANKMAN_SKILLS_TYPE_PERK,
@@ -246,7 +162,37 @@ class ITEM_TYPES(object):
      TANKMAN_ROLES_FEMALE_DRIVER,
      TANKMAN_ROLES_FEMALE_RADIOMAN,
      TANKMAN_ROLES_FEMALE_GUNNER,
-     TANKMAN_ROLES_FEMALE_LOADER)
+     TANKMAN_ROLES_FEMALE_LOADER,
+     TANKMAN_ROLES_POSSESSIVECASE_COMMANDER,
+     TANKMAN_ROLES_POSSESSIVECASE_DRIVER,
+     TANKMAN_ROLES_POSSESSIVECASE_RADIOMAN,
+     TANKMAN_ROLES_POSSESSIVECASE_GUNNER,
+     TANKMAN_ROLES_POSSESSIVECASE_LOADER,
+     TANKMAN_ROLES_FEMALE_POSSESSIVECASE_COMMANDER,
+     TANKMAN_ROLES_FEMALE_POSSESSIVECASE_DRIVER,
+     TANKMAN_ROLES_FEMALE_POSSESSIVECASE_RADIOMAN,
+     TANKMAN_ROLES_FEMALE_POSSESSIVECASE_GUNNER,
+     TANKMAN_ROLES_FEMALE_POSSESSIVECASE_LOADER,
+     TANKMAN_ROLES_OBJECTIVECASE_COMMANDER,
+     TANKMAN_ROLES_OBJECTIVECASE_DRIVER,
+     TANKMAN_ROLES_OBJECTIVECASE_RADIOMAN,
+     TANKMAN_ROLES_OBJECTIVECASE_GUNNER,
+     TANKMAN_ROLES_OBJECTIVECASE_LOADER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_COMMANDER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_DRIVER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_RADIOMAN,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_GUNNER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_LOADER,
+     TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_COMMANDER,
+     TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_DRIVER,
+     TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_RADIOMAN,
+     TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_GUNNER,
+     TANKMAN_ROLES_OBJECTIVECASE_UPPERCASE_LOADER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_COMMANDER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_DRIVER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_RADIOMAN,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_GUNNER,
+     TANKMAN_ROLES_FEMALE_OBJECTIVECASE_UPPERCASE_LOADER)
     TANKMAN_SKILLS_TYPE_ENUM = (TANKMAN_SKILLS_TYPE_SKILL,
      TANKMAN_SKILLS_TYPE_SKILL_SHORT,
      TANKMAN_SKILLS_TYPE_PERK,

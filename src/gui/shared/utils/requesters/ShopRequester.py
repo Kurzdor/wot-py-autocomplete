@@ -18,6 +18,8 @@ from post_progression_common import CUSTOM_ROLE_SLOT_CHANGE_PRICE
 from post_progression_prices_common import getPostProgressionPrice
 from skeletons.gui.shared.utils.requesters import IShopCommonStats, IShopRequester
 from gui.shared.gui_items.gui_item_economics import ItemPrice
+if typing.TYPE_CHECKING:
+    from typing import Tuple, Dict, Any
 _logger = logging.getLogger(__name__)
 _DEFAULT_EXCHANGE_RATE = 400
 _DEFAULT_CRYSTAL_EXCHANGE_RATE = 200
@@ -29,12 +31,13 @@ _TankmenRestoreConfig = namedtuple('_TankmenRestoreConfig', 'freeDuration billab
 _TargetData = namedtuple('_TargetData', 'targetType, targetValue, limit')
 _ResourceData = namedtuple('_ResourceData', 'resourceType, value, isPercentage')
 _ConditionData = namedtuple('_ConditionData', 'conditionType, value')
+_DEFAULT_SLOT_PRICE = (0, ([Currency.CREDITS, 300],))
 
 class _NamedGoodieData(GoodieData):
 
     @staticmethod
-    def __new__(cls, variety, target, enabled, lifetime, useby, counter, autostart, condition, resource):
-        return GoodieData.__new__(cls, variety, _TargetData(*target) if target else None, enabled, lifetime, useby, counter, autostart, _ConditionData(*condition) if condition else None, _ResourceData(*resource) if resource else None)
+    def __new__(cls, variety, target, enabled, lifetime, useby, counter, autostart, condition, resource, expireAfter, roundToEndOfGameDay):
+        return GoodieData.__new__(cls, variety, _TargetData(*target) if target else None, enabled, lifetime, useby, counter, autostart, _ConditionData(*condition) if condition else None, _ResourceData(*resource) if resource else None, expireAfter if expireAfter else None, roundToEndOfGameDay if roundToEndOfGameDay else True)
 
     def getTargetValue(self):
         return int(self.target.targetValue.split('_')[1]) if self.target.targetType == GOODIE_TARGET_TYPE.ON_BUY_PREMIUM else self.target.targetValue
@@ -188,10 +191,11 @@ class ShopCommonStats(IShopCommonStats):
 
     @property
     def slotsPrices(self):
-        return self.getValue('slotsPrices', (0, [300]))
+        return self.getValue('slotsPrices', _DEFAULT_SLOT_PRICE)
 
     def getVehicleSlotsPrice(self, currentSlotsCount):
-        return getNextSlotPrice(currentSlotsCount, self.slotsPrices)
+        price = getNextSlotPrice(currentSlotsCount, self.slotsPrices)
+        return Money.makeFrom(price[0], price[1])
 
     @property
     def dropSkillsCost(self):
@@ -235,6 +239,10 @@ class ShopCommonStats(IShopCommonStats):
     @property
     def changeRoleCost(self):
         return self.getValue('changeRoleCost', 600)
+
+    @property
+    def tankman(self):
+        return self.getValue('tankman', {})
 
     @property
     def freeXPConversion(self):
@@ -387,42 +395,24 @@ class ShopRequester(AbstractSyncDataRequester, ShopCommonStats, IShopRequester):
 
         return False
 
-    def getTankmanCostWithDefaults(self):
-        from gui.shared.tooltips import ACTION_TOOLTIPS_TYPE
-        from gui.shared.tooltips.formatters import packActionTooltipData
-        shopPrices = self.tankmanCost
-        defaultPrices = self.defaults.tankmanCost
-        action = []
-        tmanCost = []
-        for idx, price in enumerate(shopPrices):
-            data = price.copy()
-            shopPrice = Money(**price)
-            defaultPrice = Money(**defaultPrices[idx])
-            actionData = None
-            if shopPrice != defaultPrice:
-                key = '{}TankmanCost'.format(shopPrice.getCurrency(byWeight=True))
-                actionData = packActionTooltipData(ACTION_TOOLTIPS_TYPE.ECONOMICS, key, True, shopPrice, defaultPrice)
-            tmanCost.append(data)
-            action.append(actionData)
-
-        return (tmanCost, action)
-
     def getVehicleSlotsPrice(self, currentSlotsCount):
         price = super(ShopRequester, self).getVehicleSlotsPrice(currentSlotsCount)
         slotGoodies = self.personalSlotDiscounts
         if slotGoodies:
             bestGoody = self.bestGoody(slotGoodies)
-            return getPriceWithDiscount(price, bestGoody.resource)
+            currency = price.getCurrency()
+            return Money.makeFrom(currency, getPriceWithDiscount(price.get(price.getCurrency(), 0), bestGoody.resource))
         return price
 
     def getVehicleSlotsItemPrice(self, currentSlotsCount):
         defPrice = self.defaults.getVehicleSlotsPrice(currentSlotsCount)
         price = self.getVehicleSlotsPrice(currentSlotsCount)
+        currency = price.getCurrency()
         slotGoodies = self.personalSlotDiscounts
         if slotGoodies:
             bestGoody = self.bestGoody(slotGoodies)
-            price = getPriceWithDiscount(price, bestGoody.resource)
-        return ItemPrice(price=Money.makeFrom(Currency.GOLD, price), defPrice=Money.makeFrom(Currency.GOLD, defPrice))
+            price = Money.makeFrom(currency, getPriceWithDiscount(price.get(currency, 0), bestGoody.resource))
+        return ItemPrice(price=price, defPrice=defPrice)
 
     def getTankmanCostItemPrices(self, vehLevel):
         result = []
@@ -718,6 +708,10 @@ class DefaultShopRequester(ShopCommonStats):
     @property
     def changeRoleCost(self):
         return self.getValue('changeRoleCost', self.__proxy.changeRoleCost)
+
+    @property
+    def tankman(self):
+        return self.getValue('tankman', self.__proxy.tankman)
 
     @property
     def freeXPConversion(self):

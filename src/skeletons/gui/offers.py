@@ -14,11 +14,16 @@ class IOffersNovelty(INovelty):
 
 
 class IOffersBannerController(object):
+    onShowBanners = None
+    onHideBanners = None
 
     def init(self):
         raise NotImplementedError
 
     def fini(self):
+        raise NotImplementedError
+
+    def isEnabled(self):
         raise NotImplementedError
 
     def showBanners(self):
@@ -78,6 +83,15 @@ class IOffersDataProvider(object):
         raise NotImplementedError
 
     def isOfferAvailable(self, tokenID):
+        raise NotImplementedError
+
+    def iUnlockedOffers(self, onlyVisible=True, includeAllOffers=True):
+        raise NotImplementedError
+
+    def getUnlockedOffers(self, onlyVisible=True, includeAllOffers=True):
+        raise NotImplementedError
+
+    def isOfferUnlocked(self, tokenID):
         raise NotImplementedError
 
     def getAmountOfGiftsGenerated(self, tokenID, mainTokenCount):

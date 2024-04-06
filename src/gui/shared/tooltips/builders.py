@@ -36,7 +36,7 @@ class TooltipBuilder(object):
     def provider(self):
         return self._provider
 
-    def build(self, manager, stateType, advanced_, *args, **kwargs):
+    def build(self, stateType, advanced_, *args, **kwargs):
         raise NotImplementedError
 
     def supportAdvanced(self, tooltipType, *args):
@@ -46,9 +46,8 @@ class TooltipBuilder(object):
 class SimpleBuilder(TooltipBuilder):
     __slots__ = ()
 
-    def build(self, manager, stateType, advanced_, *args, **kwargs):
-        manager.show(args, self._linkage)
-        return None
+    def build(self, stateType, advanced_, *args, **kwargs):
+        return (self._provider, args, self._linkage)
 
 
 class AdvancedBuilder(TooltipBuilder):
@@ -70,10 +69,9 @@ class DataBuilder(SimpleBuilder):
         self._provider = provider
         self._provider.calledBy = tooltipType
 
-    def build(self, manager, formatType, advanced_, *args, **kwargs):
+    def build(self, formatType, advanced_, *args, **kwargs):
         data = self._buildData(advanced_, *args, **kwargs)
-        manager.show(data, self._linkage)
-        return self._provider
+        return (self._provider, data, self._linkage)
 
     def _buildData(self, advanced_, *args, **kwargs):
         return self._provider.buildToolTip(*args, **kwargs)
@@ -81,9 +79,26 @@ class DataBuilder(SimpleBuilder):
 
 class TooltipWindowBuilder(DataBuilder):
 
-    def build(self, manager, formatType, advanced_, *args, **kwargs):
+    def build(self, formatType, advanced_, *args, **kwargs):
         self._buildData(advanced_, *args, **kwargs)
         return self._provider
+
+
+class AdvancedTooltipWindowBuilder(AdvancedBuilder):
+    __slots__ = ('_adProvider', '_condition', '_provider')
+
+    def __init__(self, tooltipType, linkage, provider, adProvider, condition=None):
+        super(AdvancedTooltipWindowBuilder, self).__init__(tooltipType, linkage)
+        self._adProvider = adProvider
+        self._condition = condition
+        self._provider = provider
+
+    def build(self, formatType, advanced_, *args, **kwargs):
+        supportAdvanced = self.supportAdvanced(self._tooltipType, *args)
+        return self._adProvider if advanced_ and supportAdvanced else self._provider
+
+    def supportAdvanced(self, tooltipType, *args):
+        return self._condition(*args) if self._condition is not None else True
 
 
 class AdvancedDataBuilder(AdvancedBuilder):
@@ -95,10 +110,9 @@ class AdvancedDataBuilder(AdvancedBuilder):
         self._adProvider = adProvider
         self._condition = condition
 
-    def build(self, manager, formatType, advanced_, *args, **kwargs):
+    def build(self, formatType, advanced_, *args, **kwargs):
         data = self._buildData(advanced_, *args, **kwargs)
-        manager.show(data, self._linkage)
-        return self._provider
+        return (self._provider, data, self._linkage)
 
     def supportAdvanced(self, tooltipType, *args):
         return self._condition(*args) if self._condition is not None else True
@@ -129,15 +143,14 @@ class ConditionBuilder(DataBuilder):
         super(ConditionBuilder, self).__init__(tooltipType, linkage, provider)
         self._defaultLinkage = defaultLinkage
 
-    def build(self, manager, formatType, advanced_, *args, **kwargs):
+    def build(self, formatType, advanced_, *args, **kwargs):
         data = self._buildData(advanced_, *args, **kwargs)
         if self._check(data):
-            manager.show(data, self._linkage)
+            linkage = self._linkage
         else:
             data = self._format(data, formatType)
-            if data:
-                manager.show(data, self._defaultLinkage)
-        return self._provider
+            linkage = self._defaultLinkage
+        return (self._provider, data, linkage)
 
     def _format(self, data, formatType):
         return complex_formatters.doFormatData(data['data'], formatType)
@@ -166,7 +179,7 @@ class ComplexBuilder(AdvancedBuilder):
     def supportAdvanced(self, tooltipType, *args):
         return tooltipType in self.advancedComplexTooltips
 
-    def build(self, manager, formatType, advanced_, *args, **kwargs):
+    def build(self, formatType, advanced_, *args, **kwargs):
         data = complex_formatters.doFormatToolTip(args[0], formatType)
         linkage = self._linkage
         if self.supportAdvanced(*args):
@@ -182,10 +195,10 @@ class ComplexBuilder(AdvancedBuilder):
                 data = advanced.ComplexTooltip(contexts.ToolTipContext(None), disableAnim).buildToolTip(data)
             linkage = TOOLTIPS_CONSTANTS.BLOCKS_DEFAULT_UI
         if data:
-            manager.show(data, linkage)
+            return (self._provider, data, linkage)
         else:
             _logger.debug('Complex tooltip %s can not be shown: %r', formatType, args)
-        return
+            return (None, None, None)
 
 
 class AdvancedComplexBuilder(AdvancedBuilder):
@@ -198,7 +211,7 @@ class AdvancedComplexBuilder(AdvancedBuilder):
         linkage = args[0]
         return linkage in ADVANCED_COMPLEX_TOOLTIPS
 
-    def build(self, manager, formatType, advanced_, *args, **kwargs):
+    def build(self, formatType, advanced_, *args, **kwargs):
         disableAnim = self._getDisableAnimFlag()
         linkage = args[0]
         supportAdvanced = self.supportAdvanced(self.tooltipType, linkage)
@@ -211,9 +224,7 @@ class AdvancedComplexBuilder(AdvancedBuilder):
             data = self._provider.buildToolTip(*args)
             if supportAdvanced:
                 self._provider.addAdvancedBlock(data, disableAnim)
-        if data:
-            manager.show(data, self._linkage)
-        return self._provider
+        return (self._provider, data, self._linkage)
 
 
 class BuildersCollection(object):

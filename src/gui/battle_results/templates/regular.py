@@ -6,7 +6,7 @@ from gui.Scaleform.locale.BATTLE_RESULTS import BATTLE_RESULTS
 from gui.Scaleform.locale.INGAME_GUI import INGAME_GUI
 from gui.Scaleform.locale.MENU import MENU
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
-from gui.battle_results.components import base
+from gui.battle_results.components import base, epic
 from gui.battle_results.components import common
 from gui.battle_results.components import details
 from gui.battle_results.components import personal
@@ -76,6 +76,8 @@ _COMMON_VO_META = base.DictMeta({'iconType': 'tank',
  'clientArenaIdx': 0,
  'uiVisibility': 0,
  'eligibleForCrystalRewards': False,
+ 'modificationStr': '',
+ 'modificationIconPath': '',
  'rank': None,
  'epicMode': False})
 _CLAN_COMMON_VO_META = base.PropertyMeta((('clanDBID', -1, 'clanDBID'), ('clanAbbrev', '', 'clanAbbrev')))
@@ -134,6 +136,8 @@ REGULAR_COMMON_STATS_BLOCK.addComponent(11, _TIME_STATS_BLOCK.clone())
 REGULAR_COMMON_STATS_BLOCK.addComponent(12, shared.ClientIndexItem('clientArenaIdx'))
 REGULAR_COMMON_STATS_BLOCK.addComponent(13, common.TeamsUiVisibility('uiVisibility'))
 REGULAR_COMMON_STATS_BLOCK.addComponent(14, common.EligibleForCrystalRewards('eligibleForCrystalRewards'))
+REGULAR_COMMON_STATS_BLOCK.addComponent(15, epic.StrBattleModificationItem('modificationStr'))
+REGULAR_COMMON_STATS_BLOCK.addComponent(16, epic.BattleModificationItem('modificationIconPath'))
 _PERSONAL_VO_META = base.DictMeta({'isPremium': False,
  'isLegionnaire': False,
  'creditsStr': '0',
@@ -253,10 +257,16 @@ _TOTAL_EFFICIENCY_HEADER_META = base.PropertyMeta(((BATTLE_EFFICIENCY_TYPES.DEST
 _TOTAL_EFFICIENCY_HEADER_META.bind(personal.TotalEfficiencyDetailsHeader)
 _PREMIUM_BONUS_VO_META = base.PropertyMeta((('description', '', 'description'),
  ('bonusLeft', '', 'bonusLeft'),
+ ('wotPlusBonusLeft', '', 'wotPlusBonusLeft'),
+ ('detailsLink', '', 'detailsLink'),
+ ('additionalBonusLeft', '', 'additionalBonusLeft'),
  ('xpValue', '', 'xpValue'),
  ('statusBonusLabel', '', 'statusBonusLabel'),
  ('statusBonusTooltip', '', 'statusBonusTooltip'),
- ('bonusIcon', '', 'bonusIcon')))
+ ('bonusIcon', '', 'bonusIcon'),
+ ('premiumAndPlusExhausted', '', 'premiumAndPlusExhausted'),
+ ('hasWotPremium', '', 'hasWotPremium'),
+ ('hasWotPlus', '', 'hasWotPlus')))
 _PREMIUM_BONUS_VO_META.bind(details.PremiumBonusDetailsBlock)
 _PREMIUM_EARNINGS_VO_META = base.DictMeta({'xpTitleStrings': [],
  'xpTitleTooltips': [],
@@ -373,3 +383,4 @@ BATTLE_PASS_PROGRESS_STATS_BLOCK = progress.BattlePassProgressBlock(base.ListMet
 QUESTS_PROGRESS_STATS_BLOCK = progress.QuestsProgressBlock(base.ListMeta(), 'quests', _RECORD.PERSONAL)
 DOG_TAGS_PROGRESS_STATS_BLOCK = progress.DogTagsProgressBlock(base.ListMeta(), 'dog_tags', _RECORD.PERSONAL)
 PROGRESSIVE_REWARD_VO = progress.ProgressiveRewardVO('progressiveReward')
+PRESTIGE_PROGRESS_VO = progress.PrestigeProgressVO('prestige')

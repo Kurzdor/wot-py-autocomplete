@@ -20,7 +20,7 @@ from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.impl import backport
 from gui.impl.gen import R
-from gui.server_events.awards_formatters import AWARDS_SIZES, getEpicAwardFormatter, EPIC_AWARD_SIZE
+from gui.server_events.awards_formatters import AWARDS_SIZES, getEpicAwardFormatter, EPIC_AWARD_SIZE, getMissionsDefaultAwardFormatter
 from gui.server_events.bonuses import SimpleBonus
 from gui.server_events.cond_formatters.prebattle import MissionsPreBattleConditionsFormatter
 from gui.server_events.cond_formatters.requirements import AccountRequirementsFormatter, TQAccountRequirementsFormatter
@@ -52,8 +52,8 @@ _cardCondFormatter = cards_formatters.CardBattleConditionsFormatters()
 _detailedCardCondFormatter = cards_formatters.DetailedCardBattleConditionsFormatters()
 _cardTokenConditionFormatter = cards_formatters.CardTokenConditionFormatter()
 _detailedCardTokenConditionFormatter = cards_formatters.DetailedCardTokenConditionFormatter()
-_cardAwardsFormatter = CurtailingAwardsComposer(CARD_AWARDS_COUNT)
-_detailedCardAwardsFormatter = DetailedCardAwardComposer(DETAILED_CARD_AWARDS_COUNT)
+_cardAwardsFormatter = CurtailingAwardsComposer(CARD_AWARDS_COUNT, getMissionsDefaultAwardFormatter())
+_detailedCardAwardsFormatter = DetailedCardAwardComposer(DETAILED_CARD_AWARDS_COUNT, getMissionsDefaultAwardFormatter())
 _awardsWindowBonusFormatter = AwardsWindowComposer(CARD_AWARDS_BIG_COUNT)
 _epicAwardsWindowBonusFormatter = CurtailingAwardsComposer(CARD_AWARDS_EPIC_COUNT, getEpicAwardFormatter())
 _personalMissionsAwardsFormatter = PersonalMissionsAwardComposer(DETAILED_CARD_AWARDS_COUNT)
@@ -502,7 +502,7 @@ class _BattleRoyaleDailyMissionInfo(_EventDailyMissionInfo):
         return self.__battleRoyaleController
 
     def _getCompleteKey(self):
-        return R.strings.battle_royale.questsTooltip.mission_info.timeLeft() if not self._controller.isDailyQuestsRefreshAvailable() else super(_BattleRoyaleDailyMissionInfo, self)._getCompleteKey()
+        return R.strings.battle_royale.questsTooltip.timeLeft() if not self._controller.isDailyQuestsRefreshAvailable() else super(_BattleRoyaleDailyMissionInfo, self)._getCompleteKey()
 
 
 class _RankedMissionInfo(_MissionInfo):
@@ -638,6 +638,8 @@ class _DetailedMissionInfo(_MissionInfo):
                         criteria = criteria | ~REQ_CRITERIA.VEHICLE.EVENT_BATTLE
                     if constants.ARENA_BONUS_TYPE.EPIC_BATTLE not in arenaTypes:
                         criteria = criteria | ~REQ_CRITERIA.VEHICLE.EPIC_BATTLE
+                    if constants.ARENA_BONUS_TYPE.FUN_RANDOM not in arenaTypes:
+                        criteria = criteria | ~REQ_CRITERIA.VEHICLE.FUN_RANDOM
                     if constants.ARENA_BONUS_TYPE.BATTLE_ROYALE_SQUAD in arenaTypes or constants.ARENA_BONUS_TYPE.BATTLE_ROYALE_SOLO in arenaTypes:
                         isQuestForBattleRoyale = True
         xpMultCond = conds.find('hasReceivedMultipliedXP')

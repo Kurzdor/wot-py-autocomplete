@@ -24,6 +24,9 @@ class VEHICLE_PREVIEW(object):
     HEADER_BACKBTN_DESCRLABEL_RESOURCEWELL = '#vehicle_preview:header/backBtn/descrLabel/resourceWell'
     HEADER_BACKBTN_DESCRLABEL_BATTLEMATTERS = '#vehicle_preview:header/backBtn/descrLabel/battleMatters'
     HEADER_BACKBTN_DESCRLABEL_BATTLEMATTERSMAINREWARD = '#vehicle_preview:header/backBtn/descrLabel/battleMattersMainReward'
+    HEADER_BACKBTN_DESCRLABEL_COLLECTIONS = '#vehicle_preview:header/backBtn/descrLabel/collections'
+    HEADER_BACKBTN_DESCRLABEL_COMP7 = '#vehicle_preview:header/backBtn/descrLabel/comp7'
+    HEADER_BACKBTN_DESCRLABEL_CLANSUPPLY = '#vehicle_preview:header/backBtn/descrLabel/clanSupply'
     HEADER_TITLE = '#vehicle_preview:header/title'
     HEADER_CLOSEBTN_LABEL = '#vehicle_preview:header/closeBtn/label'
     HERO_HEADER_TITLE = '#vehicle_preview:hero/header/title'
@@ -32,6 +35,7 @@ class VEHICLE_PREVIEW(object):
     BUYINGPANEL_LABEL = '#vehicle_preview:buyingPanel/Label'
     BUYINGPANEL_ALERTLABEL = '#vehicle_preview:buyingPanel/alertLabel'
     BUYINGPANEL_UNIQUEVEHICLELABEL = '#vehicle_preview:buyingPanel/uniqueVehicleLabel'
+    BUYINGPANEL_AVAILABLEFORWOTPLUS = '#vehicle_preview:buyingPanel/availableForWotPlus'
     BUYINGPANEL_TRADEINLABEL = '#vehicle_preview:buyingPanel/tradeInLabel'
     BUYINGPANEL_OFFER_RENT_TITLE_FRONTLINE_ORDINAL = '#vehicle_preview:buyingPanel/offer/rent/title/frontline/ordinal'
     BUYINGPANEL_OFFER_RENT_FRONTLINE_DESCRIPTION_HEADER = '#vehicle_preview:buyingPanel/offer/rent/frontline/description/header'
@@ -63,6 +67,8 @@ class VEHICLE_PREVIEW(object):
     BUYINGPANEL_BUYBTN_LABEL_BUY = '#vehicle_preview:buyingPanel/buyBtn/label/buy'
     BUYINGPANEL_BUYBTN_LABEL_EXCHANGE = '#vehicle_preview:buyingPanel/buyBtn/label/exchange'
     BUYINGPANEL_BUYBTN_LABEL_BUYITEMPACK = '#vehicle_preview:buyingPanel/buyBtn/label/buyItemPack'
+    BUYINGPANEL_BUYBTN_LABEL_FORCOINSOBTAIN = '#vehicle_preview:buyingPanel/buyBtn/label/forCoinsObtain'
+    BUYINGPANEL_BUYBTN_LABEL_FREEOBTAIN = '#vehicle_preview:buyingPanel/buyBtn/label/freeObtain'
     BUYINGPANEL_BUYBTN_LABEL_RENT = '#vehicle_preview:buyingPanel/buyBtn/label/rent'
     BUYINGPANEL_BUYBTN_LABEL_RESTORE = '#vehicle_preview:buyingPanel/buyBtn/label/restore'
     BUYINGPANEL_BUYBTN_LABEL_RESEARCH = '#vehicle_preview:buyingPanel/buyBtn/label/research'
@@ -93,6 +99,7 @@ class VEHICLE_PREVIEW(object):
     INFOPANEL_PREMIUM_CREDITSTEXT = '#vehicle_preview:infoPanel/premium/creditsText'
     INFOPANEL_PREMIUM_CREWTRANSFERTITLE = '#vehicle_preview:infoPanel/premium/crewTransferTitle'
     INFOPANEL_PREMIUM_CREWTRANSFERTEXT = '#vehicle_preview:infoPanel/premium/crewTransferText'
+    INFOPANEL_PREMIUM_NOCREWTRANSFERPENALTYTEXT = '#vehicle_preview:infoPanel/premium/noCrewTransferPenaltyText'
     INFOPANEL_PREMIUM_BONSTITLE = '#vehicle_preview:infoPanel/premium/bonsTitle'
     INFOPANEL_PREMIUM_BONSTEXT = '#vehicle_preview:infoPanel/premium/bonsText'
     INFOPANEL_PREMIUM_BUILTINEQUPMENTTITLE = '#vehicle_preview:infoPanel/premium/builtInEqupmentTitle'
@@ -121,6 +128,14 @@ class VEHICLE_PREVIEW(object):
     BUYINGPANEL_STYLE_DESCRIPTION_TITLE = '#vehicle_preview:buyingPanel/style/description/title'
     BUYINGPANEL_STYLE_DESCRIPTION_TEXT = '#vehicle_preview:buyingPanel/style/description/text'
     BUYINGPANEL_STYLE_DESCRIPTION_BUTTON_TEXT = '#vehicle_preview:buyingPanel/style/description/button/text'
+    SHOWCASESTYLEBUYING_ACTIONBTN_LABEL_BUY = '#vehicle_preview:showcaseStyleBuying/actionBtn/label/buy'
+    SHOWCASESTYLEBUYING_TIMEREMAINING_DESC = '#vehicle_preview:showcaseStyleBuying/timeRemaining/desc'
+    SHOWCASESTYLEBUYING_BOUGHTMSG = '#vehicle_preview:showcaseStyleBuying/boughtMsg'
+    SHOWCASESTYLEBUYING_NOVEHICLEMSG = '#vehicle_preview:showcaseStyleBuying/noVehicleMsg'
+    SHOWCASESTYLEBUYING_OUTOFTIMEMSG = '#vehicle_preview:showcaseStyleBuying/outOfTimeMsg'
+    SHOWCASESTYLEBUYING_ACTIONBTN_TOOLTIP_NOTENOUGHFUNDS = '#vehicle_preview:showcaseStyleBuying/actionBtn/tooltip/notEnoughFunds'
+    SHOWCASESTYLEBUYING_ACTIONBTN_TOOLTIP_UNAVAILABLE = '#vehicle_preview:showcaseStyleBuying/actionBtn/tooltip/unavailable'
+    SHOWCASESTYLEBUYING_ACTIONBTN_TOOLTIP_SERVICEUNAVAILABLE = '#vehicle_preview:showcaseStyleBuying/actionBtn/tooltip/serviceUnavailable'
     HEADER_BACKBTN_DESCRLABEL_ENUM = (HEADER_BACKBTN_DESCRLABEL_RESEARCHTREE,
      HEADER_BACKBTN_DESCRLABEL_PERSONALAWARDS,
      HEADER_BACKBTN_DESCRLABEL_SHOP,
@@ -139,7 +154,10 @@ class VEHICLE_PREVIEW(object):
      HEADER_BACKBTN_DESCRLABEL_BLUEPRINTSEXCHANGE,
      HEADER_BACKBTN_DESCRLABEL_RESOURCEWELL,
      HEADER_BACKBTN_DESCRLABEL_BATTLEMATTERS,
-     HEADER_BACKBTN_DESCRLABEL_BATTLEMATTERSMAINREWARD)
+     HEADER_BACKBTN_DESCRLABEL_BATTLEMATTERSMAINREWARD,
+     HEADER_BACKBTN_DESCRLABEL_COLLECTIONS,
+     HEADER_BACKBTN_DESCRLABEL_COMP7,
+     HEADER_BACKBTN_DESCRLABEL_CLANSUPPLY)
     BUYINGPANEL_OFFER_RENT_NAME_ENUM = (BUYINGPANEL_OFFER_RENT_NAME_CYCLE, BUYINGPANEL_OFFER_RENT_NAME_CYCLES, BUYINGPANEL_OFFER_RENT_NAME_SEASON)
     BUYINGPANEL_OFFER_RENT_LABEL_ENUM = (BUYINGPANEL_OFFER_RENT_LABEL_CYCLE, BUYINGPANEL_OFFER_RENT_LABEL_CYCLES, BUYINGPANEL_OFFER_RENT_LABEL_SEASON)
 

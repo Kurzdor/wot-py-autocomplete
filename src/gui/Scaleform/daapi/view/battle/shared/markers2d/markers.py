@@ -3,8 +3,11 @@
 from enum import Enum
 import Event
 import GUI
+import Math
+from chat_commands_consts import INVALID_TARGET_ID, MarkerType
 from gun_rotation_shared import getLocalAimPoint
 from vehicle_systems.tankStructure import TankNodeNames
+HIDDEN_VEHICLE_OFFSET = Math.Vector3(0, 5, 0)
 
 class ReplyStateForMarker(Enum):
     CREATE_STATE = 0
@@ -116,6 +119,20 @@ class BaseMarker(Marker):
         return self._boundCheckEnabled
 
 
+class AreaMarker(Marker):
+
+    def __init__(self, markerID, targetID=INVALID_TARGET_ID, bcMarkerType=MarkerType.INVALID_MARKER_TYPE, active=True):
+        super(AreaMarker, self).__init__(markerID, active)
+        self._targetID = targetID
+        self._bcMarkerType = bcMarkerType
+
+    def getTargetID(self):
+        return self._targetID
+
+    def getBCMarkerType(self):
+        return self._bcMarkerType
+
+
 class VehicleMarker(Marker):
 
     def __init__(self, markerID, vehicleID, vProxy=None, active=True, isPlayerTeam=False):
@@ -134,12 +151,15 @@ class VehicleMarker(Marker):
     def attach(self, vProxy):
         self.detach()
         self._vProxy = vProxy
-        self._vProxy.appearance.onModelChanged += self.__onModelChanged
+        if self._vProxy.appearance is not None:
+            self._vProxy.appearance.onModelChanged += self.__onModelChanged
+        return
 
     def detach(self):
-        if self._vProxy is not None and self._vProxy.appearance is not None:
-            self._vProxy.appearance.onModelChanged -= self.__onModelChanged
-            self._vProxy = None
+        if self._vProxy is not None and hasattr(self._vProxy, 'appearance'):
+            if self._vProxy.appearance is not None:
+                self._vProxy.appearance.onModelChanged -= self.__onModelChanged
+                self._vProxy = None
         return
 
     def destroy(self):
@@ -169,13 +189,18 @@ class VehicleMarker(Marker):
 
     @classmethod
     def fetchMatrixProvider(cls, vProxy):
-        rootMP = vProxy.model.node(TankNodeNames.HULL_SWINGING)
-        guiMP = vProxy.model.node(TankNodeNames.GUI)
-        rootM = rootMP.localMatrix
-        guiM = guiMP.localMatrix
-        offset = guiM.translation - rootM.translation
-        rootCalculator = vProxy.model.getWorldMatrixCalculator(TankNodeNames.HULL_SWINGING)
-        return GUI.WGVehicleMarkersMatrixProvider(rootCalculator, offset)
+        if vProxy.isHidden or vProxy.model is None:
+            matrix = Math.Matrix()
+            matrix.setTranslate(vProxy.position + HIDDEN_VEHICLE_OFFSET)
+            return matrix
+        else:
+            rootMP = vProxy.model.node(TankNodeNames.HULL_SWINGING)
+            guiMP = vProxy.model.node(TankNodeNames.GUI)
+            rootM = rootMP.localMatrix
+            guiM = guiMP.localMatrix
+            offset = guiM.translation - rootM.translation
+            rootCalculator = vProxy.model.getWorldMatrixCalculator(TankNodeNames.HULL_SWINGING)
+            return GUI.WGVehicleMarkersMatrixProvider(rootCalculator, offset)
 
     def getMatrixProvider(self):
         return self.fetchMatrixProvider(self._vProxy) if self._vProxy is not None else None

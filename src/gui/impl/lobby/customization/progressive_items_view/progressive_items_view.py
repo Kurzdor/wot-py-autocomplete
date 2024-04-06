@@ -4,7 +4,6 @@ import logging
 import BigWorld
 from adisp import adisp_process
 from CurrentVehicle import g_currentVehicle
-from account_helpers.settings_core.settings_constants import OnceOnlyHints
 from frameworks.wulf import ViewFlags, ViewSettings
 from gui import GUI_SETTINGS
 from gui.shared.view_helpers.blur_manager import CachedBlur
@@ -28,7 +27,6 @@ from skeletons.gui.impl import IGuiLoader
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.shared import IItemsCache
 from skeletons.account_helpers.settings_core import ISettingsCore
-from tutorial.hints_manager import HINT_SHOWN_STATUS
 from web.web_client_api import webApiCollection, ui as ui_web_api, sound as sound_web_api
 from gui.shared.utils.graphics import isRendererPipelineDeferred
 from items.components.c11n_constants import CustomizationType
@@ -76,6 +74,20 @@ class ProgressiveItemsView(ViewImpl):
             return window
         return super(ProgressiveItemsView, self).createToolTip(event)
 
+    def update(self, *args, **kwargs):
+        itemIntCD = kwargs.get('itemIntCD')
+        self._vehicle = g_currentVehicle.item
+        self._possibleItems = self._getPossibleItemsForVehicle()
+        self._itemsProgressData = self.__itemsCache.items.inventory.getC11nProgressionDataForVehicle(self._vehicle.intCD)
+        with self.getViewModel().transaction() as model:
+            model.setTankName(self._vehicle.userName)
+            model.setTankLevel(int2roman(self._vehicle.level))
+            model.setTankType(self._vehicle.typeBigIconResource())
+            self.__setItems(model)
+            model.setIsRendererPipelineDeferred(isRendererPipelineDeferred())
+            model.setItemToScroll(0 if itemIntCD is None else itemIntCD)
+        return
+
     @property
     def viewModel(self):
         return super(ProgressiveItemsView, self).getViewModel()
@@ -103,22 +115,10 @@ class ProgressiveItemsView(ViewImpl):
         return
 
     def _onLoading(self, *args, **kwargs):
-        self._vehicle = g_currentVehicle.item
-        self._possibleItems = self._getPossibleItemsForVehicle()
-        self._itemsProgressData = self.__itemsCache.items.inventory.getC11nProgressionDataForVehicle(self._vehicle.intCD)
-        itemIntCD = kwargs.get('itemIntCD')
-        with self.getViewModel().transaction() as model:
-            model.setTankName(self._vehicle.userName)
-            model.setTankLevel(int2roman(self._vehicle.level))
-            model.setTankType(self._vehicle.typeBigIconResource())
-            self.__setItems(model)
-            model.setIsRendererPipelineDeferred(isRendererPipelineDeferred())
-            model.setItemToScroll(0 if itemIntCD is None else itemIntCD)
-        return
+        self.update(*args, **kwargs)
 
     def _onLoaded(self, *args, **kwargs):
         self.__blur.enable()
-        self.__settingsCore.serverSettings.setOnceOnlyHintsSettings({OnceOnlyHints.C11N_PROGRESSION_VIEW_HINT: HINT_SHOWN_STATUS})
 
     def _onSelectItem(self, args=None):
         if args is not None:
@@ -157,6 +157,7 @@ class ProgressiveItemsView(ViewImpl):
         return [ item.compactDescr for item in sortedItems if (item.filter is None or item.filter.matchVehicleType(vehicleType)) and item.itemType == CustomizationType.PROJECTION_DECAL ]
 
     def __setItems(self, model):
+        model.progressiveItems.clearItems()
         for intCD in self._possibleItems:
             itemModel = ItemModel()
             item = self.__customizationService.getItemByCD(intCD)

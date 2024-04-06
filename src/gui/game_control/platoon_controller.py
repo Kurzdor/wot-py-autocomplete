@@ -7,6 +7,7 @@ import Event
 import SoundGroups
 import VOIP
 from CurrentVehicle import g_currentVehicle
+import CGF
 from shared_utils import findFirst
 from UnitBase import UNIT_ROLE, UnitAssemblerSearchFlags, extendTiersFilter
 from constants import EPlatoonButtonState, MIN_VEHICLE_LEVEL, MAX_VEHICLE_LEVEL
@@ -19,7 +20,6 @@ from constants import QUEUE_TYPE
 from gui.Scaleform.daapi.view.lobby.rally import vo_converters
 from gui.Scaleform.daapi.view.lobby.rally.vo_converters import makeVehicleVO
 from gui.Scaleform.genConsts.PREBATTLE_ALIASES import PREBATTLE_ALIASES
-from gui.hangar_cameras.hangar_camera_common import CameraRelatedEvents
 from gui.impl import backport
 from gui.impl.gen import R
 from gui.impl.lobby.platoon.platoon_config import QUEUE_TYPE_TO_PREBATTLE_ACTION_NAME, PREBATTLE_TYPE_TO_VEH_CRITERIA, PrbEntityInfo, EPlatoonLayout, ePlatoonLayouts, Position, SquadInfo, buildCurrentLayouts
@@ -40,7 +40,7 @@ from helpers.statistics import HARDWARE_SCORE_PARAMS
 from messenger import MessengerEntry
 from messenger.ext import channel_num_gen
 from skeletons.account_helpers.settings_core import ISettingsCore
-from skeletons.gui.game_control import IPlatoonController, IUISpamController
+from skeletons.gui.game_control import IPlatoonController
 from skeletons.gui.impl import IGuiLoader
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.server_events import IEventsCache
@@ -54,8 +54,9 @@ from gui.shared.gui_items.Vehicle import Vehicle
 from gui.shared.formatters.ranges import toRomanRangeString
 from gui.impl.lobby.platoon.platoon_helpers import convertTierFilterToList
 from gui.prb_control.settings import REQUEST_TYPE
+from cgf_components.hangar_camera_manager import HangarCameraManager
 if TYPE_CHECKING:
-    from typing import Optional as TOptional, Tuple as TTuple
+    from typing import Any, Optional as TOptional, Tuple as TTuple
     from UnitBase import ProfileVehicle
 _logger = logging.getLogger(__name__)
 _MIN_PERF_PRESET_NAME = 'MIN'
@@ -148,7 +149,6 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
     __itemsCache = dependency.descriptor(IItemsCache)
     __settingsCore = dependency.descriptor(ISettingsCore)
     __hangarSpace = dependency.descriptor(IHangarSpace)
-    __uiSpamController = dependency.descriptor(IUISpamController)
 
     def __init__(self):
         super(PlatoonController, self).__init__()
@@ -182,6 +182,7 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
         validateDisplaySettings = self.__checkForSettingsModification()
         if validateDisplaySettings:
             self.__validateSystemReq()
+        self.currentPlatoonLayouts = buildCurrentLayouts(self.getPrbEntityType())
         self.__isPlatoonVisualizationEnabled = bool(self.__settingsCore.getSetting(GAME.DISPLAY_PLATOON_MEMBERS))
         self.__startListening()
         self.__cacheAvailableVehicles()
@@ -195,6 +196,7 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
         prebattleType = self.getPrbEntityType()
         self.__destroy(hideOnly=False)
         self.__prevPrbEntityInfo = PrbEntityInfo(queueType, prebattleType)
+        self.__clearPlatoonTankInfo()
 
     def onAccountBecomeNonPlayer(self):
         self.__stopListening()
@@ -247,9 +249,10 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
             return
         self.__executeQueue = False
         self.prbDispatcher.doAction(PrbAction(''))
+        self.__updatePlatoonTankInfo()
 
-    def leavePlatoon(self, isExit=True, ignoreConfirmation=False):
-        action = LeavePrbAction(isExit=isExit, ignoreConfirmation=ignoreConfirmation)
+    def leavePlatoon(self, isExit=True, ignoreConfirmation=False, parent=None):
+        action = LeavePrbAction(isExit=isExit, ignoreConfirmation=ignoreConfirmation, parent=parent)
         self.__tankDisplayPosition.clear()
         event = events.PrbActionEvent(action, events.PrbActionEvent.LEAVE)
         g_eventBus.handleEvent(event, EVENT_BUS_SCOPE.LOBBY)
@@ -300,7 +303,7 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
         self.__waitingReadyAccept = True
         if notReady:
             changeStatePossible = yield self.__lobbyContext.isHeaderNavigationPossible()
-        if changeStatePossible and notReady:
+        if changeStatePossible and notReady and not self.prbEntity.isCommander():
             changeStatePossible = yield functions.checkAmmoLevel((g_currentVehicle.item,))
         if changeStatePossible:
             self.prbEntity.togglePlayerReadyAction(True)
@@ -596,6 +599,11 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
             self.__channelCtrl.addMessage(messages.getUnitPlayerNotification(settings.UNIT_NOTIFICATION_KEY.GIVE_LEADERSHIP, pInfo))
         self.onMembersUpdate()
 
+    def onUnitPlayerProfileVehicleChanged(self, accountDBID):
+        if self.getPrbEntityType() not in PREBATTLE_TYPE.SQUAD_PREBATTLES:
+            return
+        self.onMembersUpdate()
+
     def hasVehiclesForSearch(self, tierLevel=None):
         return bool(self.__availableTiersForSearch) if tierLevel is None else self.__availableTiersForSearch & 1 << tierLevel != 0
 
@@ -800,8 +808,9 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
         self.__currentlyDisplayedTanks = 0
         if self.isInPlatoon() and self.__getNotReadyPlayersCount() < self.__getPlayerCount() - 1:
             self.__updatePlatoonTankInfo()
-            cameraManager = self.__hangarSpace.space.getCameraManager()
-            cameraManager.setPlatoonStartingCameraPosition()
+            cameraManager = CGF.getManager(self.__hangarSpace.spaceID, HangarCameraManager)
+            if cameraManager:
+                cameraManager.enablePlatoonMode(True)
 
     def __stopListening(self):
         _logger.debug('PlatoonController: stop listening')
@@ -831,7 +840,9 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
     def __unitMgrOnUnitJoined(self, unitMgrID, prbType):
         _logger.debug('PlatoonController: __unitMgrOnUnitJoined')
         self.__tankDisplayPosition.clear()
-        self.__ensureHintIsHidden()
+        serverSettings = self.__settingsCore.serverSettings
+        if not serverSettings.getOnceOnlyHintsSettings().get(OnceOnlyHints.PLATOON_BTN_HINT, False):
+            self.__settingsCore.serverSettings.setOnceOnlyHintsSettings({OnceOnlyHints.PLATOON_BTN_HINT: True})
         if self.hasDelayedCallback(self.destroyUI):
             self.stopCallback(self.destroyUI)
         if self.__startAutoSearchOnUnitJoin:
@@ -841,10 +852,6 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
         if self.isInSearch():
             self.__filterExpander.start(self.getCurrentSearchFlags())
         self.__updatePlatoonTankInfo()
-
-    def __ensureHintIsHidden(self):
-        if not self.__uiSpamController.shouldBeHidden(OnceOnlyHints.PLATOON_BTN_HINT):
-            self.__settingsCore.serverSettings.setOnceOnlyHintsSettings({OnceOnlyHints.PLATOON_BTN_HINT: True})
 
     def __unitMgrOnUnitLeft(self, unitMgrID, isFinishedAssembling):
         _logger.debug('PlatoonController: __unitMgrOnUnitLeft')
@@ -888,20 +895,16 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
     def __platoonTankLoaded(self, event):
         self.__currentlyDisplayedTanks += 1
         if self.__currentlyDisplayedTanks == 1:
-            g_eventBus.handleEvent(CameraRelatedEvents(CameraRelatedEvents.FORCE_DISABLE_IDLE_PARALAX_MOVEMENT, ctx={'isDisable': True,
-             'setIdle': True,
-             'setParallax': False}), EVENT_BUS_SCOPE.LOBBY)
-            cameraManager = self.__hangarSpace.space.getCameraManager()
-            cameraManager.setPlatoonCameraDistance(enable=True)
+            cameraManager = CGF.getManager(self.__hangarSpace.spaceID, HangarCameraManager)
+            if cameraManager:
+                cameraManager.enablePlatoonMode(True)
 
     def __platoonTankDestroyed(self, event):
         self.__currentlyDisplayedTanks = max(0, self.__currentlyDisplayedTanks - 1)
         if self.__currentlyDisplayedTanks <= 0:
-            g_eventBus.handleEvent(CameraRelatedEvents(CameraRelatedEvents.FORCE_DISABLE_IDLE_PARALAX_MOVEMENT, ctx={'isDisable': False,
-             'setIdle': True,
-             'setParallax': False}), EVENT_BUS_SCOPE.LOBBY)
-            cameraManager = self.__hangarSpace.space.getCameraManager()
-            cameraManager.setPlatoonCameraDistance(enable=False)
+            cameraManager = CGF.getManager(self.__hangarSpace.spaceID, HangarCameraManager)
+            if cameraManager:
+                cameraManager.enablePlatoonMode(False)
 
     def __getNotReadyPlayersCount(self):
         players = self.prbEntity.getPlayers().values()
@@ -992,6 +995,13 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
             self.onPlatoonTankUpdated(result)
             return
 
+    def __clearPlatoonTankInfo(self):
+        entity = self.prbEntity
+        if entity is not None and hasattr(entity, 'getRosterSettings'):
+            unitSlotCount = entity.getRosterSettings().getMaxSlots()
+            self.onPlatoonTankUpdated({i:False for i in range(unitSlotCount)})
+        return
+
     def __hasEnoughSlots(self, slots):
         return len(self.__availablePlatoonTanks) + 1 >= slots
 
@@ -1064,9 +1074,23 @@ class PlatoonController(IPlatoonController, IGlobalListener, CallbackDelayer):
         self.__tankDisplayPosition[currentPlayer.accID] = currentPlayerIdx
 
     def __removeAccFromPositions(self, accID):
+        maxSlotCount = self.prbEntity.getRosterSettings().getMaxSlots()
         removedIdx = self.__tankDisplayPosition.pop(accID, None)
+        currPlayerIdx = self.__tankDisplayPosition[BigWorld.player().id]
         if removedIdx is not None:
-            self.__tankDisplayPosition = {k:(v if v < removedIdx else v - 1) for k, v in self.__tankDisplayPosition.items()}
+            if maxSlotCount == _MAX_SLOT_COUNT_FOR_PLAYER_RESORTING:
+                for playerID, slotIdx in self.__tankDisplayPosition.iteritems():
+                    if slotIdx > removedIdx:
+                        if slotIdx == currPlayerIdx + 1:
+                            self.__tankDisplayPosition[playerID] = slotIdx - 2
+                        elif slotIdx != currPlayerIdx:
+                            self.__tankDisplayPosition[playerID] = slotIdx - 1
+
+            else:
+                for playerID, slotIdx in self.__tankDisplayPosition.iteritems():
+                    if slotIdx > removedIdx:
+                        self.__tankDisplayPosition[playerID] = slotIdx - 1
+
         return
 
     def __onVehicleStateChanged(self, updateReason, _):

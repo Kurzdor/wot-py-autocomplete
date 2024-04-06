@@ -7,6 +7,7 @@ from base64 import b64encode
 from datetime import datetime, timedelta, time as dt_time
 from client_request_lib import exceptions
 from client_request_lib.data_sources import base
+from debug_utils import LOG_ERROR
 EXAMPLES = {}
 DEFAULT_SINCE_DELAY = timedelta(days=1)
 SUCCESS_STATUSES = [200, 201, 304]
@@ -68,8 +69,9 @@ class GatewayDataAccessor(base.BaseDataAccessor):
                     except zlib.error:
                         pass
 
-                    data = json.loads(data)
-                except:
+                    data = json.loads(data) if data else {}
+                except Exception as error:
+                    LOG_ERROR('Can not process request response. Exception occured: %s' % type(error).__name__, str(error))
                     data = None
                     headers = None
 
@@ -176,6 +178,10 @@ class GatewayDataAccessor(base.BaseDataAccessor):
 
     def agate_v4_fetch_product_list_state(self, callback, request_data, fields=None):
         url = '/agate/api/v4/commerce/fetchProductListState/'
+        return self._request_data(callback, url, method='POST', post_data=request_data)
+
+    def agate_v6_get_user_subscriptions2(self, callback, request_data, fields=None):
+        url = '/agate/api/v6/commerce/getUserSubscriptions2/'
         return self._request_data(callback, url, method='POST', post_data=request_data)
 
     def get_clan_members(self, callback, clan_id, fields=None):
@@ -386,6 +392,22 @@ class GatewayDataAccessor(base.BaseDataAccessor):
         return self._request_data(callback, url, get_data={'rev': rev}, converters={'periphery_id': int,
          'unit_server_id': int})
 
+    def get_wgsh_common_unit_info(self, callback, periphery_id, unit_server_id, rev, fields=None):
+        url = '/wgsh/v2/periphery/units/info/'
+        get_data = {'rev': rev,
+         'periphery_id': periphery_id,
+         'unit_server_id': unit_server_id}
+        return self._request_data(callback, url, get_data=get_data, converters={'periphery_id': int,
+         'unit_server_id': int})
+
+    def get_wgsh_account_unit_info(self, callback, periphery_id, unit_server_id, rev, fields=None):
+        url = '/wgsh/v2/periphery/units/account_info/'
+        get_data = {'rev': rev,
+         'periphery_id': periphery_id,
+         'unit_server_id': unit_server_id}
+        return self._request_data(callback, url, get_data=get_data, converters={'periphery_id': int,
+         'unit_server_id': int})
+
     def set_vehicle(self, callback, periphery_id, unit_server_id, vehicle_cd, fields=None):
         url = '/wgsh/periphery/{periphery_id}/units/{unit_server_id}/vehicles/'.format(periphery_id=periphery_id, unit_server_id=unit_server_id)
         post_data = {'vehicle_cd': vehicle_cd}
@@ -494,6 +516,24 @@ class GatewayDataAccessor(base.BaseDataAccessor):
         return self._request_data(callback, url, get_data={}, converters={'periphery_id': int,
          'unit_server_id': int}, method='POST', post_data=post_data)
 
+    def wgsh_event_settings(self, callback, fields=None):
+        url = '/wgshevents/settings'
+        return self._request_data(callback, url, get_data={}, method='GET')
+
+    def wgsh_event_clan_info(self, callback, fields=None):
+        url = '/wgshevents/clan/info'
+        return self._request_data(callback, url, method='GET')
+
+    def wgsh_event_get_frozen_vehicles(self, callback):
+        url = '/wgshevents/frozen_vehicle'
+        return self._request_data(callback, url, method='GET')
+
+    def wgsh_event_unfreeze_vehicle(self, callback, playerSpaID, vehicleCD, price):
+        url = '/wgshevents/frozen_vehicle'
+        return self._request_data(callback, url, method='PATCH', post_data={'vehicle_cd': vehicleCD,
+         'repair_price': price,
+         'spa_id': playerSpaID})
+
     def clan_statistics(self, callback, clan_id, fields=None):
         url = '/wgsh/clans/{clan_id}/'.format(clan_id=clan_id)
         return self._request_data(callback, url, get_data={}, converters={}, method='GET')
@@ -570,8 +610,10 @@ class GatewayDataAccessor(base.BaseDataAccessor):
         url = '/hof/user/restore/'
         return self._request_data(callback, url, method='POST')
 
-    def get_teaser(self, callback):
+    def get_teaser(self, callback, additionalData=None):
         get_params = {'language': self._get_formatted_language_code()}
+        if additionalData:
+            get_params.update(additionalData)
         url = '/promobe/teaser/'
         return self._request_data(callback, url, get_data=get_params, method='GET')
 
@@ -626,6 +668,48 @@ class GatewayDataAccessor(base.BaseDataAccessor):
             urlencoded_string = urllib.urlencode([ ('entitlement_codes', code) for code in entitlement_codes ])
             url = '{}?{}'.format(url, urlencoded_string)
         return self._request_data(callback, url, method='GET')
+
+    def get_inventory_entitlements_v5(self, callback, entitlementsFilter):
+        url = '/agate/api/v5/inventory/getInventoryEntitlements/'
+        return self._request_data(callback, url, method='POST', post_data=entitlementsFilter)
+
+    def get_storefront_products(self, callback, ctx):
+        url = '/shop/api/external/v2/{storefront}/products_with_categories/'.format(storefront=ctx.getStorefront())
+        return self._request_data(callback, url, method='GET')
+
+    def buy_storefront_product(self, callback, ctx):
+        url = '/shop/api/external/v2/{storefront}/products/{product_code}/buy/'.format(storefront=ctx.getStorefront(), product_code=ctx.getProductCode())
+        price = ctx.getExpectedPrice()
+        postData = {'amount': 1,
+         'prices': [{'amount': price.value,
+                     'code': price.currency,
+                     'item_type': 'currency'}]}
+        return self._request_data(callback, url, method='POST', post_data=postData)
+
+    def get_clan_supply_quests(self, callback):
+        url = '/clansupply/client/clansupply/quests'
+        return self._request_data(callback, url, method='GET')
+
+    def post_clan_supply_quests(self, callback):
+        url = '/clansupply/client/clansupply/quests'
+        return self._request_data(callback, url, method='POST')
+
+    def claim_quest_rewards(self, callback):
+        url = '/clansupply/client/clansupply/claim_rewards'
+        return self._request_data(callback, url, method='POST')
+
+    def get_progression_settings(self, callback):
+        url = '/clansupply/client/campaign_map/settings'
+        return self._request_data(callback, url, method='GET')
+
+    def get_progression_progress(self, callback):
+        url = '/clansupply/client/campaign_map/progress'
+        return self._request_data(callback, url, method='GET')
+
+    def purchase_progression_stage(self, callback, region_number, expected_price):
+        url = '/clansupply/client/campaign_map/purchase'
+        return self._request_data(callback, url, method='POST', post_data={'region_number': region_number,
+         'expected_price': expected_price})
 
     def _get_formatted_language_code(self):
         return self.client_lang.replace('_', '-')

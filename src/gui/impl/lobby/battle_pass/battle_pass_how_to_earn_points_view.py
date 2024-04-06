@@ -1,9 +1,9 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/impl/lobby/battle_pass/battle_pass_how_to_earn_points_view.py
-import itertools
 import logging
+import itertools
 from constants import ARENA_BONUS_TYPE
-from frameworks.wulf import ViewSettings, WindowFlags
+from frameworks.wulf import Array, ViewSettings, WindowFlags
 from gui.impl import backport
 from gui.impl.gen import R
 from gui.impl.gen.view_models.views.lobby.battle_pass.battle_pass_how_to_earn_points_view_model import BattlePassHowToEarnPointsViewModel
@@ -17,11 +17,14 @@ from gui.impl.pub import ViewImpl
 from gui.impl.pub.lobby_window import LobbyWindow
 from gui.server_events.events_dispatcher import showDailyQuests
 from gui.shared.event_dispatcher import showHangar
-from gui.shared.view_helpers.blur_manager import CachedBlur
 from helpers import dependency
 from skeletons.gui.game_control import IBattlePassController
 from skeletons.gui.shared import IItemsCache
-SUPPORTED_ARENA_BONUS_TYPES = [ARENA_BONUS_TYPE.REGULAR, ARENA_BONUS_TYPE.EPIC_BATTLE, ARENA_BONUS_TYPE.COMP7]
+REVERSE_GAME_MODE_ORDER = (ARENA_BONUS_TYPE.BATTLE_ROYALE_SOLO,
+ ARENA_BONUS_TYPE.EPIC_BATTLE,
+ ARENA_BONUS_TYPE.COMP7,
+ ARENA_BONUS_TYPE.REGULAR)
+REVERSE_GAME_MODE_ORDER_MAP = {bonusType:idx for idx, bonusType in enumerate(REVERSE_GAME_MODE_ORDER)}
 _rBattlePass = R.strings.battle_pass
 _logger = logging.getLogger(__name__)
 
@@ -44,17 +47,21 @@ class BattlePassHowToEarnPointsView(ViewImpl):
         super(BattlePassHowToEarnPointsView, self)._onLoading(*args, **kwargs)
         self.__createGeneralModel()
 
-    def __createGeneralModel(self):
-        with self.viewModel.transaction() as tx:
-            gameModes = tx.getGameModes()
-            gameModes.clear()
-            for supportedArenaType in SUPPORTED_ARENA_BONUS_TYPES:
-                if supportedArenaType == ARENA_BONUS_TYPE.BATTLE_ROYALE_SOLO:
-                    gameModes.addViewModel(self.__createBattleRoyalGameModel())
-                gameModes.addViewModel(self.__createGameModel(supportedArenaType))
+    def __getGameMode(self, arenaType):
+        return self.__createBattleRoyalGameModel() if arenaType == ARENA_BONUS_TYPE.BATTLE_ROYALE_SOLO else self.__createGameModel(arenaType)
 
-            tx.setSyncInitiator((tx.getSyncInitiator() + 1) % 1000)
-            tx.setChapterID(self.__chapterID)
+    def __createGeneralModel(self):
+        with self.viewModel.transaction() as model:
+            model.getGameModes().clear()
+            gameModeModels = Array()
+            for arenaType in sorted(self.__battlePass.getVisibleGameModes(), key=REVERSE_GAME_MODE_ORDER_MAP.get, reverse=True):
+                if any((bonusType.value == arenaType for bonusType in ArenaBonusType.__members__.values())):
+                    gameModeModels.addViewModel(self.__getGameMode(arenaType))
+                _logger.error('ArenaBonusType %s is not supported in BattlePassHowToEarnPointsView', arenaType)
+
+            model.setGameModes(gameModeModels)
+            model.setSyncInitiator((model.getSyncInitiator() + 1) % 1000)
+            model.setChapterID(self.__chapterID)
 
     def __createGameModel(self, gameType):
         viewModel = self.__createViewHeader(gameType)
@@ -186,7 +193,7 @@ class BattlePassHowToEarnPointsView(ViewImpl):
         self.__createDailyCard(gameType, viewModel, PointsCardType.COMP7)
 
     def __createRandomCardsModel(self, gameType, viewModel):
-        self.__createSpecialVehCard(viewModel, ARENA_BONUS_TYPE.REGULAR)
+        self.__createSpecialVehCard(viewModel, gameType)
         self.__createLimitCard(viewModel)
         self.__createDailyCard(gameType, viewModel)
 
@@ -250,6 +257,8 @@ class BattlePassHowToEarnPointsView(ViewImpl):
     def __onBattlePassSettingsChange(self, *_):
         if self.__battlePass.isVisible() and not self.__battlePass.isPaused():
             self.__createGeneralModel()
+        elif self.__battlePass.isPaused():
+            self.destroyWindow()
         else:
             showHangar()
 
@@ -259,12 +268,6 @@ class BattlePassHowToEarnPointsView(ViewImpl):
 
 
 class BattlePassHowToEarnPointsWindow(LobbyWindow):
-    __slots__ = ('__blur',)
 
     def __init__(self, parent=None, chapterID=0):
         super(BattlePassHowToEarnPointsWindow, self).__init__(WindowFlags.WINDOW | WindowFlags.WINDOW_FULLSCREEN, content=BattlePassHowToEarnPointsView(R.views.lobby.battle_pass.BattlePassHowToEarnPointsView(), chapterID))
-        self.__blur = CachedBlur(enabled=True, ownLayer=self.layer)
-
-    def _finalize(self):
-        self.__blur.fini()
-        super(BattlePassHowToEarnPointsWindow, self)._finalize()

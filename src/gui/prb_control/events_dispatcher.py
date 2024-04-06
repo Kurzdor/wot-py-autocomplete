@@ -76,6 +76,9 @@ class EventDispatcher(object):
         g_eventBus.removeListener(events.TrainingEvent.SHOW_EPIC_TRAINING_LIST, self.__showEpicTrainingList, scope=EVENT_BUS_SCOPE.LOBBY)
         return
 
+    def dispatchSwitchResult(self, result):
+        self.__fireEvent(events.PrebattleEvent(events.PrebattleEvent.SWITCHED if result else events.PrebattleEvent.NOT_SWITCHED))
+
     def isTrainingLoaded(self):
         return self.__getLoadedEvent() in _LOCKED_SCREENS or self.__loadingEvent in _LOCKED_SCREENS
 
@@ -135,12 +138,6 @@ class EventDispatcher(object):
 
     def loadRankedUnreachable(self):
         self.__fireShowEvent(RANKEDBATTLES_ALIASES.RANKED_BATTLES_UNREACHABLE_VIEW_ALIAS)
-
-    def loadBootcampQueue(self):
-        self.__fireEvent(events.LoadViewEvent(SFViewLoadParams(VIEW_ALIAS.BOOTCAMP_QUEUE_DIALOG_SHOW)))
-
-    def unloadBootcampQueue(self):
-        self.__fireEvent(events.LoadViewEvent(SFViewLoadParams(VIEW_ALIAS.BOOTCAMP_QUEUE_DIALOG_CLOSE)))
 
     def removeTrainingFromCarousel(self, isList=True, closeWindow=True):
         clientType = SPECIAL_CLIENT_WINDOWS.TRAINING_LIST if isList else SPECIAL_CLIENT_WINDOWS.TRAINING_ROOM

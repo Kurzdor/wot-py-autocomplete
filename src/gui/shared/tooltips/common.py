@@ -4,8 +4,12 @@ import cPickle
 import logging
 import math
 from collections import namedtuple, defaultdict
+from gui.impl.lobby.collection.tooltips.collection_item_tooltip_view import CollectionItemTooltipView
+from gui.impl.lobby.personal_reserves.booster_tooltip import BoosterTooltip
+from gui.impl.lobby.personal_reserves.quest_booster_tooltip import QuestBoosterTooltip
 from gui.impl.lobby.personal_reserves.tooltips.personal_reserves_tooltip_view import PersonalReservesTooltipView
 from gui.impl.pub import ToolTipWindow
+from gui.impl.pub.tooltip_window import SimpleTooltipContent
 from helpers.i18n import makeString
 import ArenaType
 import ResMgr
@@ -27,7 +31,7 @@ from gui.Scaleform.locale.MESSENGER import MESSENGER
 from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.clans import formatters as clans_fmts
-from gui.clans.items import formatField
+from gui.clans.data_wrapper.utils import formatField
 from gui.impl import backport
 from gui.impl.backport.backport_tooltip import DecoratedTooltipWindow
 from gui.impl.gen import R
@@ -51,7 +55,7 @@ from gui.shared.formatters.text_styles import concatStylesToMultiLine
 from gui.shared.formatters.time_formatters import getTimeLeftStr, getTillTimeByResource
 from gui.shared.gui_items import GUI_ITEM_TYPE, ACTION_ENTITY_ITEM
 from gui.shared.money import Money, Currency, MONEY_UNDEFINED
-from gui.shared.tooltips import ToolTipBaseData, TOOLTIP_TYPE, ACTION_TOOLTIPS_TYPE, ToolTipParameterField
+from gui.shared.tooltips import ToolTipBaseData, TOOLTIP_TYPE, ACTION_TOOLTIPS_TYPE, ToolTipParameterField, WulfTooltipData
 from gui.shared.tooltips import efficiency
 from gui.shared.tooltips import formatters
 from gui.shared.view_helpers import UsersInfoHelper
@@ -63,7 +67,7 @@ from messenger.storage import storage_getter
 from predefined_hosts import g_preDefinedHosts, HOST_AVAILABILITY, PING_STATUSES, PingData
 from skeletons.account_helpers.settings_core import ISettingsCore
 from skeletons.connection_mgr import IConnectionManager
-from skeletons.gui.game_control import IIGRController, IServerStatsController, IBattleRoyaleRentVehiclesController
+from skeletons.gui.game_control import IIGRController, IServerStatsController, IBattleRoyaleController
 from skeletons.gui.goodies import IGoodiesCache
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.server_events import IEventsCache
@@ -642,7 +646,7 @@ class ActionTooltipData(ToolTipBaseData):
     def __init__(self, context):
         super(ActionTooltipData, self).__init__(context, TOOLTIP_TYPE.CONTROL)
 
-    def getDisplayableData(self, itemType, key, newPrice, oldPrice, isBuying, forCredits=False, rentPackage=None, checkAllCurrencies=False):
+    def getDisplayableData(self, itemType, key, newPrice, oldPrice, isBuying, forCredits=False, rentPackage=None, checkAllCurrencies=False, **kwargs):
         descr = ''
         hasRentCompensation = False
         hasPersonalDiscount = False
@@ -688,6 +692,9 @@ class ActionTooltipData(ToolTipBaseData):
             deviceNameType = ACTION_TOOLTIPS_TYPE.BOOSTER
         elif itemType == ACTION_TOOLTIPS_TYPE.ECONOMICS:
             itemName = key
+            if key == 'slotsPrices':
+                currency = Money.makeFromMoneyTuple(newPrice).getCurrency()
+                itemName = '{}/{}'.format(key, currency)
         template = 'html_templates:lobby/quests/actions'
         formatedOldPrice, formatedNewPrice = formatActionPrices(oldPrice, newPrice, isBuying, checkAllCurrencies)
         body = i18n.makeString(TOOLTIPS.ACTIONPRICE_BODY, oldPrice=formatedOldPrice, newPrice=formatedNewPrice)
@@ -730,8 +737,9 @@ class ActionSlotTooltipData(ToolTipBaseData):
     def __init__(self, context):
         super(ActionSlotTooltipData, self).__init__(context, TOOLTIP_TYPE.CONTROL)
 
-    def getDisplayableData(self, newPrice, oldPrice):
-        affectedAction = self.eventsCache.getAffectedAction('slotsPrices')
+    def getDisplayableData(self, newPrice, oldPrice, **kwargs):
+        currency = Money.makeFromMoneyTuple(newPrice).getCurrency()
+        affectedAction = self.eventsCache.getAffectedAction('{}/{}'.format('slotsPrices', currency))
         actionUserName = None
         if affectedAction:
             action = self.eventsCache.getActions().get(affectedAction[ACTION_ENTITY_ITEM.ACTION_NAME_IDX])
@@ -792,25 +800,6 @@ class FrontlineDiscountTooltipData(BaseDiscountTooltipData):
         bodyText = i18n.makeString(bodyTemplate, discount=self._formatPrice(discount, currencyType), oldPrice=self._formatPrice(fullCost, currencyType), newPrice=self._formatPrice(cost, currencyType))
         return {'header': headerText,
          'body': bodyText}
-
-
-class ActionXPTooltipData(BaseDiscountTooltipData):
-
-    def getDisplayableData(self, newPrice, oldPrice):
-        oldPrice = Money.makeFromMoneyTuple(oldPrice)
-        if not oldPrice.isDefined():
-            oldPrice = Money(credits=0)
-        currency = Currency.CREDITS
-        for currency in Currency.ALL:
-            currencyValue = oldPrice.get(currency)
-            if currencyValue is not None:
-                break
-
-        newPrice = Money.makeFromMoneyTuple(newPrice)
-        if not newPrice.isDefined():
-            newPrice = Money.makeFrom(currency, 0)
-        isGoldPrice = newPrice.isCurrencyDefined(Currency.GOLD)
-        return self._packDisplayableData(newPrice.gold if isGoldPrice else newPrice.credits, oldPrice.gold if isGoldPrice else oldPrice.credits, DISCOUNT_TYPE.FREE_XP if isGoldPrice else DISCOUNT_TYPE.XP)
 
 
 class ToolTipFortWrongTime(ToolTipBaseData):
@@ -1023,7 +1012,7 @@ class CURRENCY_SETTINGS(object):
         return cls.__DECONSTRUCT_SETTINGS.get(currency, cls.DECONSTRUCT_EQUIPCOINS_PRICE)
 
 
-_OPERATIONS_SETTINGS = {CURRENCY_SETTINGS.BUY_CREDITS_PRICE: _CurrencySetting(TOOLTIPS.VEHICLE_BUY_PRICE, icons.credits(), text_styles.credits, ICON_TEXT_FRAMES.CREDITS, iconYOffset=0),
+_OPERATIONS_SETTINGS = {CURRENCY_SETTINGS.BUY_CREDITS_PRICE: _CurrencySetting(TOOLTIPS.VEHICLE_BUY_PRICE, icons.credits(), text_styles.credits, ICON_TEXT_FRAMES.CREDITS, iconYOffset=2),
  CURRENCY_SETTINGS.RESTORE_PRICE: _CurrencySetting('#tooltips:vehicle/restore_price', icons.credits(), text_styles.credits, ICON_TEXT_FRAMES.CREDITS, iconYOffset=0),
  CURRENCY_SETTINGS.BUY_GOLD_PRICE: _CurrencySetting(TOOLTIPS.VEHICLE_BUY_PRICE, icons.gold(), text_styles.gold, ICON_TEXT_FRAMES.GOLD, iconYOffset=0),
  CURRENCY_SETTINGS.BUY_CRYSTAL_PRICE: _CurrencySetting(TOOLTIPS.VEHICLE_BUY_PRICE, icons.crystal(), text_styles.crystal, ICON_TEXT_FRAMES.CRYSTAL, iconYOffset=0),
@@ -1097,22 +1086,38 @@ def makePriceBlock(price, currencySetting, neededValue=None, oldPrice=None, perc
         return formatters.packTextParameterWithIconBlockData(name=text, value=valueFormatted, icon=settings.frame, valueWidth=valueWidth, padding=formatters.packPadding(left=-5), nameOffset=iconRightOffset, gap=gap, iconYOffset=settings.iconYOffset)
 
 
-def makeRemovalPriceBlock(price, currencySetting, neededValue=None, oldPrice=None, percent=0, valueWidth=-1, leftPadding=61, forcedText='', isDeluxe=False, gap=15, canUseDemountKit=False):
+def makeRemovalPriceBlock(price, currencySetting, neededValue=None, oldPrice=None, percent=0, valueWidth=-1, leftPadding=61, forcedText='', isDeluxe=False, gap=15, canUseDemountKit=False, wotPlusStatus=False, isFreeToDemount=False, isFreeDeluxeEnabled=False, isFreeDemountEnabled=False):
     _int = backport.getIntegralFormat
     settings = _getCurrencySetting(currencySetting)
     if settings is None:
         return
     icon = settings.icon
     countFormatted = text_styles.concatStylesWithSpace(settings.textStyle(_int(price)), icon)
+    divisorIcon = icons.divisor()
     dkCount = text_styles.demountKitText('1')
     dkIcon = icons.demountKit()
     dkText = text_styles.concatStylesWithSpace(dkCount, dkIcon)
+    wotPlusLabel = text_styles.wotPlusText(backport.text(R.strings.demount_kit.equipmentDemount.wotPlus() if not wotPlusStatus else R.strings.demount_kit.equipmentDemount.optionFree()))
+    wotPlusIcon = icons.wotPlus()
+    wotPlusText = text_styles.concatStylesWithSpace(wotPlusLabel, wotPlusIcon)
+    if wotPlusStatus:
+        if isFreeToDemount:
+            countFormatted = wotPlusText
     descr = R.strings.demount_kit.equipmentInstall
-    if isDeluxe or not canUseDemountKit:
+    if wotPlusStatus and isFreeToDemount:
         dynAccId = descr.demount()
+    elif not canUseDemountKit and not isDeluxe:
+        dynAccId = descr.demount()
+    elif isDeluxe:
+        if isFreeDeluxeEnabled:
+            dynAccId = descr.demountNoKitOr()
+        else:
+            dynAccId = descr.demount()
+    elif isFreeDemountEnabled:
+        dynAccId = descr.demountWithKitOr()
     else:
-        dynAccId = descr.demountOr()
-    valueFormatted = backport.text(dynAccId, count=countFormatted, countDK=text_styles.main(dkText))
+        dynAccId = descr.demountWithKit()
+    valueFormatted = backport.text(dynAccId, count=countFormatted, countDK=text_styles.main(dkText), wotPlus=text_styles.main(wotPlusText), divisor=divisorIcon)
     neededText = getFormattedNeededValue(settings, _int(neededValue)) if neededValue else ''
     text = text_styles.concatStylesWithSpace(text_styles.main(settings.text if not forcedText else forcedText), neededText)
     if percent != 0:
@@ -1238,7 +1243,7 @@ class SettingsKeyShowRadialMenu(BlocksTooltipData):
 
 class HeaderMoneyAndXpTooltipData(BlocksTooltipData):
     itemsCache = dependency.descriptor(IItemsCache)
-    __rentVehiclesController = dependency.descriptor(IBattleRoyaleRentVehiclesController)
+    battleRoyaleController = dependency.descriptor(IBattleRoyaleController)
 
     def __init__(self, ctx):
         super(HeaderMoneyAndXpTooltipData, self).__init__(ctx, TOOLTIPS_CONSTANTS.BLOCKS_DEFAULT_UI)
@@ -1273,7 +1278,7 @@ class HeaderMoneyAndXpTooltipData(BlocksTooltipData):
         elif self._btnType == CURRENCIES_CONSTANTS.FREE_XP:
             valueStr = text_styles.expText(backport.getIntegralFormat(self.itemsCache.items.stats.actualFreeXP))
         elif self._btnType == CURRENCIES_CONSTANTS.BRCOIN:
-            brCoin = self.__rentVehiclesController.getBRCoinBalance(0)
+            brCoin = self.battleRoyaleController.getBRCoinBalance(0)
             valueStr = text_styles.bpcoin(backport.getIntegralFormat(brCoin))
         elif self._btnType == CURRENCIES_CONSTANTS.EQUIP_COIN:
             valueStr = text_styles.bpcoin(backport.getIntegralFormat(self.itemsCache.items.stats.equipCoin))
@@ -1323,7 +1328,7 @@ class MissionsToken(BlocksTooltipData):
         return items
 
     def __packTitleBlock(self, token):
-        return formatters.packImageTextBlockData(title=text_styles.highTitle(makeString(TOOLTIPS.MISSIONS_TOKEN_HEADER, name=makeString(token.getUserName()))), img=token.getImage(TOKEN_SIZES.MEDIUM), txtPadding={'top': 14,
+        return formatters.packImageTextBlockData(title=text_styles.highTitle(token.getUserName()), img=token.getImage(TOKEN_SIZES.MEDIUM), txtPadding={'top': 14,
          'left': 11,
          'right': 5})
 
@@ -1571,7 +1576,55 @@ class PersonalReservesWidgetTooltipContent(BlocksTooltipData):
     def __init__(self, ctx):
         super(PersonalReservesWidgetTooltipContent, self).__init__(ctx, TOOLTIPS_CONSTANTS.BLOCKS_DEFAULT_UI)
 
-    def getDisplayableData(self, *args):
+    def getDisplayableData(self, *args, **kwargs):
         content = PersonalReservesTooltipView()
+        return ToolTipWindow(None, content, kwargs.get('parent', content.getParentWindow()))
+
+
+class CollectionItemTooltipContentWindowData(ToolTipBaseData):
+
+    def __init__(self, context):
+        super(CollectionItemTooltipContentWindowData, self).__init__(context, TOOLTIPS_CONSTANTS.COLLECTION_ITEM)
+
+    def getDisplayableData(self, itemID, isDetailed, *args, **kwargs):
+        _, _, collectionID, itemID = itemID.split(':')
+        content = CollectionItemTooltipView(int(itemID), int(collectionID), isDetailed)
         window = ToolTipWindow(None, content, content.getParentWindow())
         return window
+
+
+def getSimpleTooltipFactory(header='', body='', note='', alert=''):
+    return lambda : SimpleTooltipContent(R.views.common.tooltip_window.simple_tooltip_content.SimpleTooltipContent(), header, body, note, alert)
+
+
+class ResearchButtonTooltipData(BlocksTooltipData):
+
+    def __init__(self, context):
+        super(ResearchButtonTooltipData, self).__init__(context, TOOLTIPS_CONSTANTS.BLOCKS_DEFAULT_UI)
+        self._setWidth(365)
+        self._setContentMargin(bottom=6)
+        self._setMargins(afterBlock=6, afterSeparator=12)
+
+    def _packBlocks(self, *args, **kwargs):
+        tooltipBlocks = super(ResearchButtonTooltipData, self)._packBlocks()
+        tooltipBlocks.append(formatters.packTitleDescBlock(text_styles.middleTitle(backport.text(R.strings.tooltips.hangar.unlockButton.header())), desc=text_styles.main(backport.text(R.strings.tooltips.hangar.unlockButton.body()))))
+        tooltipBlocks.append(formatters.packBuildUpBlockData([formatters.packTextBlockData(text_styles.neutral(backport.text(R.strings.tooltips.hangar.unlockButton.footer())))], linkage=BLOCKS_TOOLTIP_TYPES.TOOLTIP_BUILDUP_BLOCK_WHITE_BG_LINKAGE))
+        return tooltipBlocks
+
+
+class BoosterTooltipContent(WulfTooltipData):
+
+    def __init__(self, context):
+        super(BoosterTooltipContent, self).__init__(context, TOOLTIPS_CONSTANTS.BOOSTER)
+
+    def getTooltipContent(self, boosterID, *args, **kwargs):
+        return BoosterTooltip(boosterID, self.context)
+
+
+class QuestBoosterTooltipContent(WulfTooltipData):
+
+    def __init__(self, context):
+        super(QuestBoosterTooltipContent, self).__init__(context, TOOLTIPS_CONSTANTS.BOOSTERS_QUESTS)
+
+    def getTooltipContent(self, boosterID, *args, **kwargs):
+        return QuestBoosterTooltip(boosterID)

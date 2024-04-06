@@ -228,8 +228,8 @@ class ConcealmentBonus(object):
 
 class Customization(FittingItem):
     __slots__ = ('_boundVehicles', '_bonus', '_installedVehicles', '__noveltyData', '__progressingData', '__installedCount', '__boundInventoryCount', '__fullInventoryCount', '__fullCount', '__questProgressInfo')
-    _service = dependency.descriptor(ICustomizationService)
     eventsCache = dependency.descriptor(IEventsCache)
+    _service = dependency.descriptor(ICustomizationService)
 
     def __init__(self, intCompactDescr, proxy=None):
         super(Customization, self).__init__(intCompactDescr, proxy)
@@ -1157,7 +1157,7 @@ class Style(Customization):
                 if self.descriptor.isItemInstallable(item.descriptor):
                     return EditingStyleReason(EDITING_STYLE_REASONS.IS_EDITABLE)
 
-            return EditingStyleReason(EDITING_STYLE_REASONS.NOT_HAVE_ANY_PROGRESIIVE_DECALS)
+            return EditingStyleReason(EDITING_STYLE_REASONS.NOT_HAVE_ANY_PROGRESSIVE_DECALS)
 
     def isProgressionRequiredCanBeEdited(self, vehicleIntCD):
         return self.isProgressionRequired and self.canBeEditedForVehicle(vehicleIntCD)

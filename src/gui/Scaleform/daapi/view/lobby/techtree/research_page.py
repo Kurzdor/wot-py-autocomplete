@@ -1,5 +1,6 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/Scaleform/daapi/view/lobby/techtree/research_page.py
+import typing
 from logging import getLogger
 from CurrentVehicle import g_currentVehicle
 from account_helpers import AccountSettings
@@ -21,7 +22,7 @@ from gui.Scaleform.genConsts.VEHPREVIEW_CONSTANTS import VEHPREVIEW_CONSTANTS
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.impl import backport
 from gui.impl.gen.resources import R
-from gui.impl.lobby.buy_vehicle_view import VehicleBuyActionTypes
+from gui.impl.lobby.hangar.buy_vehicle_view import VehicleBuyActionTypes
 from gui.shared import EVENT_BUS_SCOPE
 from gui.shared import event_dispatcher as shared_events
 from gui.shared import events
@@ -34,16 +35,20 @@ from gui.shared.gui_items.Vehicle import getTypeBigIconPath, Vehicle, getShopVeh
 from gui.shared.gui_items.items_actions import factory as ItemsActionsFactory
 from gui.shared.money import Currency
 from gui.shared.utils.functions import makeTooltip
+from gui.shared.utils.module_upd_available_helper import updateViewedItems
 from gui.shop import canBuyGoldForVehicleThroughWeb
 from helpers import int2roman, dependency
 from helpers.blueprint_generator import g_blueprintGenerator
 from helpers.i18n import makeString as _ms
 from items import getTypeOfCompactDescr
 from nation_change.nation_change_helpers import iterVehTypeCDsInNationGroup
-from skeletons.gui.game_control import IBootcampController, ITradeInController
+from skeletons.gui.game_control import ITradeInController
 from skeletons.gui.shared import IItemsCache
 from gui.shared.tutorial_helper import getTutorialGlobalStorage
 from tutorial.control.context import GLOBAL_FLAG
+if typing.TYPE_CHECKING:
+    from typing import List, Tuple, Any
+    from gui.Scaleform.daapi.view.lobby.techtree.nodes import ExposedNode
 _logger = getLogger(__name__)
 _BENEFIT_ITEMS_LIMIT = 4
 
@@ -66,7 +71,10 @@ def _getMoneyBenefits(benefits, root, _=None):
 
 def _getCrewBenefits(benefits, root, _=None):
     if not root.isCrewLocked:
-        benefits.append((backport.image(R.images.gui.maps.shop.kpi.crow_benefits()), backport.text(R.strings.vehicle_preview.infoPanel.premium.crewTransferTitle()), backport.text(R.strings.vehicle_preview.infoPanel.premium.crewTransferText())))
+        text = R.strings.vehicle_preview.infoPanel.premium.crewTransferText()
+        if root.ignoreRoleIncompatibility:
+            text = R.strings.vehicle_preview.infoPanel.premium.noCrewTransferPenaltyText()
+        benefits.append((backport.image(R.images.gui.maps.shop.kpi.crow_benefits()), backport.text(R.strings.vehicle_preview.infoPanel.premium.crewTransferTitle()), backport.text(text)))
 
 
 def _getCrystalsBenefit(benefits, root, _=None):
@@ -135,7 +143,6 @@ _BANNER_GETTERS = {States.RESTORE: _getRestoreBannerStr,
 
 class Research(ResearchMeta):
     __tradeIn = dependency.descriptor(ITradeInController)
-    __bootcamp = dependency.descriptor(IBootcampController)
 
     def __init__(self, ctx=None, skipConfirm=False):
         super(Research, self).__init__(ResearchItemsData(dumpers.ResearchItemsObjDumper()))
@@ -174,6 +181,7 @@ class Research(ResearchMeta):
         self._data.setRootCD(vehCD)
         self.redraw()
         self._vehPostProgressionEntryPoint.tryUnlock()
+        updateViewedItems(vehicle=self.vehicle)
 
     def redraw(self):
         self._data.load()
@@ -268,6 +276,7 @@ class Research(ResearchMeta):
 
     def invalidateVTypeXP(self, xps):
         self._vehPostProgressionEntryPoint.redraw(self.vehicle)
+        updateViewedItems(vehicle=self.vehicle)
         super(Research, self).invalidateVTypeXP(xps)
 
     def invalidateRent(self, vehicles):
@@ -330,6 +339,7 @@ class Research(ResearchMeta):
         self.__preloadingBP = self._data.getRootCD()
         g_blueprintGenerator.generate(self.__preloadingBP)
         self._vehPostProgressionEntryPoint = VehPostProgressionEntryPoint(self)
+        updateViewedItems(vehicle=self.vehicle)
 
     def _dispose(self):
         if self.__preloadingBP is not None:
@@ -383,10 +393,6 @@ class Research(ResearchMeta):
         isNationChangeAvailable = root.isNationChangeAvailable
         isShownNationChangeTooltip = tankHasNationGroup and not isNationChangeAvailable
         tankName = root.userName
-        if self.__bootcamp.isInBootcamp():
-            awardVehicles = self.__bootcamp.getAwardVehicles()
-            if root.intCD in awardVehicles:
-                tankName = backport.text(R.strings.bootcamp.award.options.tankTitle()).format(title=tankName)
         result = {'vehicleTitle': {'intCD': self._data.getRootCD(),
                           'tankTierStr': text_styles.grandTitle(tankTier),
                           'tankNameStr': text_styles.grandTitle(tankName),
@@ -397,7 +403,7 @@ class Research(ResearchMeta):
                           'statusStr': self.__getRootStatusStr(root),
                           'roleText': getRoleTextWithIcon(root.role, root.roleLabel)},
          'vehicleButton': {'shopIconPath': getShopVehicleIconPath(STORE_CONSTANTS.ICON_SIZE_MEDIUM, root.name.split(':')[1]),
-                           'compareBtnVisible': not self.__bootcamp.isInBootcamp(),
+                           'compareBtnVisible': True,
                            'compareBtnEnabled': comparisonState,
                            'compareBtnLabel': backport.text(R.strings.menu.research.labels.button.addToCompare()),
                            'compareBtnTooltip': comparisonTooltip,
@@ -494,7 +500,7 @@ class Research(ResearchMeta):
 
     @staticmethod
     def __getRootStatusStr(root):
-        return text_styles.concatStylesToSingleLine(icons.makeImageTag(backport.image(R.images.gui.maps.icons.library.ClockIcon_1()), width=38, height=38, vSpace=-14), RentLeftFormatter(root.rentInfo).getRentLeftStr(strForSpecialTimeFormat=backport.text(R.strings.menu.research.status.rentLeft()))) if root.isRented and not root.rentalIsOver and not root.isTelecom and not root.isPremiumIGR else ''
+        return text_styles.concatStylesToSingleLine(icons.makeImageTag(backport.image(R.images.gui.maps.icons.library.ClockIcon_1()), width=38, height=38, vSpace=-14), RentLeftFormatter(root.rentInfo).getRentLeftStr(strForSpecialTimeFormat=backport.text(R.strings.menu.research.status.rentLeft()))) if root.isRented and not root.rentalIsOver and not root.isTelecom and not root.isPremiumIGR and not root.isWotPlus else ''
 
     @staticmethod
     def __getNationChangeTooltip(root):

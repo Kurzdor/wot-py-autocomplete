@@ -12,8 +12,8 @@ from helpers.CallbackDelayer import CallbackDelayer
 from items import vehicles
 from items.artefacts import AoeEffects, AreaShow
 from skeletons.gui.battle_session import IBattleSessionProvider
+from gui.battle_control import avatar_getter
 from gui.battle_control.battle_constants import FEEDBACK_EVENT_ID
-from gui.shared.gui_items.marker_items import MarkerItem
 from AreaOfEffect import EffectRunner
 
 def _equipmentEffectFactory(entity):
@@ -89,7 +89,7 @@ class _Comp7ApplicationPointEffect(_ApplicationPointEffect):
         self._updateViewState()
         self._updateCoordinates()
         self._vehicle = BigWorld.entities.get(self._entity.vehicleID)
-        if not self._isEnemy():
+        if self._isVisible():
             duration = self._getAreaDuration()
             if duration > 0:
                 self._createArea(duration)
@@ -152,6 +152,10 @@ class _Comp7ApplicationPointEffect(_ApplicationPointEffect):
         vInfo = self._guiSessionProvider.getArenaDP().getVehicleInfo(self._entity.vehicleID)
         return vInfo.team != BigWorld.player().team
 
+    def _isVisible(self):
+        vInfo = self._guiSessionProvider.getArenaDP().getVehicleInfo(self._entity.vehicleID)
+        return vInfo.team == avatar_getter.getObserverTeam() or vInfo.isObserver()
+
     def _getRadius(self):
         return self._equipment.getRadiusBasedOnSkillLevel(self._entity.level)
 
@@ -166,6 +170,7 @@ class _Comp7ApplicationPointEffect(_ApplicationPointEffect):
 
 class _Comp7ReconApplicationPointEffect(_Comp7ApplicationPointEffect):
     _VIEW_STATE_DURATION = 5.0
+    _COMP7_RECON_MARKER = 'COMP7_RECON'
 
     def _getFeedbackEventId(self):
         return FEEDBACK_EVENT_ID.VEHICLE_POINT_RECON
@@ -173,7 +178,7 @@ class _Comp7ReconApplicationPointEffect(_Comp7ApplicationPointEffect):
     def _createMarker(self, duration):
         ctrl = self._guiSessionProvider.shared.areaMarker
         if ctrl is not None:
-            marker = ctrl.createMarker(self._entity.matrix, MarkerItem.COMP7_RECON)
+            marker = ctrl.createMarker(self._entity.matrix, self._COMP7_RECON_MARKER)
             self._markerID = ctrl.addMarker(marker)
             self._callbackDelayer.delayCallback(duration, self._clearMarker)
         return

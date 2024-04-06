@@ -36,6 +36,25 @@ BATTLE_RESULTS_COMPOSER = 32
 SEASON_PROVIDER_HANDLER = 33
 MESSENGER_SERVER_FORMATTERS = 34
 CAROUSEL_EVENTS_ENTRIES = 35
+BANNER_ENTRY_POINT_LUI_RULE = 36
+LIMITED_UI_TOKENS = 37
+PRB_MODE_NAME_KWARGS = 38
+QUEUE_MODE_NAME_KWARGS = 39
+BONUS_TYPE_MODE_NAME_KWARGS = 40
+PRB_CONDITION_ICON = 41
+HANGAR_PRESETS_READERS = 42
+HANGAR_PRESETS_PROCESSORS = 43
+AMMUNITION_PANEL_VIEW = 44
+VEHICLE_VIEW_STATE = 45
+DYN_OBJ_CACHE = 46
+SHARED_REPO = 47
+CONTEXT_MENU_COMMANDS = 48
+CONTEXT_MENU_OPTION_BUILDER = 49
+ADVANCED_CHAT_COMPONENT = 50
+BATTLE_CHANEL_CONTROLLER = 51
+HIT_DIRECTION_CONTROLLER = 52
+CUSTOMIZATION_HANGAR_AVAILABLE = 53
+OPTIMIZED_VIEWS = 54
 
 class _CollectEventsManager(object):
 
@@ -146,6 +165,20 @@ def registerBattleControllerRepo(guiType, repoCls):
 
 def collectBattleControllerRepo(guiType, setup):
     ctx = __collectEM.handleEvent((BATTLE_REPO, guiType), ctx={'setup': setup})
+    return (ctx.get('repo'), 'repo' in ctx)
+
+
+def registerSharedControllerRepo(guiType, repoCls):
+
+    def onCollect(ctx):
+        ctx['repo'] = repoCls.create(ctx['setup']) if repoCls else None
+        return
+
+    __collectEM.addListener((SHARED_REPO, guiType), onCollect)
+
+
+def collectSharedControllerRepo(guiType, setup):
+    ctx = __collectEM.handleEvent((SHARED_REPO, guiType), ctx={'setup': setup})
     return (ctx.get('repo'), 'repo' in ctx)
 
 
@@ -281,16 +314,16 @@ def collectArenaDescrs(guiType):
     return __collectEM.handleEvent((ARENA_DESCRIPTION, guiType), ctx={}).get('arena_descr_class')
 
 
-def registerSquadFinder(guiType, squadFinderClass):
+def registerSquadFinder(guiType, squadFinderClass, rosterClass):
 
     def onCollect(ctx):
-        ctx['squad_finder_class'] = squadFinderClass
+        ctx['squad_finder_data'] = (squadFinderClass, rosterClass)
 
     __collectEM.addListener((ARENA_SQUAD_FINDER, guiType), onCollect)
 
 
 def collectSquadFinder(guiType):
-    return __collectEM.handleEvent((ARENA_SQUAD_FINDER, guiType), ctx={}).get('squad_finder_class')
+    return __collectEM.handleEvent((ARENA_SQUAD_FINDER, guiType), ctx={}).get('squad_finder_data', (None, None))
 
 
 def registerNotificationsListeners(listenerClasses):
@@ -386,6 +419,58 @@ def collectPrbInviteHtmlFormatter(prbType):
     return __collectEM.handleEvent((PRB_INVITE_HTML_FORMATTER, prbType), ctx={}).get('formatter')
 
 
+def registerModeNameKwargsGetterByPrb(prbType, prbModeNameKwargsKwargsGetter):
+
+    def onCollect(ctx):
+        ctx['prbModeNameKwargsGetter'] = prbModeNameKwargsKwargsGetter
+
+    __collectEM.addListener((PRB_MODE_NAME_KWARGS, prbType), onCollect)
+
+
+def collectModeNameKwargsByPrbType(prbType):
+    getter = __collectEM.handleEvent((PRB_MODE_NAME_KWARGS, prbType), ctx={}).get('prbModeNameKwargsGetter')
+    return getter() if getter is not None else {}
+
+
+def registerModeNameKwargsGetterByQueue(queueType, queueModeNameKwargsKwargsGetter):
+
+    def onCollect(ctx):
+        ctx['queueModeNameKwargsGetter'] = queueModeNameKwargsKwargsGetter
+
+    __collectEM.addListener((QUEUE_MODE_NAME_KWARGS, queueType), onCollect)
+
+
+def collectModeNameKwargsByQueueType(queueType):
+    getter = __collectEM.handleEvent((QUEUE_MODE_NAME_KWARGS, queueType), ctx={}).get('queueModeNameKwargsGetter')
+    return getter() if getter is not None else {}
+
+
+def registerModeNameKwargsGetterByBonusType(bonusType, prbModeNameKwargsKwargsGetter):
+
+    def onCollect(ctx):
+        ctx['bonusModeNameKwargsGetter'] = prbModeNameKwargsKwargsGetter
+
+    __collectEM.addListener((BONUS_TYPE_MODE_NAME_KWARGS, bonusType), onCollect)
+
+
+def collectModeNameKwargsByBonusType(bonusType):
+    getter = __collectEM.handleEvent((BONUS_TYPE_MODE_NAME_KWARGS, bonusType), ctx={}).get('bonusModeNameKwargsGetter')
+    return getter() if getter is not None else {}
+
+
+def registerPrebattleConditionIconGetter(bonusType, prebattleConditionIconGetter):
+
+    def onCollect(ctx):
+        ctx['prbConditionIconGetter'] = prebattleConditionIconGetter
+
+    __collectEM.addListener((PRB_CONDITION_ICON, bonusType), onCollect)
+
+
+def collectPrebattleConditionIcon(bonusType):
+    getter = __collectEM.handleEvent((PRB_CONDITION_ICON, bonusType), ctx={}).get('prbConditionIconGetter')
+    return getter() if getter is not None else None
+
+
 def registerModeSelectorItem(prbActionName, itemCls):
 
     def onCollect(ctx):
@@ -422,6 +507,18 @@ def registerBannerEntryPointValidator(alias, validator):
 
 def collectBannerEntryPointValidator(alias):
     return __collectEM.handleEvent((BANNER_ENTRY_POINT_VALIDATOR, alias), ctx={}).get('validator')
+
+
+def registerBannerEntryPointLUIRule(alias, ruleID):
+
+    def onCollect(ctx):
+        ctx['ruleID'] = ruleID
+
+    __collectEM.addListener((BANNER_ENTRY_POINT_LUI_RULE, alias), onCollect)
+
+
+def collectBannerEntryPointLUIRule(alias):
+    return __collectEM.handleEvent((BANNER_ENTRY_POINT_LUI_RULE, alias), ctx={}).get('ruleID')
 
 
 def registerCarouselEventEntryPoint(viewID, viewClass):
@@ -559,3 +656,169 @@ def registerSeasonProviderHandler(seasonType, seasonControllerHandler):
 
 def collectSeasonProviderHandler(seasonType):
     return __collectEM.handleEvent((SEASON_PROVIDER_HANDLER, seasonType), ctx={}).get(seasonType, None)
+
+
+def registerLimitedUIToken(tokenInfo):
+
+    def onCollect(ctx):
+        ctx['tokens'].append(tokenInfo)
+
+    __collectEM.addListener(LIMITED_UI_TOKENS, onCollect)
+
+
+def registerLimitedUITokens(tokensInfos):
+
+    def onCollect(ctx):
+        ctx['tokens'].extend(tokensInfos)
+
+    __collectEM.addListener(LIMITED_UI_TOKENS, onCollect)
+
+
+def collectLimitedUITokens():
+    return __collectEM.handleEvent(LIMITED_UI_TOKENS, ctx={'tokens': []})['tokens']
+
+
+def registerHangarPresetGetter(queueType, processor):
+
+    def onCollect(ctx):
+        ctx['presetsGetters'][queueType] = processor(ctx['config'])
+
+    __collectEM.addListener(HANGAR_PRESETS_PROCESSORS, onCollect)
+
+
+def collectHangarPresetsGetters(config):
+    return __collectEM.handleEvent(HANGAR_PRESETS_PROCESSORS, {'presetsGetters': {},
+     'config': config})['presetsGetters']
+
+
+def registerHangarPresetsReader(reader):
+
+    def onCollect(ctx):
+        ctx['presetsReaders'].append(reader)
+
+    __collectEM.addListener(HANGAR_PRESETS_READERS, onCollect)
+
+
+def collectHangarPresetsReaders():
+    return __collectEM.handleEvent(HANGAR_PRESETS_READERS, ctx={'presetsReaders': []})['presetsReaders']
+
+
+def registerAmmunitionPanelView(viewCls):
+
+    def onCollect(ctx):
+        ctx[viewCls.__name__] = viewCls
+
+    __collectEM.addListener((AMMUNITION_PANEL_VIEW, viewCls.__name__), onCollect)
+
+
+def collectAmmunitionPanelView(viewAlias):
+    return __collectEM.handleEvent((AMMUNITION_PANEL_VIEW, viewAlias), ctx={}).get(viewAlias, None)
+
+
+def registerVehicleViewState(viewState):
+
+    def onCollect(ctx):
+        ctx['viewStates'].append(viewState)
+
+    __collectEM.addListener(VEHICLE_VIEW_STATE, onCollect)
+
+
+def collectVehicleViewStates():
+    return __collectEM.handleEvent(VEHICLE_VIEW_STATE, ctx={'viewStates': []})['viewStates']
+
+
+def registerDynObjCache(arenaGuiType, dynCache):
+
+    def onCollect(ctx):
+        ctx['dynCache'] = dynCache
+
+    __collectEM.addListener((DYN_OBJ_CACHE, arenaGuiType), onCollect)
+
+
+def collectDynObjCache(arenaGuiType):
+    return __collectEM.handleEvent((DYN_OBJ_CACHE, arenaGuiType), ctx={}).get('dynCache')
+
+
+def registerLobbyContexMenuHandler(optionID, commandHandler):
+
+    def onCollect(ctx):
+        ctx[optionID] = commandHandler
+
+    __collectEM.addListener((CONTEXT_MENU_COMMANDS, optionID), onCollect)
+
+
+def collectLobbyContexMenuHandler(optionID):
+    return __collectEM.handleEvent((CONTEXT_MENU_COMMANDS, optionID), ctx={}).get(optionID, None)
+
+
+def registerLobbyContexMenuOptionBuilder(optionBuilder):
+
+    def onCollect(ctx):
+        ctx['cmOptionBuilders'].append(optionBuilder)
+
+    __collectEM.addListener(CONTEXT_MENU_OPTION_BUILDER, onCollect)
+
+
+def collectLobbyContexMenuOptionBuilders():
+    return __collectEM.handleEvent(CONTEXT_MENU_OPTION_BUILDER, {'cmOptionBuilders': []})['cmOptionBuilders']
+
+
+def registerAdvancedChatComponent(bonusType, component):
+
+    def onCollect(ctx):
+        ctx[bonusType] = component
+
+    __collectEM.addListener((ADVANCED_CHAT_COMPONENT, bonusType), onCollect)
+
+
+def collectAdvancedChatComponent(bonusType):
+    return __collectEM.handleEvent((ADVANCED_CHAT_COMPONENT, bonusType), ctx={}).get(bonusType, None)
+
+
+def registerBattleChanelController(guiType, battleChanelType, controller):
+
+    def onCollect(ctx):
+        ctx[guiType] = controller
+
+    __collectEM.addListener((BATTLE_CHANEL_CONTROLLER, battleChanelType), onCollect)
+
+
+def collectBattleChanelController(battleChanelType, guiType):
+    return __collectEM.handleEvent((BATTLE_CHANEL_CONTROLLER, battleChanelType), ctx={}).get(guiType, None)
+
+
+def registerHitDirectionController(guiType, hitDirectionType, hitDirectionPlayerType):
+
+    def onCollect(ctx):
+        ctx[guiType] = (hitDirectionType, hitDirectionPlayerType)
+
+    __collectEM.addListener((HIT_DIRECTION_CONTROLLER, guiType), onCollect)
+
+
+def collectHitDirectionController(guiType, defaultHitDirectionType, defaultHitDirectionPlayerType):
+    defaultValue = (defaultHitDirectionType, defaultHitDirectionPlayerType)
+    return __collectEM.handleEvent((HIT_DIRECTION_CONTROLLER, guiType), ctx={}).get(guiType, defaultValue)
+
+
+def registerCustomizationHangarDecorator(handler):
+
+    def onCollect(ctx):
+        ctx['handlers'].append(handler)
+
+    __collectEM.addListener(CUSTOMIZATION_HANGAR_AVAILABLE, onCollect)
+
+
+def collectCustomizationHangarDecorator():
+    return __collectEM.handleEvent(CUSTOMIZATION_HANGAR_AVAILABLE, {'handlers': []})['handlers']
+
+
+def registerOptimizedViews(optimizedViewsSettings):
+
+    def onCollect(ctx):
+        ctx['optimizedViewsSettings'].update(optimizedViewsSettings)
+
+    __collectEM.addListener(OPTIMIZED_VIEWS, onCollect)
+
+
+def collectOptimizedViews():
+    return __collectEM.handleEvent(OPTIMIZED_VIEWS, ctx={'optimizedViewsSettings': {}})['optimizedViewsSettings']

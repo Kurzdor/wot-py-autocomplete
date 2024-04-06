@@ -103,6 +103,9 @@ class BattleBoosterBlockTooltipData(BlocksTooltipData):
         inventoryBlock = BattleBoosterInventoryBlockConstructor(module, statsConfig, leftPadding, rightPadding).construct()
         if inventoryBlock:
             items.append(formatters.packBuildUpBlockData(inventoryBlock, padding=formatters.packPadding(left=12, right=rightPadding, top=topPadding, bottom=-8), gap=textGap))
+        boosterIsUseless = BoosterHasNoEffectBlockConstructor(module, statusConfig).construct()
+        if boosterIsUseless:
+            items.append(formatters.packBuildUpBlockData(boosterIsUseless, gap=-4, padding=formatters.packPadding(left=leftPadding, right=rightPadding, top=topPadding, bottom=bottomPadding), stretchBg=False))
         return items
 
 
@@ -138,7 +141,7 @@ class EffectsBlockConstructor(BattleBoosterTooltipBlockConstructor):
             block.append(formatters.packImageTextBlockData(title=description, txtOffset=20))
         elif module.isCrewBooster():
             skillLearnt = module.isAffectedSkillLearnt(vehicle)
-            skillName = backport.text(R.strings.item_types.tankman.skills.dyn(module.getAffectedSkillName())())
+            skillName = backport.text(R.strings.crew_perks.dyn(self.module.getAffectedSkillName()).name())
             replaceText = module.getCrewBoosterAction(True)
             boostText = module.getCrewBoosterAction(False)
             skillNotLearntText = text_styles.standard(backport.text(R.strings.tooltips.battleBooster.skill.not_learnt()))
@@ -146,9 +149,9 @@ class EffectsBlockConstructor(BattleBoosterTooltipBlockConstructor):
             applyStyles = vehicle is not None
             replaceText, boostText = self.__getSkillTexts(skillLearnt, replaceText, boostText, applyStyles)
             block.append(formatters.packImageTextBlockData(title=replaceText, img=backport.image(R.images.gui.maps.icons.buttons.checkmark()) if not skillLearnt and applyStyles else None, imgPadding=formatters.packPadding(left=2, top=3), txtOffset=20))
-            block.append(formatters.packImageTextBlockData(title=skillNotLearntText % skillName, txtOffset=20))
+            block.append(formatters.packImageTextBlockData(title=skillNotLearntText.format(boosterName=skillName), txtOffset=20))
             block.append(formatters.packImageTextBlockData(title=boostText, img=backport.image(R.images.gui.maps.icons.buttons.checkmark()) if skillLearnt and applyStyles else None, imgPadding=formatters.packPadding(left=2, top=3), txtOffset=20, padding=formatters.packPadding(top=15)))
-            block.append(formatters.packImageTextBlockData(title=skillLearntText % skillName, txtOffset=20))
+            block.append(formatters.packImageTextBlockData(title=skillLearntText.format(boosterName=skillName), txtOffset=20))
         else:
             kpi = first(module.getKpi(self.configuration.vehicle))
             if kpi:
@@ -168,3 +171,15 @@ class EffectsBlockConstructor(BattleBoosterTooltipBlockConstructor):
                 return (text_styles.main(replaceText), text_styles.bonusAppliedText(boostText))
             return (text_styles.bonusAppliedText(replaceText), text_styles.main(boostText))
         return (text_styles.main(replaceText), text_styles.main(boostText))
+
+
+class BoosterHasNoEffectBlockConstructor(BattleBoosterTooltipBlockConstructor):
+
+    def construct(self):
+        block = list()
+        module = self.module
+        vehicle = self.configuration.vehicle
+        if vehicle is not None and not module.isAffectsOnVehicle(vehicle, self.configuration.eqSetupIDx):
+            block.append(formatters.packTextBlockData(text_styles.statusAlert(backport.text(R.strings.tooltips.battleBooster.useless.header()))))
+            block.append(formatters.packTextBlockData(text=text_styles.main(backport.text(R.strings.tooltips.battleBooster.useless.body())), padding=formatters.packPadding(top=8)))
+        return block

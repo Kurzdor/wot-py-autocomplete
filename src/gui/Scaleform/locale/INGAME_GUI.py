@@ -111,6 +111,8 @@ class INGAME_GUI(object):
     CHAT_SHORTCUTS_ATTACKING_BASE_NUMBERED = '#ingame_gui:chat_shortcuts/attacking_base_numbered'
     CHAT_SHORTCUTS_ATTENTION_TO_OBJECTIVE_ATK = '#ingame_gui:chat_shortcuts/attention_to_objective_atk'
     CHAT_SHORTCUTS_ATTENTION_TO_OBJECTIVE_ATK_AUTOCOMMIT = '#ingame_gui:chat_shortcuts/attention_to_objective_atk_autocommit'
+    CHAT_SHORTCUTS_MOVE_TO_TARGET = '#ingame_gui:chat_shortcuts/move_to_target'
+    CHAT_SHORTCUTS_MOVE_TO_TARGET_AUTOCOMMIT = '#ingame_gui:chat_shortcuts/move_to_target_autocommit'
     CHAT_SHORTCUTS_ATTENTION_TO_BASE_DEF = '#ingame_gui:chat_shortcuts/attention_to_base_def'
     CHAT_SHORTCUTS_ATTENTION_TO_BASE_DEF_NUMBERED = '#ingame_gui:chat_shortcuts/attention_to_base_def_numbered'
     CHAT_SHORTCUTS_DEFENDING_BASE = '#ingame_gui:chat_shortcuts/defending_base'
@@ -288,7 +290,15 @@ class INGAME_GUI(object):
     TIMER_STARTED = '#ingame_gui:timer/started'
     TIMER_BATTLEPERIOD = '#ingame_gui:timer/battlePeriod'
     POSTMORTEM_TIPS_OBSERVERMODE_LABEL = '#ingame_gui:postmortem/tips/observerMode/label'
+    POSTMORTEM_TIPS_OBSERVERMODEFRONTLINE_LABEL = '#ingame_gui:postmortem/tips/observerModeFrontline/label'
     POSTMORTEM_TIPS_OBSERVERMODE_TEXT = '#ingame_gui:postmortem/tips/observerMode/text'
+    POSTMORTEM_TIPS_OBSERVERMODEFRONTLINE_TEXT = '#ingame_gui:postmortem/tips/observerModeFrontline/text'
+    POSTMORTEM_TIPS_FREECAM_BUTTON = '#ingame_gui:postmortem/tips/freecam/button'
+    POSTMORTEM_TIPS_FREECAM_LABEL = '#ingame_gui:postmortem/tips/freecam/label'
+    POSTMORTEM_TIPS_FREECAM_TEXT = '#ingame_gui:postmortem/tips/freecam/text'
+    POSTMORTEM_TIPS_FREECAMUNAVAILABLE_LABEL = '#ingame_gui:postmortem/tips/freecamUnavailable/label'
+    POSTMORTEM_TIPS_FREECAMUNAVAILABLE_TEXT = '#ingame_gui:postmortem/tips/freecamUnavailable/text'
+    POSTMORTEM_TIPS_EXITHANGAR_BUTTON = '#ingame_gui:postmortem/tips/exitHangar/button'
     POSTMORTEM_TIPS_EXITHANGAR_LABEL = '#ingame_gui:postmortem/tips/exitHangar/label'
     POSTMORTEM_TIPS_EXITHANGAR_TEXT = '#ingame_gui:postmortem/tips/exitHangar/text'
     PLAYERS_PANEL_STATE_NONE_HEADER = '#ingame_gui:players_panel/state/none/header'
@@ -512,6 +522,7 @@ class INGAME_GUI(object):
     PLAYER_MESSAGES_DEATH_FROM_INACTIVE_CREW_AT_WORLD_COLLISION_ENEMY_ENEMY = '#ingame_gui:player_messages/DEATH_FROM_INACTIVE_CREW_AT_WORLD_COLLISION_ENEMY_ENEMY'
     VEHICLE_MESSAGES_DEATH_FROM_DEATH_ZONE_SELF_SUICIDE = '#ingame_gui:vehicle_messages/DEATH_FROM_DEATH_ZONE_SELF_SUICIDE'
     POSTMORTEM_MESSAGES_DEATH_FROM_DEATH_ZONE_SELF_SUICIDE = '#ingame_gui:postmortem_messages/DEATH_FROM_DEATH_ZONE_SELF_SUICIDE'
+    POSTMORTEM_MESSAGES_DEATH_FROM_STATIC_DEATH_ZONE_SELF_SUICIDE = '#ingame_gui:postmortem_messages/DEATH_FROM_STATIC_DEATH_ZONE_SELF_SUICIDE'
     VEHICLE_MESSAGES_DEATH_FROM_DEATH_ZONE_ENEMY_SELF = '#ingame_gui:vehicle_messages/DEATH_FROM_DEATH_ZONE_ENEMY_SELF'
     POSTMORTEM_MESSAGES_DEATH_FROM_DEATH_ZONE_ENEMY_SELF = '#ingame_gui:postmortem_messages/DEATH_FROM_DEATH_ZONE_ENEMY_SELF'
     VEHICLE_MESSAGES_DEATH_FROM_DEATH_ZONE_ALLY_SELF = '#ingame_gui:vehicle_messages/DEATH_FROM_DEATH_ZONE_ALLY_SELF'
@@ -522,6 +533,7 @@ class INGAME_GUI(object):
     PLAYER_MESSAGES_DEATH_FROM_DEATH_ZONE_SELF_ALLY = '#ingame_gui:player_messages/DEATH_FROM_DEATH_ZONE_SELF_ALLY'
     PLAYER_MESSAGES_DEATH_FROM_DEATH_ZONE_SELF_ENEMY = '#ingame_gui:player_messages/DEATH_FROM_DEATH_ZONE_SELF_ENEMY'
     PLAYER_MESSAGES_DEATH_FROM_DEATH_ZONE_ALLY_SUICIDE = '#ingame_gui:player_messages/DEATH_FROM_DEATH_ZONE_ALLY_SUICIDE'
+    PLAYER_MESSAGES_DEATH_FROM_STATIC_DEATH_ZONE_ALLY_SUICIDE = '#ingame_gui:player_messages/DEATH_FROM_STATIC_DEATH_ZONE_ALLY_SUICIDE'
     PLAYER_MESSAGES_DEATH_FROM_DEATH_ZONE_ALLY_SELF = '#ingame_gui:player_messages/DEATH_FROM_DEATH_ZONE_ALLY_SELF'
     PLAYER_MESSAGES_DEATH_FROM_DEATH_ZONE_ALLY_ALLY = '#ingame_gui:player_messages/DEATH_FROM_DEATH_ZONE_ALLY_ALLY'
     PLAYER_MESSAGES_DEATH_FROM_DEATH_ZONE_ALLY_ENEMY = '#ingame_gui:player_messages/DEATH_FROM_DEATH_ZONE_ALLY_ENEMY'
@@ -555,7 +567,9 @@ class INGAME_GUI(object):
     POSTMORTEM_MESSAGES_DEATH_FROM_THUNDER_STRIKE = '#ingame_gui:postmortem_messages/DEATH_FROM_THUNDER_STRIKE'
     POSTMORTEM_MESSAGES_DEATH_FROM_CORRODING_SHOT = '#ingame_gui:postmortem_messages/DEATH_FROM_CORRODING_SHOT'
     POSTMORTEM_MESSAGES_DEATH_FROM_CLING_BRANDER = '#ingame_gui:postmortem_messages/DEATH_FROM_CLING_BRANDER'
+    POSTMORTEM_MESSAGES_DEATH_FROM_BR_BOT = '#ingame_gui:postmortem_messages/DEATH_FROM_BR_BOT'
     POSTMORTEM_MESSAGES_DEATH_FROM_SHOT_ARCADE_BOMBER_BATTLE_ROYALE = '#ingame_gui:postmortem_messages/DEATH_FROM_SHOT_ARCADE_BOMBER_BATTLE_ROYALE'
+    POSTMORTEM_MESSAGES_DEATH_FROM_SHOT_ARCADE_BOMBER_WITH_OWN_DAMAGE_BATTLE_ROYALE = '#ingame_gui:postmortem_messages/DEATH_FROM_SHOT_ARCADE_BOMBER_WITH_OWN_DAMAGE_BATTLE_ROYALE'
     PLAYER_MESSAGES_DEATH_FROM_OVERTURN_SELF_SUICIDE = '#ingame_gui:player_messages/DEATH_FROM_OVERTURN_SELF_SUICIDE'
     PLAYER_MESSAGES_DEATH_FROM_OVERTURN_SELF_ALLY = '#ingame_gui:player_messages/DEATH_FROM_OVERTURN_SELF_ALLY'
     PLAYER_MESSAGES_DEATH_FROM_OVERTURN_SELF_ENEMY = '#ingame_gui:player_messages/DEATH_FROM_OVERTURN_SELF_ENEMY'
@@ -614,15 +628,16 @@ class INGAME_GUI(object):
     EFFICIENCYRIBBONS_STUN = '#ingame_gui:efficiencyRibbons/stun'
     EFFICIENCYRIBBONS_ASSISTSTUN = '#ingame_gui:efficiencyRibbons/assistStun'
     EFFICIENCYRIBBONS_DEATHZONE = '#ingame_gui:efficiencyRibbons/deathZone'
+    EFFICIENCYRIBBONS_STATICDEATHZONE = '#ingame_gui:efficiencyRibbons/staticDeathZone'
     EFFICIENCYRIBBONS_CANNONDMG = '#ingame_gui:efficiencyRibbons/CannonDmg'
     EFFICIENCYRIBBONS_AIRSTRIKEDMG = '#ingame_gui:efficiencyRibbons/AirstrikeDmg'
     EFFICIENCYRIBBONS_ARTILLERYDMG = '#ingame_gui:efficiencyRibbons/ArtilleryDmg'
+    EFFICIENCYRIBBONS_HEALTHADDED = '#ingame_gui:efficiencyRibbons/healthAdded'
     DAMAGELOG_SHELLTYPE_ARMOR_PIERCING = '#ingame_gui:damageLog/shellType/ARMOR_PIERCING'
     DAMAGELOG_SHELLTYPE_HIGH_EXPLOSIVE = '#ingame_gui:damageLog/shellType/HIGH_EXPLOSIVE'
     DAMAGELOG_SHELLTYPE_ARMOR_PIERCING_HE = '#ingame_gui:damageLog/shellType/ARMOR_PIERCING_HE'
     DAMAGELOG_SHELLTYPE_ARMOR_PIERCING_CR = '#ingame_gui:damageLog/shellType/ARMOR_PIERCING_CR'
     DAMAGELOG_SHELLTYPE_HOLLOW_CHARGE = '#ingame_gui:damageLog/shellType/HOLLOW_CHARGE'
-    DAMAGELOG_DEATH_ZONE = '#ingame_gui:damageLog/DEATH_ZONE'
     DAMAGELOG_MULTIPLIER = '#ingame_gui:damageLog/multiplier'
     HITMARKER_BLOCKED = '#ingame_gui:hitMarker/blocked'
     HITMARKER_RICOCHET = '#ingame_gui:hitMarker/ricochet'
@@ -898,6 +913,8 @@ class INGAME_GUI(object):
     BATTLEPROGRESS_HINT_NOBINDINGKEY = '#ingame_gui:battleProgress/hint/noBindingKey'
     HELPSCREEN_HINT_PRESS = '#ingame_gui:helpScreen/hint/press'
     HELPSCREEN_HINT_DESCRIPTION = '#ingame_gui:helpScreen/hint/description'
+    HELPSCREEN_MAPBOX_PRESS = '#ingame_gui:helpScreen/mapbox/press'
+    HELPSCREEN_MAPBOX_DESCRIPTION = '#ingame_gui:helpScreen/mapbox/description'
     COMMANDERCAM_HINT_DESCRIPTION = '#ingame_gui:commanderCam/hint/description'
     BATTLECOMMUNICATION_HINT_PRESS = '#ingame_gui:battleCommunication/hint/press'
     BATTLECOMMUNICATION_HINT_DESCRIPTION = '#ingame_gui:battleCommunication/hint/description'
@@ -990,6 +1007,18 @@ class INGAME_GUI(object):
     PERSONAL_RESERVES_HINT_PRESS = '#ingame_gui:personal_reserves/hint/press'
     PERSONAL_RESERVES_HINT_DESCRIPTION = '#ingame_gui:personal_reserves/hint/description'
     HINT_NOBINDINGKEY = '#ingame_gui:hint/noBindingKey'
+    DESTROYTIMER_LIFTOVER = '#ingame_gui:destroyTimer/liftOver'
+    DANGER_ZONE_INDICATOR = '#ingame_gui:danger_zone/indicator'
+    WARNING_ZONE_INDICATOR = '#ingame_gui:warning_zone/indicator'
+    STATUSNOTIFICATIONTIMERS_STATICDEATHZONE = '#ingame_gui:statusNotificationTimers/staticDeathZone'
+    DEVMAPS_HINT_PRESS = '#ingame_gui:devMaps/hint/press'
+    DEVMAPS_HINT_DESCRIPTION = '#ingame_gui:devMaps/hint/description'
+    DEVMAPS_MAPINFO_TEXT = '#ingame_gui:devMaps/mapInfo/text'
+    DEVMAPS_MAPINFO_INFO = '#ingame_gui:devMaps/mapInfo/info'
+    PENETRATION_HIGH = '#ingame_gui:penetration/high'
+    PENETRATION_LOW = '#ingame_gui:penetration/low'
+    BOT_ELITE = '#ingame_gui:bot/elite'
+    BOT_BOSS = '#ingame_gui:bot/boss'
     CHAT_SHORTCUTS_ENUM = (CHAT_SHORTCUTS_ATTENTION_TO_POSITION_GRIDINFO,
      CHAT_SHORTCUTS_ATTENTION_TO_POSITION,
      CHAT_SHORTCUTS_GOING_THERE_GRIDINFO,
@@ -1016,6 +1045,8 @@ class INGAME_GUI(object):
      CHAT_SHORTCUTS_ATTACKING_BASE_NUMBERED,
      CHAT_SHORTCUTS_ATTENTION_TO_OBJECTIVE_ATK,
      CHAT_SHORTCUTS_ATTENTION_TO_OBJECTIVE_ATK_AUTOCOMMIT,
+     CHAT_SHORTCUTS_MOVE_TO_TARGET,
+     CHAT_SHORTCUTS_MOVE_TO_TARGET_AUTOCOMMIT,
      CHAT_SHORTCUTS_ATTENTION_TO_BASE_DEF,
      CHAT_SHORTCUTS_ATTENTION_TO_BASE_DEF_NUMBERED,
      CHAT_SHORTCUTS_DEFENDING_BASE,
@@ -1105,9 +1136,11 @@ class INGAME_GUI(object):
      EFFICIENCYRIBBONS_STUN,
      EFFICIENCYRIBBONS_ASSISTSTUN,
      EFFICIENCYRIBBONS_DEATHZONE,
+     EFFICIENCYRIBBONS_STATICDEATHZONE,
      EFFICIENCYRIBBONS_CANNONDMG,
      EFFICIENCYRIBBONS_AIRSTRIKEDMG,
      EFFICIENCYRIBBONS_ARTILLERYDMG,
+     EFFICIENCYRIBBONS_HEALTHADDED,
      EFFICIENCYRIBBONS_ENEMYSECTORCAPTURED,
      EFFICIENCYRIBBONS_DESTRUCTIBLEDAMAGED,
      EFFICIENCYRIBBONS_DESTRUCTIBLEDESTROYED,

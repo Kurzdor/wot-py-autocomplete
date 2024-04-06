@@ -2,40 +2,39 @@
 # Embedded file name: scripts/client/gui/shared/gui_items/processors/vehicle.py
 import logging
 from itertools import chain
-import BigWorld
 import AccountCommands
-from constants import RentType, SEASON_NAME_BY_TYPE, CLIENT_COMMAND_SOURCES
+import BigWorld
 from AccountCommands import VEHICLE_SETTINGS_FLAG
-from gui.impl import backport
-from gui.impl.gen import R
-from nation_change.nation_change_helpers import getMainVehicleInNationGroup, hasNationGroup, getNationGroupID
-from gui.shared.gui_items.processors.messages.items_processor_messages import ItemBuyProcessorMessage, BattleAbilitiesApplyProcessorMessage, LayoutApplyProcessorMessage, BattleBoostersApplyProcessorMessage, OptDevicesApplyProcessorMessage, ConsumablesApplyProcessorMessage, ShellsApplyProcessorMessage
-from gui.shared.gui_items.vehicle_equipment import EMPTY_ITEM
-from gui.veh_post_progression.messages import makeVehiclePostProgressionUnlockMsg, makeAllPairsDiscardMsg
-from items import EQUIPMENT_TYPES
-from items.components.crew_skins_constants import NO_CREW_SKIN_ID
-from items.components.c11n_constants import SeasonType
 from adisp import adisp_process, adisp_async
+from constants import RentType, SEASON_NAME_BY_TYPE, CLIENT_COMMAND_SOURCES
 from gui import SystemMessages, g_tankActiveCamouflage
 from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from gui.Scaleform.locale.SYSTEM_MESSAGES import SYSTEM_MESSAGES
 from gui.SystemMessages import SM_TYPE, CURRENCY_TO_SM_TYPE
-from gui.shared.formatters import formatPrice, formatGoldPrice, text_styles
+from gui.impl import backport
+from gui.impl.gen import R
+from gui.shared.formatters import formatPrice, text_styles, getStyle, getBWFormatter
 from gui.shared.formatters import icons
 from gui.shared.formatters.time_formatters import formatTime, getTimeLeftInfo
-from gui.shared.utils.requesters import REQ_CRITERIA
 from gui.shared.gui_items import GUI_ITEM_TYPE
 from gui.shared.gui_items.Vehicle import getCrewCount
-from gui.shared.gui_items.processors import ItemProcessor, Processor, makeI18nSuccess, makeI18nError, plugins as proc_plugs, makeSuccess, makeCrewSkinCompensationMessage
-from gui.shared.money import Money, MONEY_UNDEFINED, Currency, ZERO_MONEY
-from gui.shared.utils.requesters.recycle_bin_requester import VehicleRestoreInfo
-from helpers import time_utils, dependency
 from gui.shared.gui_items.gui_item_economics import ItemPrice, getVehicleBattleBoostersLayoutPrice, getVehicleConsumablesLayoutPrice, getVehicleOptionalDevicesLayoutPrice, getVehicleShellsLayoutPrice
+from gui.shared.gui_items.processors import ItemProcessor, Processor, makeI18nSuccess, makeI18nError, plugins as proc_plugs, makeSuccess
+from gui.shared.gui_items.processors.messages.items_processor_messages import ItemBuyProcessorMessage, BattleAbilitiesApplyProcessorMessage, LayoutApplyProcessorMessage, BattleBoostersApplyProcessorMessage, OptDevicesApplyProcessorMessage, ConsumablesApplyProcessorMessage, ShellsApplyProcessorMessage
+from gui.shared.gui_items.vehicle_equipment import EMPTY_ITEM
+from gui.shared.money import Money, MONEY_UNDEFINED, Currency, ZERO_MONEY
+from gui.shared.utils.requesters import REQ_CRITERIA
+from gui.shared.utils.requesters.recycle_bin_requester import VehicleRestoreInfo
+from gui.veh_post_progression.messages import makeVehiclePostProgressionUnlockMsg, makeAllPairsDiscardMsg
+from helpers import time_utils, dependency
 from helpers.i18n import makeString
+from items import EQUIPMENT_TYPES
+from items.components.c11n_constants import SeasonType
+from nation_change.nation_change_helpers import getMainVehicleInNationGroup, hasNationGroup, getNationGroupID
+from rent_common import parseRentID
 from skeletons.gui.game_control import IRestoreController, ITradeInController, IEpicBattleMetaGameController
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.shared import IItemsCache
-from rent_common import parseRentID
 from soft_exception import SoftException
 _logger = logging.getLogger(__name__)
 _SEASON_RENT_DURATION_KEY = {RentType.SEASON_RENT: 'season',
@@ -270,13 +269,18 @@ class VehicleSlotBuyer(Processor):
         self.__hasDiscounts = bool(self.itemsCache.items.shop.personalSlotDiscounts)
         self.__frozenSlotPrice = None
         slotCost = self.__getSlotPrice()
+        currency = slotCost.getCurrency()
         if self.__hasDiscounts and not slotCost:
             confirmationType = 'freeSlotConfirmation'
             ctx = {}
         else:
             confirmationType = 'buySlotConfirmation'
-            ctx = {'goldCost': text_styles.concatStylesWithSpace(text_styles.gold(str(slotCost.gold)), icons.makeImageTag(RES_ICONS.MAPS_ICONS_LIBRARY_GOLDICON_2))}
-        super(VehicleSlotBuyer, self).__init__((proc_plugs.MessageInformator('buySlotNotEnoughCredits', activeHandler=lambda : not proc_plugs.MoneyValidator(slotCost).validate().success, isEnabled=showWarning), proc_plugs.MessageConfirmator(confirmationType, isEnabled=showConfirm, ctx=ctx), proc_plugs.MoneyValidator(slotCost)))
+            img = RES_ICONS.MAPS_ICONS_LIBRARY_GOLDICON_2
+            if currency == Currency.CREDITS:
+                img = RES_ICONS.MAPS_ICONS_LIBRARY_CREDITSICON_2
+            style = getStyle(currency) if currency in Currency.ALL else text_styles.credits
+            ctx = {'goldCost': text_styles.concatStylesWithSpace(style(backport.getIntegralFormat(abs(slotCost.get(currency)))), icons.makeImageTag(img))}
+        super(VehicleSlotBuyer, self).__init__((proc_plugs.MessageInformator('buySlotNotEnough/{}'.format(currency), activeHandler=lambda : not proc_plugs.MoneyValidator(slotCost).validate().success, isEnabled=showWarning), proc_plugs.MessageConfirmator(confirmationType, isEnabled=showConfirm, ctx=ctx), proc_plugs.MoneyValidator(slotCost)))
         return
 
     def _errorHandler(self, code, errStr='', ctx=None):
@@ -284,11 +288,10 @@ class VehicleSlotBuyer(Processor):
 
     def _successHandler(self, code, ctx=None):
         price = self.__getSlotPrice()
-        if price:
-            money = formatPrice(price)
-        else:
-            money = formatGoldPrice(price.gold)
-        return makeI18nSuccess(sysMsgKey='vehicle_slot_buy/success', money=money, type=SM_TYPE.FinancialTransactionWithGold)
+        msgType = SM_TYPE.FinancialTransactionWithGold
+        if price.getCurrency() == Currency.CREDITS:
+            msgType = SM_TYPE.FinancialTransactionWithCredits
+        return makeI18nSuccess(sysMsgKey='vehicle_slot_buy/success', money=formatPrice(price), type=msgType)
 
     def _request(self, callback):
         _logger.debug('Attempt to request server for buying vehicle slot')
@@ -300,16 +303,16 @@ class VehicleSlotBuyer(Processor):
         else:
             price = self.itemsCache.items.shop.getVehicleSlotsPrice(self.itemsCache.items.stats.vehicleSlots)
             if self.__hasDiscounts:
-                self.__frozenSlotPrice = Money(gold=price)
-            return Money(gold=price)
+                self.__frozenSlotPrice = price
+            return price
 
 
 class VehicleSeller(ItemProcessor):
     __restore = dependency.descriptor(IRestoreController)
     __lobbyContext = dependency.descriptor(ILobbyContext)
-    __slots__ = ('vehicle', 'nationGroupVehs', 'shells', 'eqs', 'optDevs', 'gainMoney', 'spendMoney', 'inventory', 'customizationItems', 'boosters', 'itemsForDemountKit', 'isCrewDismiss', 'isDismantlingForMoney', 'isRemovedAfterRent', 'usedDemountKitsCount', '__hasPairModification')
+    __slots__ = ('vehicle', 'nationGroupVehs', 'shells', 'eqs', 'optDevs', 'gainMoney', 'spendMoney', 'inventory', 'customizationItems', 'boosters', 'itemsForDemountKit', 'itemsFreeToDemount', 'isCrewDismiss', 'isDismantlingForMoney', 'isRemovedAfterRent', 'usedDemountKitsCount', '__hasPairModification')
 
-    def __init__(self, vehicle, shells=None, eqs=None, optDevs=None, inventory=None, customizationItems=None, boosters=None, isCrewDismiss=False, itemsForDemountKit=None):
+    def __init__(self, vehicle, shells=None, eqs=None, optDevs=None, inventory=None, customizationItems=None, boosters=None, isCrewDismiss=False, itemsForDemountKit=None, itemsForFreeDemount=None):
         shells = shells or []
         eqs = eqs or []
         boosters = boosters or []
@@ -317,21 +320,21 @@ class VehicleSeller(ItemProcessor):
         inventory = inventory or []
         customizationItems = customizationItems or []
         itemsForDemountKit = itemsForDemountKit or []
+        itemsForFreeDemount = itemsForFreeDemount or []
         nationGroupVehs = vehicle.getAllNationGroupVehs(self.itemsCache.items)
         self.vehicle = vehicle
         self.nationGroupVehs = nationGroupVehs
         self.shells = shells
         self.eqs = eqs
         self.optDevs = optDevs
-        self.gainMoney, self.spendMoney = self.__getGainSpendMoney(vehicle, nationGroupVehs, shells, eqs, boosters, optDevs, inventory, customizationItems, itemsForDemountKit)
+        self.gainMoney, self.spendMoney = self.__getGainSpendMoney(vehicle, nationGroupVehs, shells, eqs, boosters, optDevs, inventory, customizationItems, itemsForDemountKit, itemsForFreeDemount)
         self.inventory = set((m.intCD for m in inventory))
         self.customizationItems = set(customizationItems)
         self.boosters = boosters
         self.itemsForDemountKit = itemsForDemountKit
-        barracksBerthsNeeded = getCrewCount(nationGroupVehs)
+        self.itemsFreeToDemount = itemsForFreeDemount
         bufferOverflowCtx = {}
         isBufferOverflowed = False
-        crewSkinsNeedDeletion = []
         self.__compensationAmount = ItemPrice(Money(), Money())
         if isCrewDismiss:
             tankmenGoingToBuffer, deletedTankmen = self.__restore.getTankmenDeletedBySelling(*nationGroupVehs)
@@ -343,42 +346,22 @@ class VehicleSeller(ItemProcessor):
                 if countOfDeleted > 1:
                     bufferOverflowCtx['multiple'] = True
                     bufferOverflowCtx['extraCount'] = countOfDeleted - 1
-            if self.__lobbyContext.getServerSettings().isCrewSkinsEnabled():
-                freeCountByItem = {}
-                for veh in nationGroupVehs:
-                    for _, tankman in veh.crew:
-                        if tankman is not None and tankman.skinID != NO_CREW_SKIN_ID:
-                            crewSkinItem = self.itemsCache.items.getCrewSkin(tankman.skinID)
-                            if freeCountByItem.setdefault(crewSkinItem.getID(), crewSkinItem.getFreeCount()) < crewSkinItem.getMaxCount():
-                                freeCountByItem[crewSkinItem.getID()] += 1
-                            else:
-                                crewSkinsNeedDeletion.append(crewSkinItem)
-                                self.__compensationAmount += crewSkinItem.getBuyPrice()
-
-        self.__compensationRequired = bool(crewSkinsNeedDeletion)
         plugins = [proc_plugs.VehicleValidator(vehicle, False, prop={'isBroken': True,
           'isLocked': True}),
          proc_plugs.VehicleSellValidator(vehicle),
          proc_plugs.MoneyValidator(self.spendMoney - self.gainMoney),
          proc_plugs.VehicleSellsLeftValidator(vehicle, not (vehicle.isRented and vehicle.rentalIsOver)),
-         proc_plugs.BarracksSlotsValidator(barracksBerthsNeeded, isEnabled=not isCrewDismiss),
          proc_plugs.BufferOverflowConfirmator(bufferOverflowCtx, isEnabled=isBufferOverflowed),
          proc_plugs.BattleBoosterValidator(boosters),
          proc_plugs.DismountForDemountKitValidator(vehicle, itemsForDemountKit),
+         proc_plugs.FreeToDemountValidator(itemsForFreeDemount),
          _getUniqueVehicleSellConfirmator(vehicle)]
-        if self.__lobbyContext.getServerSettings().isCrewSkinsEnabled():
-            ctx = {'price': self.__compensationAmount,
-             'action': None,
-             'items': crewSkinsNeedDeletion}
-            skinsPlugin = proc_plugs.CrewSkinsCompensationDialogConfirmator('crewSkins/skinWillBeDeleted', proc_plugs.CrewSkinsRemovalCompensationDialogMeta.OUT_OF_STORAGE_SUFFIX, ctx=ctx, isEnabled=bool(crewSkinsNeedDeletion))
-            plugins.append(skinsPlugin)
         super(VehicleSeller, self).__init__(vehicle, plugins)
         self.isCrewDismiss = isCrewDismiss
-        self.isDismantlingForMoney = bool(self.spendMoney)
-        self.isRemovedAfterRent = vehicle.isRented
         self.usedDemountKitsCount = len(itemsForDemountKit)
+        self.isDismantlingForMoney = bool(self.spendMoney) or self.usedDemountKitsCount
+        self.isRemovedAfterRent = vehicle.isRented
         self.__hasPairModification = any((step.action.getPurchasedID() is not None for step in vehicle.postProgression.iterUnorderedSteps() if step.action.isMultiAction()))
-        return
 
     def _errorHandler(self, code, errStr='', ctx=None):
         localKey = 'vehicle_sell/{}'
@@ -395,8 +378,6 @@ class VehicleSeller(ItemProcessor):
             timeKey, formattedTime = getTimeLeftInfo(self.itemsCache.items.shop.vehiclesRestoreConfig.restoreDuration)
             restoreInfo = backport.text(R.strings.system_messages.vehicle.restoreDuration.dyn(timeKey, R.invalid)(), time=formattedTime)
         additionalMsgs = []
-        if self.__compensationRequired:
-            additionalMsgs.append(makeCrewSkinCompensationMessage(self.__compensationAmount))
         if self.__hasPairModification:
             additionalMsgs.append(makeAllPairsDiscardMsg(self.vehicle.userName))
         g_tankActiveCamouflage[self.vehicle.intCD] = SeasonType.UNDEFINED
@@ -404,17 +385,21 @@ class VehicleSeller(ItemProcessor):
         if self.usedDemountKitsCount:
             msgCtx['countDK'] = self.usedDemountKitsCount
         if self.isDismantlingForMoney:
-            msgCtx['gainMoney'] = formatPrice(self.gainMoney)
-            msgCtx['spendMoney'] = formatPrice(self.spendMoney)
+            msgCtx['gainMoney'] = self.__formatPrice(self.gainMoney)
+            msgCtx['spendMoney'] = self.__formatPrice(self.spendMoney, isReceived=False)
         else:
-            msgCtx['money'] = formatPrice(self.gainMoney)
+            msgCtx['money'] = self.__formatPrice(self.gainMoney)
         if not self.isRemovedAfterRent:
             msgCtx['restoreInfo'] = restoreInfo
         sysMsgR = R.strings.system_messages.dyn('vehicle_remove' if self.isRemovedAfterRent else 'vehicle_sell', R.invalid)
         if sysMsgR:
-            sysMsgR = sysMsgR.dyn('success_dismantling' if self.isDismantlingForMoney else 'success', R.invalid)
-        if sysMsgR and self.usedDemountKitsCount:
-            sysMsgR = sysMsgR.dyn('with_demount_kit', R.invalid)
+            if self.isDismantlingForMoney:
+                sysMsgR = sysMsgR.success_dismantling
+            elif self.isRemovedAfterRent:
+                gainCurrencies = [ c for c in Currency.ALL if self.gainMoney.get(c) ]
+                sysMsgR = sysMsgR.success.dyn('default' if gainCurrencies else 'zero_cost', R.invalid)
+            else:
+                sysMsgR = sysMsgR.success
         if self.isRemovedAfterRent:
             smType = SM_TYPE.Remove
         elif sellForGold:
@@ -428,7 +413,7 @@ class VehicleSeller(ItemProcessor):
         _logger.debug('Make server request: %s, %s, %s, %s, %s, %s, %s, %s, %s', self.nationGroupVehs, bool(self.shells), bool(self.eqs), bool(self.boosters), bool(self.inventory), bool(self.optDevs), self.isDismantlingForMoney, self.isCrewDismiss, saleData)
         BigWorld.player().inventory.sellVehicle(saleData, lambda code, errStr='': self._response(code, callback, errStr=errStr))
 
-    def __getGainSpendMoney(self, currentVehicle, vehicles, vehShells, vehEqs, boosters, optDevicesToSell, inventory, customizationItems, itemsForDemountKit):
+    def __getGainSpendMoney(self, currentVehicle, vehicles, vehShells, vehEqs, boosters, optDevicesToSell, inventory, customizationItems, itemsForDemountKit, itemsForFreeDemount):
         moneyGain = currentVehicle.sellPrices.itemPrice.price
         for shell in vehShells:
             moneyGain += shell.sellPrices.itemPrice.price * shell.count
@@ -443,7 +428,7 @@ class VehicleSeller(ItemProcessor):
             getCount = getCustomizationItemSellCountForVehicle
             moneyGain += module.sellPrices.itemPrice.price * reduce(lambda acc, veh: acc + getCount(module, veh.intCD), vehicles, 0)
 
-        dismantlingToInventoryDevices = getDismantlingForMoneyToInventoryDevices(optDevicesToSell, itemsForDemountKit, *vehicles)
+        dismantlingToInventoryDevices = getDismantlingForMoneyToInventoryDevices(optDevicesToSell, (itemsForDemountKit + itemsForFreeDemount), *vehicles)
         moneySpend = calculateSpendMoney(self.itemsCache.items, dismantlingToInventoryDevices)
         return (moneyGain, moneySpend)
 
@@ -473,6 +458,7 @@ class VehicleSeller(ItemProcessor):
             itemsFromVehicle = set()
             seenCustItems = set()
             itemsForDemountKit = set()
+            itemsFreeToDemount = set()
             customizationItems = []
             for shell in list(self.shells):
                 if shell.isInSetup(vehicle) and shell.intCD not in itemsFromVehicle:
@@ -507,14 +493,49 @@ class VehicleSeller(ItemProcessor):
                     itemsForDemountKit.add(od.intCD)
                     self.itemsForDemountKit.remove(od)
 
+            for od in list(self.itemsFreeToDemount):
+                if od.isInSetup(vehicle) and od.intCD not in itemsFreeToDemount and od.intCD not in itemsFromVehicle:
+                    itemsFreeToDemount.add(od.intCD)
+                    self.itemsFreeToDemount.remove(od)
+
             result.append((vehicle.invID,
              self.isCrewDismiss,
              list(itemsFromVehicle),
              list(itemsFromInventory[vehicle.invID]),
              customizationItems,
-             list(itemsForDemountKit)))
+             list(itemsForDemountKit),
+             list(itemsFreeToDemount)))
 
         return result
+
+    @staticmethod
+    def getCurrencyString(currencyCode, isReceived=True):
+        return backport.text(R.strings.messenger.platformCurrencyMsg.dyn('received' if isReceived else 'debited').dyn(currencyCode)()) if currencyCode not in Currency.ALL else backport.text(R.strings.messenger.serviceChannelMessages.currencyUpdate.dyn('received' if isReceived else 'debited').dyn(currencyCode)())
+
+    def __formatPrice(self, price, isReceived=True):
+        separator = ',\n'
+        bullet = u'\u2022 '
+        cSpace = ': '
+        items = []
+        if self.usedDemountKitsCount and not isReceived:
+            items.append(backport.text(R.strings.system_messages.vehicle_sell.currencyUpdate.debited.demount_kit(), countDK=self.usedDemountKitsCount))
+        currencies = [ c for c in Currency.ALL if price.get(c) is not None ]
+        for c in currencies:
+            value = price.get(c, 0)
+            if value == 0:
+                continue
+            formatter = getBWFormatter(c)
+            cFormatted = formatter(value)
+            styler = getStyle(c)
+            cFormatted = styler(cFormatted)
+            cIdentifier = self.getCurrencyString(c, isReceived)
+            items.append(''.join((cIdentifier, cSpace, cFormatted)))
+
+        if not items:
+            return ''
+        else:
+            result = separator.join(('{} {}'.format(bullet, item) for item in items)) if items else ''
+            return result
 
 
 def getDismantlingForMoneyToInventoryDevices(optDevicesToSell, itemsForDemountKit, *vehicles):
@@ -569,7 +590,7 @@ class VehicleTmenXPAccelerator(VehicleSettingsProcessor):
     def __init__(self, vehicle, value, confirmationEnabled=True):
         plugins = []
         if confirmationEnabled:
-            plugins.append(proc_plugs.MessageConfirmator('xpToTmenCheckbox', isEnabled=value))
+            plugins.append(proc_plugs.TmenXPAcceleratorConfirmator(isEnabled=value))
         super(VehicleTmenXPAccelerator, self).__init__(vehicle, VEHICLE_SETTINGS_FLAG.XP_TO_TMAN, value, plugins)
 
     def _errorHandler(self, code, errStr='', ctx=None):
@@ -719,9 +740,11 @@ class OptDevicesInstaller(Processor):
         self.addPlugins((proc_plugs.VehicleValidator(self._vehicle), proc_plugs.MoneyValidator(self.__price, byCurrencyError=False), proc_plugs.OptionalDevicesInstallValidator(self._vehicle)))
 
     def _request(self, callback):
-        BigWorld.player().inventory.equipOptDevsSequence(self._vehicle.invID, self.__devices, lambda code, errStr: self._response(code, callback, errStr))
+        BigWorld.player().inventory.equipOptDevsSequence(self._vehicle.invID, self.__devices, lambda code, errStr, ctx: self._response(code, callback, errStr=errStr, ctx=None))
 
     def _errorHandler(self, code, errStr='', ctx=None):
+        if ctx is not None and isinstance(ctx, dict) and ctx.get('exception_message'):
+            errStr = ctx.get('exception_message')
         return OptDevicesApplyProcessorMessage().makeErrorMsg(errStr)
 
     def _successHandler(self, code, ctx=None):

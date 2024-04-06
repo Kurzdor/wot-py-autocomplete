@@ -22,7 +22,13 @@ def makeArenaFullName(arenaTypeName, i18nKey):
 
 
 def makeRegularFinishResultLabel(finishReason, teamResult):
-    return backport.text(R.strings.battle_results.finish.reason.dyn('c_{}{}'.format(finishReason, teamResult))()) if finishReason == FINISH_REASON.EXTERMINATION else backport.text(R.strings.battle_results.finish.reason.dyn('c_{}'.format(finishReason))())
+    return backport.text(getRegularFinishResultResource(finishReason, teamResult))
+
+
+def getRegularFinishResultResource(finishReason, teamResult):
+    isExtermination = finishReason == FINISH_REASON.EXTERMINATION
+    reasonKey = 'c_{}{}'.format(finishReason, teamResult) if isExtermination else 'c_{}'.format(finishReason)
+    return R.strings.battle_results.finish.reason.dyn(reasonKey)()
 
 
 def makeEpicBattleFinishResultLabel(finishReason, teamResult):
@@ -54,11 +60,18 @@ class RegularArenaFullNameItem(base.StatsItem):
     def _convert(self, record, reusable):
         arenaGuiType = reusable.common.arenaGuiType
         arenaType = reusable.common.arenaType
-        if arenaGuiType in (ARENA_GUI_TYPE.RANDOM, ARENA_GUI_TYPE.EPIC_RANDOM):
+        if arenaGuiType in ARENA_GUI_TYPE.RANDOM_RANGE:
             i18nKey = _ARENA_TYPE_FORMAT.format(arenaType.getGamePlayName())
         else:
             i18nKey = _ARENA_TYPE_EXT_FORMAT.format(arenaGuiType)
         return makeArenaFullName(arenaType.getName(), i18nKey)
+
+
+class ArenaNameItem(base.StatsItem):
+    __slots__ = ()
+
+    def _convert(self, record, reusable):
+        return backport.text(R.strings.arenas.dyn('c_{}'.format(reusable.common.arenaType.getGeometryName())).name())
 
 
 class ArenaIconItem(base.StatsItem):

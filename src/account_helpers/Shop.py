@@ -335,13 +335,13 @@ class Shop(object):
         vehTypeCompDescr = vehicles.makeIntCompactDescrByID('vehicle', nationIdx, innationIdx)
         roleIdx = tankmen.SKILL_INDICES[role]
         if callback is not None:
-            proxy = lambda requestID, resultID, errorStr, ext={}: callback(resultID, ext.get('tmanInvID', None), ext.get('tmanCompDescr', None))
+            proxy = lambda requestID, resultID, errorStr, ext={}: callback(resultID, ext.get('tmanInvID', None), ext.get('tmanCD', None))
         else:
             proxy = None
         self.__account._doCmdInt2Str(AccountCommands.CMD_TMAN_RECRUIT, vehTypeCompDescr, roleIdx, tokenName, proxy)
         return
 
-    def buyGoodie(self, goodieID, count, forGold, callback):
+    def buyGoodie(self, goodieID, count, forGold, doActivation=False, callback=None):
         if self.__ignore:
             if callback is not None:
                 callback(AccountCommands.RES_NON_PLAYER, {})
@@ -352,7 +352,12 @@ class Shop(object):
                 proxy = lambda requestID, resultID, errorStr, ext={}: callback(resultID)
             else:
                 proxy = None
-            self.__account._doCmdInt4(AccountCommands.CMD_BUY_GOODIE, self.__getCacheRevision(), goodieID, count, forGold, proxy)
+            args = [self.__getCacheRevision(),
+             goodieID,
+             count,
+             forGold,
+             doActivation]
+            self.__account._doCmdIntArr(AccountCommands.CMD_BUY_GOODIE, args, proxy)
             return
 
     def buyAndEquipOutfit(self, vehInvID, outfitData, callback):
@@ -434,7 +439,7 @@ class Shop(object):
             self.__account._doCmdInt3(AccountCommands.CMD_APPLY_ADDITIONAL_XP, self.__getCacheRevision(), arenaUniqueID, vehTypeCompDescr, proxy)
             return
 
-    def buyBattlePass(self, seasonID, chapterID, callback):
+    def buyBattlePass(self, seasonID, chapterID, priceID, callback):
         if self.__ignore:
             if callback is not None:
                 callback(AccountCommands.RES_NON_PLAYER, {})
@@ -444,7 +449,7 @@ class Shop(object):
                 proxy = lambda requestID, resultID, errorStr, ext={}: callback(requestID, resultID, errorStr)
             else:
                 proxy = None
-            self.__account._doCmdInt3(AccountCommands.CMD_BUY_BATTLE_PASS, self.__getCacheRevision(), seasonID, chapterID, proxy)
+            self.__account._doCmdInt3Str(AccountCommands.CMD_BUY_BATTLE_PASS, self.__getCacheRevision(), seasonID, chapterID, priceID, proxy)
             return
 
     def buyBattlePassLevels(self, seasonID, chapterID, levels, callback):
@@ -458,6 +463,19 @@ class Shop(object):
             else:
                 proxy = None
             self.__account._doCmdInt4(AccountCommands.CMD_BUY_BATTLE_PASS_LEVELS, self.__getCacheRevision(), seasonID, chapterID, levels, proxy)
+            return
+
+    def buyBattlePassWithLevels(self, seasonID, chapterID, priceID, callback):
+        if self.__ignore:
+            if callback is not None:
+                callback(AccountCommands.RES_NON_PLAYER, {})
+            return
+        else:
+            if callback is not None:
+                proxy = lambda requestID, resultID, errorStr, ext={}: callback(requestID, resultID, errorStr)
+            else:
+                proxy = None
+            self.__account._doCmdInt3Str(AccountCommands.CMD_BUY_BATTLE_PASS_WITH_LEVELS, self.__getCacheRevision(), seasonID, chapterID, priceID, proxy)
             return
 
     def __onSyncResponse(self, syncID, resultID, ext=None):

@@ -1,5 +1,6 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/common/items/components/tankmen_components.py
+from debug_utils import LOG_ERROR
 from items.components import component_constants
 from items.components import legacy_stuff
 from items.components import shared_components
@@ -15,20 +16,30 @@ class SPECIAL_VOICE_TAG(object):
     CELEBRITY_2021 = 'celebrity21SpecialVoice'
     CELEBRITY_2022 = 'celebrity22SpecialVoice'
     CELEBRITY_2023 = 'celebrity23SpecialVoice'
+    CELEBRITY_2024 = 'celebrity24SpecialVoice'
     DAY_OF_COSMONAUTICS_21 = 'gagarin21_specialVoice'
     MIHO = 'mihoSpecialVoice'
     YHA = 'yhaSpecialVoice'
     QUICKY_BABY = 'quickyBabySpecialVoice'
     WITCHES_CREW = 'witchesSpecialVoice'
     HAND_OF_BLOOD = 'handOfBloodSpecialVoice'
+    NAMELESS = 'japan:J29_Nameless'
+    EDELWEISS = 'japan:J30_Edelweiss'
+    TALKTOME_GOOSE = 'talktomeGooseSpecialVoice'
+    SKILL_4_LTU = 'skill4ltuSpecialVoice'
     BATTLE_OF_BLOGGERS = ('ru1_LebwaSpecialVoice', 'ru2_YushaSpecialVoice', 'ru3_Amway921SpecialVoice', 'ru4_KorbenDallasSpecialVoice', 'eu1_MailandSpecialVoice', 'eu2_Skill4ltuSpecialVoice', 'eu3_DezgamezSpecialVoice', 'eu4_AwesomeEpicGuysSpecialVoice')
     BATTLE_OF_BLOGGERS_2021 = ('bb21_ru1_Yusha_specialVoice', 'bb21_ru1_Vspishka_specialVoice', 'bb21_ru2_Amway921_specialVoice', 'bb21_ru2_Korbendailas_specialVoice', 'bb21_ru3_Lebwa_specialVoice', 'bb21_ru3_Inspirer_specialVoice', 'bb21_ru4_Evilgranny_specialVoice', 'bb21_ru4_Nearyou_specialVoice', 'bb21_eu1_Circon_specialVoice', 'bb21_eu2_Dakillzor_specialVoice', 'bb21_eu3_Newmulti2k_specialVoice', 'bb21_eu4_Orzanel_specialVoice', 'bb21_na1_Cabbagemechanic_specialVoice', 'bb21_na2_Tragicloss_specialVoice', 'bb21_na3_Cmdraf_specialVoice', 'bb21_asia1_Mastertortoise_specialVoice', 'bb21_asia2_Summertiger_specialVoice', 'bb21_asia3_Maharlika_specialVoice')
     G_I_JOE_TWITCH_2021 = ('duke_specialVoice', 'cobra_specialVoice')
     WHITE_TIGER_EVENT_2021 = ('letov_SpecialVoice', 'armand_SpecialVoice', 'elisa_SpecialVoice', 'krieger_SpecialVoice')
     WHITE_TIGER_EVENT_2022 = ('villanelle_SpecialVoice', 'ermelinda_SpecialVoice')
+    WHITE_TIGER_EVENT_2023 = ('hannelore_SpecialVoice', 'jana_SpecialVoice')
     SABATON_2021 = 'sabaton21_specialVoice'
     G_I_JOE_2022 = ('baroness22SpecialVoice', 'coverGirl22SpecialVoice')
     BPH_2022 = ('commander_bph_2022_1', 'commander_bph_2022_2', 'commander_bph_2022_3', 'commander_bph_2022_4')
+    BP_12_M = ('tankman_bp_12_m_5', 'tankman_bp_12_m_8', 'tankman_bp_12_m_9', 'tankman_bp_12_m_10')
+    BP_H2 = ('tankmen_bp1002_1', 'tankmen_bp1002_3')
+    BP_13 = ('tankmen_bp13_1', 'tankmen_bp13_2', 'tankmen_bp13_3', 'tankmen_bp13_4', 'tankmen_bp13_5', 'tankmen_bp13_6', 'tankmen_bp13_7', 'tankmen_bp13_8', 'tankmen_bp13_9')
+    CYGAN = 'cygan_SpecialVoice'
     ALL = (BUFFON,
      SABATON,
      OFFSPRING,
@@ -43,7 +54,13 @@ class SPECIAL_VOICE_TAG(object):
      QUICKY_BABY,
      WITCHES_CREW,
      CELEBRITY_2023,
-     HAND_OF_BLOOD) + BATTLE_OF_BLOGGERS + BATTLE_OF_BLOGGERS_2021 + G_I_JOE_TWITCH_2021 + WHITE_TIGER_EVENT_2021 + G_I_JOE_2022 + WHITE_TIGER_EVENT_2022 + BPH_2022
+     HAND_OF_BLOOD,
+     NAMELESS,
+     EDELWEISS,
+     SKILL_4_LTU,
+     TALKTOME_GOOSE,
+     CELEBRITY_2024,
+     CYGAN) + BATTLE_OF_BLOGGERS + BATTLE_OF_BLOGGERS_2021 + G_I_JOE_TWITCH_2021 + WHITE_TIGER_EVENT_2021 + G_I_JOE_2022 + WHITE_TIGER_EVENT_2022 + BPH_2022 + WHITE_TIGER_EVENT_2023 + BP_12_M + BP_H2 + BP_13
 
 
 class SPECIAL_CREW_TAG(object):
@@ -337,22 +354,13 @@ class NationConfig(legacy_stuff.LegacyStuff):
             return
 
     def getFirstName(self, nameID):
-        if nameID in self.__firstNames:
-            return self.__firstNames[nameID]
-        else:
-            return component_constants.EMPTY_STRING
+        return self.__firstNames.get(nameID, component_constants.EMPTY_STRING)
 
     def getLastName(self, nameID):
-        if nameID in self.__lastNames:
-            return self.__lastNames[nameID]
-        else:
-            return component_constants.EMPTY_STRING
+        return self.__lastNames.get(nameID, component_constants.EMPTY_STRING)
 
     def getIcon(self, iconID):
-        if iconID in self.__icons:
-            return self.__icons[iconID]
-        else:
-            return component_constants.EMPTY_STRING
+        return self.__icons.get(iconID, component_constants.EMPTY_STRING)
 
     def getExtensionLessIcon(self, iconID):
         if iconID in self.__icons:
@@ -366,3 +374,49 @@ class NationConfig(legacy_stuff.LegacyStuff):
         else:
             return
             return
+
+
+class LoreGroupComponent(object):
+    __slots__ = 'descr_by_nation'
+    DEFAULT = 'default'
+
+    def __init__(self, descr):
+        self.descr_by_nation = {}
+        self.addDescrForNation(LoreGroupComponent.DEFAULT, descr)
+
+    def addDescrForNation(self, nation, descr):
+        if nation in self.descr_by_nation:
+            LOG_ERROR('Lore description: {0} for nation: {1}, already exist '.format(descr, nation))
+        self.descr_by_nation[nation] = descr
+
+    def getDescrForNation(self, nation):
+        return self.descr_by_nation[nation] if nation in self.descr_by_nation else self.descr_by_nation[LoreGroupComponent.DEFAULT]
+
+
+class LoreComponent(object):
+    __slots__ = ('descr_by_group',)
+    SECTION = 'descr_by_group'
+    NATION_SECTION = 'nations'
+    __DEFAULT = 'default'
+
+    def __init__(self):
+        self.descr_by_group = {}
+
+    def addDescrForGroup(self, group, descr):
+        if group in self.descr_by_group:
+            LOG_ERROR('Description: {0} for group: {1}, already exist '.format(group, descr))
+        self.descr_by_group[group] = LoreGroupComponent(descr)
+
+    def addNationDescrForGroup(self, group, naiton, descr):
+        self.descr_by_group[group].addDescrForNation(naiton, descr)
+
+    def getLoreDescrForGroup(self, group, nation=LoreGroupComponent.DEFAULT, isDefault=False):
+        result = ''
+        if group in self.descr_by_group:
+            result = self.descr_by_group[group].getDescrForNation(nation)
+        elif isDefault:
+            result = self.descr_by_group[LoreComponent.__DEFAULT].getDescrForNation(LoreGroupComponent.DEFAULT)
+        return result
+
+    def __repr__(self):
+        return '{}()'.format(self.__class__.__name__)

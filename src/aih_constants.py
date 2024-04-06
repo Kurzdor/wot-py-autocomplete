@@ -2,6 +2,12 @@
 # Embedded file name: scripts/client/aih_constants.py
 
 
+class CTRL_TYPE(object):
+    USUAL = 0
+    OPTIONAL = 1
+    DEVELOPMENT = 2
+
+
 class ShakeReason(object):
     OWN_SHOT = 0
     OWN_SHOT_DELAYED = 1
@@ -17,17 +23,21 @@ class CTRL_MODE_NAME(object):
     SNIPER = 'sniper'
     POSTMORTEM = 'postmortem'
     DEBUG = 'debug'
-    CAT = 'cat'
     VIDEO = 'video'
     MAP_CASE = 'mapcase'
     MAP_CASE_ARCADE = 'arcadeMapcase'
-    MAP_CASE_ARCADE_EPIC_MINEFIELD = 'arcadeEpicMinefieldMapcase'
     MAP_CASE_EPIC = 'epicMapcase'
     RESPAWN_DEATH = 'respawn'
     DEATH_FREE_CAM = 'deathfreecam'
     DUAL_GUN = 'dualgun'
+    MAP_CASE_ARCADE_EPIC_MINEFIELD = 'arcadeEpicMinefieldMapcase'
+    KILL_CAM = 'killcam'
     VEHICLES_SELECTION = 'vehiclesSelection'
     DEFAULT = ARCADE
+    POSTMORTEM_CONTROL_MODES = (POSTMORTEM,
+     DEATH_FREE_CAM,
+     KILL_CAM,
+     RESPAWN_DEATH)
 
 
 CTRL_MODES = (CTRL_MODE_NAME.ARCADE,
@@ -36,7 +46,6 @@ CTRL_MODES = (CTRL_MODE_NAME.ARCADE,
  CTRL_MODE_NAME.SNIPER,
  CTRL_MODE_NAME.POSTMORTEM,
  CTRL_MODE_NAME.DEBUG,
- CTRL_MODE_NAME.CAT,
  CTRL_MODE_NAME.VIDEO,
  CTRL_MODE_NAME.MAP_CASE,
  CTRL_MODE_NAME.MAP_CASE_ARCADE,
@@ -45,6 +54,7 @@ CTRL_MODES = (CTRL_MODE_NAME.ARCADE,
  CTRL_MODE_NAME.DEATH_FREE_CAM,
  CTRL_MODE_NAME.DUAL_GUN,
  CTRL_MODE_NAME.MAP_CASE_ARCADE_EPIC_MINEFIELD,
+ CTRL_MODE_NAME.KILL_CAM,
  CTRL_MODE_NAME.VEHICLES_SELECTION)
 GUN_MARKER_MIN_SIZE = 32.0
 SPG_GUN_MARKER_ELEMENTS_COUNT = 37
@@ -57,6 +67,7 @@ class GUN_MARKER_TYPE(int):
     UNDEFINED = 0
     CLIENT = 1
     SERVER = 2
+    DUAL_ACC = 3
 
 
 class GUN_MARKER_FLAG(int):

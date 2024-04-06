@@ -12,9 +12,13 @@ class PromoGetTeaserRequestCtx(CommonWebRequestCtx):
     def isClanSyncRequired(self):
         return False
 
-    @staticmethod
-    def getDataObj(incomeData):
+    def getDataObj(self, incomeData):
         return PromoDataParser.parse(incomeData)
+
+    @classmethod
+    def getAdditionalData(cls):
+        battlesCount = cls.itemsCache.items.getAccountDossier().getRandomStats().getBattlesCount()
+        return {'additionalData': {'number_of_battles': battlesCount}}
 
     def isCaching(self):
         return False

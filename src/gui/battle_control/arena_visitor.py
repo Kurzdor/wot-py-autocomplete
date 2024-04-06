@@ -89,6 +89,7 @@ class _ArenaTypeSkeleton(object):
     squadTeamNumbers = []
     boundingBox = ((0, 0), (0, 0))
     minimap = ''
+    minimapLayers = {}
     overviewmap = ''
     winPointsSettings = None
     battleCountdownTimerSound = ''
@@ -221,6 +222,10 @@ class _ArenaTypeVisitor(IArenaVisitor):
     def getMinimapTexture(self):
         return self._arenaType.minimap
 
+    @catch_attribute_exception(default=_ArenaTypeSkeleton.minimapLayers)
+    def getMinimapLayers(self):
+        return self._arenaType.minimapLayers
+
     @catch_attribute_exception(default=_ArenaTypeSkeleton.overviewmap)
     def getOverviewMapTexture(self):
         return self._arenaType.overviewmap
@@ -274,9 +279,6 @@ class _ArenaGuiTypeVisitor(IArenaVisitor):
     def isEventBattle(self):
         return self._guiType == _GUI_TYPE.EVENT_BATTLES
 
-    def isMultiTeam(self):
-        return self._guiType == _GUI_TYPE.FALLOUT_MULTITEAM
-
     def isTrainingBattle(self):
         return self._guiType in (_GUI_TYPE.TRAINING, _GUI_TYPE.EPIC_RANDOM_TRAINING)
 
@@ -285,9 +287,6 @@ class _ArenaGuiTypeVisitor(IArenaVisitor):
 
     def isRankedBattle(self):
         return self._guiType == _GUI_TYPE.RANKED
-
-    def isBootcampBattle(self):
-        return self._guiType == _GUI_TYPE.BOOTCAMP
 
     def isInEpicRange(self):
         return self._guiType in _GUI_TYPE.EPIC_RANGE
@@ -301,6 +300,9 @@ class _ArenaGuiTypeVisitor(IArenaVisitor):
     def isMapbox(self):
         return self._guiType == _GUI_TYPE.MAPBOX
 
+    def isWinback(self):
+        return self._guiType == _GUI_TYPE.WINBACK
+
     def isMapsTraining(self):
         return self._guiType == _GUI_TYPE.MAPS_TRAINING
 
@@ -309,6 +311,9 @@ class _ArenaGuiTypeVisitor(IArenaVisitor):
 
     def isComp7Battle(self):
         return self._guiType == _GUI_TYPE.COMP7
+
+    def isComp7Training(self):
+        return self._guiType == _GUI_TYPE.TRAINING_COMP7
 
     def hasLabel(self):
         return self._guiType != _GUI_TYPE.UNKNOWN and self._guiType in _GUI_TYPE_LABEL.LABELS
@@ -406,6 +411,9 @@ class _ArenaExtraDataVisitor(IArenaVisitor):
     def isLowLevelBattle(self):
         return 0 < self._extra.get('battleLevel', 0) < 4
 
+    def isMapsInDevelopmentEnabled(self):
+        return self._extra.get('isRandomEventsAllowed', False)
+
     def getValue(self, key, default=None):
         return self._extra.get(key, default)
 
@@ -469,6 +477,9 @@ class _ArenaModifiersVisitor(IArenaVisitor):
 
     def getShellRicochetCos(self, shellKind):
         return self._shellData[shellKind][1]
+
+    def getConstantsModification(self):
+        return self._modifiers.getConstantsModification()
 
 
 class _ClientArenaVisitor(IClientArenaVisitor):
@@ -551,6 +562,18 @@ class _ClientArenaVisitor(IClientArenaVisitor):
     def hasRespawns(self):
         return self._bonus.hasRespawns()
 
+    def isEnableExternalRespawn(self):
+        ownVehicle = BigWorld.entities.get(BigWorld.player().playerVehicleID, None)
+        return bool(ownVehicle.enableExternalRespawn) if ownVehicle else False
+
+    def isArenaLeaveAllowed(self):
+        isLeaveAllowed = None
+        ownVehicle = BigWorld.entities.get(BigWorld.player().playerVehicleID, None)
+        vehRespComponent = ownVehicle and ownVehicle.dynamicComponents.get('VehicleRespawnComponent')
+        if vehRespComponent:
+            isLeaveAllowed = vehRespComponent.isLeaveAllowed
+        return isLeaveAllowed
+
     def hasHealthBar(self):
         return self._bonus.hasHealthBar()
 
@@ -610,6 +633,9 @@ class _ClientArenaVisitor(IClientArenaVisitor):
         for teamNum, points in enumerate(self.getTeamSpawnPoints(team), 1):
             for number, point in enumerate(points, 1):
                 yield (teamNum, (point[0], 0, point[1]), number)
+
+    def getVehicleCircularAoiRadius(self):
+        return self.getArenaModifiers().getConstantsModification().VEHICLE_CIRCULAR_AOI_RADIUS
 
     def getVisibilityMinRadius(self):
         return self.getArenaModifiers()(BattleParams.VISION_MIN_RADIUS, VISIBILITY.MIN_RADIUS)

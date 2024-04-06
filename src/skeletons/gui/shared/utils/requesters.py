@@ -8,6 +8,7 @@ if typing.TYPE_CHECKING:
     from gui.shared.gui_items.gui_item_economics import ItemPrice
     from gui.shared.money import Money, DynamicMoney
     from gui.shared.utils.requesters import InventoryRequester
+    from gui.shared.utils.requesters.ShopRequester import DefaultShopRequester
     from gui.veh_post_progression.models.ext_money import ExtendedMoney
     from post_progression_common import VehicleState
     from items.vehicles import VehicleType
@@ -222,6 +223,14 @@ class IStatsRequester(IRequester):
         raise NotImplementedError
 
     @property
+    def applyAdditionalWoTPlusXPCount(self):
+        raise NotImplementedError
+
+    @property
+    def dailyAppliedAdditionalXP(self):
+        raise NotImplementedError
+
+    @property
     def multipliedRankedVehicles(self):
         raise NotImplementedError
 
@@ -378,15 +387,15 @@ class IStatsRequester(IRequester):
         raise NotImplementedError
 
     @property
-    def tutorialsCompleted(self):
-        raise NotImplementedError
-
-    @property
     def oldVehInvIDs(self):
         raise NotImplementedError
 
     @property
     def dynamicCurrencies(self):
+        raise NotImplementedError
+
+    @property
+    def isEmergencyModeEnabled(self):
         raise NotImplementedError
 
     def getMapsBlackList(self):
@@ -405,6 +414,14 @@ class IStatsRequester(IRequester):
         raise NotImplementedError
 
     def getWeeklyVehicleCrystals(self, vehCD):
+        raise NotImplementedError
+
+    @property
+    def luiVersion(self):
+        raise NotImplementedError
+
+    @property
+    def newbieHintsGroup(self):
         raise NotImplementedError
 
 
@@ -560,6 +577,10 @@ class IShopCommonStats(object):
         raise NotImplementedError
 
     @property
+    def tankman(self):
+        raise NotImplementedError
+
+    @property
     def freeXPConversion(self):
         raise NotImplementedError
 
@@ -657,13 +678,15 @@ class IShopCommonStats(object):
 
 class IShopRequester(IShopCommonStats, IRequester):
 
+    def __init__(self):
+        super(IShopRequester, self).__init__()
+        self.defaults = None
+        return
+
     def getPremiumCostWithDiscount(self, premiumPacketDiscounts=None):
         raise NotImplementedError
 
     def isActionOnPremium(self):
-        raise NotImplementedError
-
-    def getTankmanCostWithDefaults(self):
         raise NotImplementedError
 
     def getTankmanCostWithGoodyDiscount(self, vehLevel):
@@ -731,10 +754,6 @@ class IGoodiesRequester(IRequester):
 
     @property
     def goodies(self):
-        raise NotImplementedError
-
-    @property
-    def pr2ConversionResult(self):
         raise NotImplementedError
 
     def getActiveClanReserves(self):
@@ -840,10 +859,6 @@ class IBattleRoyaleRequester(IRequester):
     def topCount(self):
         raise NotImplementedError
 
-    @property
-    def testDriveExpired(self):
-        raise NotImplementedError
-
     def getStats(self, arenaBonusType, playerDatabaseID=None):
         raise NotImplementedError
 
@@ -897,7 +912,7 @@ class IBlueprintsRequester(IRequester):
     def getBlueprintData(self, vehicleCD, vehicleLevel):
         raise NotImplementedError
 
-    def getBlueprintDiscount(self, vehicleCD, vehicleLevel):
+    def getBlueprintDiscount(self, vehicleCD, vehicleLevel, potentialFilledCount=0):
         raise NotImplementedError
 
     def getRequiredCountAndDiscount(self, vehicleCD, vLevel):
@@ -955,6 +970,9 @@ class ITokensRequester(IRequester):
         raise NotImplementedError
 
     def getToken(self, tokenID):
+        raise NotImplementedError
+
+    def getTokenInfo(self, tokenID):
         raise NotImplementedError
 
     def getTokenCount(self, tokenID):
@@ -1185,4 +1203,22 @@ class IResourceWellRequester(IRequester):
         raise NotImplementedError
 
     def getReward(self):
+        raise NotImplementedError
+
+    def getInitialNumberAmounts(self):
+        raise NotImplementedError
+
+
+class IAchievements20Requester(IRequester):
+
+    def getLayout(self):
+        raise NotImplementedError
+
+    def getLayoutState(self):
+        raise NotImplementedError
+
+    def getAchievementBitmask(self):
+        raise NotImplementedError
+
+    def getLayoutLength(self):
         raise NotImplementedError

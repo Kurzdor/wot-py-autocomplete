@@ -20,10 +20,6 @@ from web.web_client_api.common import ItemPackEntry, ItemPackType, ItemPackTypeG
 from gui.impl import backport
 from gui.impl.gen import R
 _logger = logging.getLogger(__name__)
-CREW_LVL_BY_TYPE = {ItemPackType.CREW_50: '50%',
- ItemPackType.CREW_75: '75%',
- ItemPackType.CREW_100: '100%',
- ItemPackType.CUSTOM_CREW_100: '100%'}
 
 class OfferGiftVehiclePreview(VehiclePreview):
     __offersProvider = dependency.descriptor(IOffersDataProvider)
@@ -124,6 +120,9 @@ class OfferGiftVehiclePreview(VehiclePreview):
          'giftID': self._gift.id})
         return exitEvent
 
+    def _onInventoryChanged(self, *_):
+        pass
+
     def __onServerSettingsChange(self, *args, **kwargs):
         if not self.__lobbyContext.getServerSettings().isOffersEnabled():
             event_dispatcher.showHangar()
@@ -131,7 +130,7 @@ class OfferGiftVehiclePreview(VehiclePreview):
     def __onOffersUpdated(self):
         offer = self.__offersProvider.getOffer(self._offer.id)
         if offer is None or not offer.isOfferAvailable:
-            if self.__offersProvider.getAvailableOffers(onlyVisible=True):
+            if self.__offersProvider.getUnlockedOffers(includeAllOffers=False):
                 event_dispatcher.showStorage(defaultSection=STORAGE_CONSTANTS.OFFERS)
             else:
                 self._customCallbacks.get('offerEndedCb', event_dispatcher.showHangar)()
@@ -142,8 +141,7 @@ class OfferGiftVehiclePreview(VehiclePreview):
         return {'isEnabled': True,
          'topTitle': '',
          'topTitleSmall': '',
-         'items': [{'count': CREW_LVL_BY_TYPE.get(item.type, ''),
-                    'hasCompensation': False,
+         'items': [{'hasCompensation': False,
                     'icon': backport.image(R.images.gui.maps.shop.rewards.c_48x48.prizeCrew()),
                     'iconAlt': backport.image(R.images.gui.maps.icons.artefact.notFound()),
                     'id': 'None',

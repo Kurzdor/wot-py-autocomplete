@@ -7,12 +7,19 @@ from gui.periodic_battles.models import PrimeTimeStatus
 from helpers import dependency
 from helpers.time_utils import getServerUTCTime
 from skeletons.gui.game_control import IComp7Controller
+from skeletons.gui.lobby_context import ILobbyContext
+from gui.impl.gen.view_models.views.lobby.comp7.season_model import SeasonName, SeasonState
 if typing.TYPE_CHECKING:
     from comp7_ranks_common import Comp7Division
+    from helpers.server_settings import Comp7RanksConfig
     from season_common import GameSeason
     from gui.impl.gen.view_models.views.lobby.comp7.division_info_model import DivisionInfoModel
     from gui.impl.gen.view_models.views.lobby.comp7.schedule_info_model import ScheduleInfoModel
     from gui.impl.gen.view_models.views.lobby.comp7.season_model import SeasonModel
+_SEASONS_NAMES_BY_NUMBER = {1: SeasonName.FIRST,
+ 2: SeasonName.SECOND,
+ 3: SeasonName.THIRD}
+SEASONS_NUMBERS_BY_NAME = {v.value:k for k, v in _SEASONS_NAMES_BY_NUMBER.iteritems()}
 
 def setDivisionInfo(model, division=None):
     if division is None:
@@ -24,27 +31,29 @@ def setDivisionInfo(model, division=None):
     return
 
 
+def getValidSeason(season=None):
+    return season or _getCurrentSeason() or _getPrevSeason() or _getNextSeason()
+
+
 def setSeasonInfo(model, season=None):
-    season = season or _getCurrentSeason() or _getNextSeason() or _getPrevSeason()
-    if season is not None:
-        model.setStartTimestamp(season.getStartDate())
-        model.setEndTimestamp(season.getEndDate())
-        model.setServerTimestamp(getServerUTCTime())
-    return
+    season = getValidSeason(season)
+    _SeasonPresenter.setSeasonInfo(model, season)
 
 
-def setScheduleInfo(model, season=None):
-    season = season or _getCurrentSeason() or _getNextSeason() or _getPrevSeason()
+def setScheduleInfo(model):
+    season = getValidSeason()
     if season is not None:
         model.setTooltipId(TOOLTIPS_CONSTANTS.COMP7_CALENDAR_DAY_INFO)
-        setSeasonInfo(model=model.season, season=season)
+    _SeasonPresenter.setSeasonInfo(model.season, season)
+    yearState = comp7_shared.getProgressionYearState()
+    model.year.setState(yearState)
     return
 
 
 @dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
-def setRanksInfo(model, comp7Controller=None):
+def setRanksInactivityInfo(model, comp7Controller=None):
+    model.setHasRankInactivityWarning(comp7_shared.hasPlayerRankInactivityWarning())
     model.setRankInactivityCount(comp7Controller.activityPoints)
-    setElitePercentage(model)
 
 
 @dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
@@ -53,8 +62,34 @@ def setElitePercentage(model, comp7Controller=None):
 
 
 @dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
+def setRankInfo(model, comp7Controller=None):
+    seasonNumber = comp7Controller.getActualSeasonNumber()
+    if not seasonNumber:
+        return
+    division = comp7_shared.getPlayerDivisionByRating(comp7Controller.getRatingForSeason(seasonNumber))
+    model.setCurrentRank(comp7_shared.getRankEnumValue(division))
+
+
+@dependency.replace_none_kwargs(comp7Controller=IComp7Controller, lobbyCtx=ILobbyContext)
+def setMaxRankInfo(model, comp7Controller=None, lobbyCtx=None):
+    seasonNumber = comp7Controller.getActualSeasonNumber()
+    if not seasonNumber:
+        return
+    maxAchivedRankNumber = comp7Controller.getMaxRankNumberForSeason(seasonNumber)
+    config = lobbyCtx.getServerSettings().comp7RanksConfig
+    ranksOrder = config.ranksOrder
+    rankId = ranksOrder[maxAchivedRankNumber - 1]
+    model.setMaxAchievedRank(comp7_shared.getRankById(rankId))
+
+
+@dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
 def isModeForcedDisabled(status, comp7Controller=None):
     return not comp7Controller.isAvailable() and status == PrimeTimeStatus.AVAILABLE
+
+
+def getSeasonNameEnum(season=None):
+    season = getValidSeason(season)
+    return _SEASONS_NAMES_BY_NUMBER.get(season.getNumber()) if season else None
 
 
 @dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
@@ -70,3 +105,27 @@ def _getNextSeason(comp7Controller=None):
 @dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
 def _getPrevSeason(comp7Controller=None):
     return comp7Controller.getPreviousSeason()
+
+
+class _SeasonPresenter(object):
+
+    @classmethod
+    def setSeasonInfo(cls, model, season):
+        if season is not None:
+            model.setName(getSeasonNameEnum(season))
+            model.setStartTimestamp(season.getStartDate())
+            model.setEndTimestamp(season.getEndDate())
+            model.setServerTimestamp(getServerUTCTime())
+            model.setHasTentativeDates(season.hasTentativeDates())
+        model.setState(cls.__getSeasonState(season))
+        return
+
+    @staticmethod
+    def __getSeasonState(season):
+        if season is not None:
+            currentTime = getServerUTCTime()
+            if currentTime < season.getStartDate():
+                return SeasonState.NOTSTARTED
+            if currentTime > season.getEndDate():
+                return SeasonState.END
+        return comp7_shared.getCurrentSeasonState()

@@ -113,11 +113,51 @@ class ISettingsCore(object):
     def isSettingChanged(self, name, value):
         raise NotImplementedError
 
-    def applyStorages(self, restartApproved):
+    def applyStorages(self, restartApproved, force=False):
         raise NotImplementedError
 
     def confirmChanges(self, confirmators):
         raise NotImplementedError
 
     def clearStorages(self):
+        raise NotImplementedError
+
+    def setOverrideSettings(self, overrideDict, disableStorages):
+        raise NotImplementedError
+
+    def unsetOverrideSettings(self):
+        raise NotImplementedError
+
+
+class IBattleCommunicationsSettings(object):
+    onChanged = None
+
+    @property
+    def isEnabled(self):
+        raise NotImplementedError
+
+    @property
+    def showStickyMarkers(self):
+        raise NotImplementedError
+
+    @property
+    def showInPlayerList(self):
+        raise NotImplementedError
+
+    @property
+    def showCalloutMessages(self):
+        raise NotImplementedError
+
+    @property
+    def showLocationMarkers(self):
+        raise NotImplementedError
+
+    @property
+    def showBaseMarkers(self):
+        raise NotImplementedError
+
+    def init(self):
+        raise NotImplementedError
+
+    def fini(self):
         raise NotImplementedError

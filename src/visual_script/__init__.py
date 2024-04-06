@@ -2,6 +2,8 @@
 # Embedded file name: scripts/common/visual_script/__init__.py
 from visual_script.misc import ASPECT
 from visual_script.registrar import VSBlockRegistrar
+from visual_script.contexts.perks_context import PerkContext, CrewContext, PerkNotifyState
+from visual_script.contexts.cgf_context import CGFGameObjectContext
 import ability_common
 import example
 import general
@@ -12,6 +14,8 @@ import balance
 import entity_blocks
 import arena_blocks
 import bitmask_blocks_common
+import dictionary_blocks
+import debug_manager_blocks
 g_blockRegistrar = VSBlockRegistrar(ASPECT.CLIENT, ASPECT.SERVER)
 g_blockRegistrar.regBlocksFromModule(example)
 g_blockRegistrar.regTypesFromModule(example)
@@ -31,3 +35,10 @@ g_blockRegistrar.regBlock(bitmask_blocks_common.BitwiseXOR)
 g_blockRegistrar.regBlock(bitmask_blocks_common.BitwiseEQUAL)
 g_blockRegistrar.regBlocksFromModule(entity_blocks)
 g_blockRegistrar.regBlock(arena_blocks.GetFlyDirection)
+g_blockRegistrar.regContext(PerkContext)
+g_blockRegistrar.regContext(CrewContext)
+g_blockRegistrar.regType(PerkNotifyState)
+g_blockRegistrar.regContext(CGFGameObjectContext)
+g_blockRegistrar.regBlocksFromModule(dictionary_blocks)
+g_blockRegistrar.regTypesFromModule(dictionary_blocks)
+g_blockRegistrar.regBlocksFromModule(debug_manager_blocks)

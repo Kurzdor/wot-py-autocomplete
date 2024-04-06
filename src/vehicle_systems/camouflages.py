@@ -199,14 +199,14 @@ def getOutfitComponent(outfitCD, vehicleDescriptor=None, seasonType=None):
         return CustomizationOutfit()
 
 
-def prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId):
+def prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId, isPlayerVehicle):
     vehicleCD = vehicleDescriptor.makeCompactDescr()
     outfitComponent = getOutfitComponent(outfitCD, vehicleDescriptor)
     outfit = Outfit(component=outfitComponent, vehicleCD=vehicleCD)
     player = BigWorld.player()
     if player is not None and hasattr(player, 'customizationDisplayType'):
         localPlayerWantsHistoricallyAccurate = player.customizationDisplayType < outfit.customizationDisplayType()
-        isLocalVehicle = player.playerVehicleID != vehicleId
+        isLocalVehicle = not isPlayerVehicle
     else:
         localPlayerWantsHistoricallyAccurate = False
         isLocalVehicle = False
@@ -545,6 +545,9 @@ def getAttachmentsAnimators(attachments, spaceId, loadedAnimators, compoundModel
             continue
         animWrapper = AnimationSequence.PartWrapperContainer(compoundModel, spaceId, attachment.partNodeAlias)
         node = compoundModel.node(attachment.attachNode)
+        if IS_EDITOR and node is None:
+            _logger.error('Cannot find attach node "%s" of the attachment in the model', attachment.attachNode)
+            continue
         animator = __prepareAnimator(loadedAnimators, sequenceItem.sequenceName, animWrapper, node, attachment.partNodeAlias)
         if animator is None:
             continue
@@ -780,6 +783,11 @@ def getGenericProjectionDecals(outfit, vehDesc):
     return decalsParams
 
 
+def getNonTankMaterials(outfit):
+    style = outfit.style
+    return style.nonTankMaterials if style is not None else None
+
+
 def __vehicleSlotsByType(vehDesc, slotType):
     for partName in TankPartNames.ALL:
         partDesc = getattr(vehDesc, partName, None)
@@ -921,4 +929,8 @@ def getOutfitData(appearance, outfit, vehicleDescr, isDamaged):
         paints.append(getRepaint(outfit, fashionIdx, vehicleDescr))
 
     decals = getGenericProjectionDecals(outfit, vehicleDescr)
-    return (camos, paints, decals)
+    nonTankMaterials = getNonTankMaterials(outfit)
+    return (camos,
+     paints,
+     decals,
+     nonTankMaterials)

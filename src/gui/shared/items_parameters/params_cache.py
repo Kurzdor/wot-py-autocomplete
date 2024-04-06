@@ -6,7 +6,7 @@ import math
 import typing
 import sys
 from constants import BonusTypes
-from gui.shared.items_parameters import calcGunParams, calcShellParams, getEquipmentParameters, isAutoReloadGun, isDualGun
+from gui.shared.items_parameters import calcGunParams, calcShellParams, getEquipmentParameters, isAutoReloadGun, isDualGun, isDualAccuracy
 from gui.shared.items_parameters import xml_reader
 from gui.shared.utils.decorators import debugTime
 import nations
@@ -21,7 +21,7 @@ if typing.TYPE_CHECKING:
 PrecachedShell = namedtuple('PrecachedShell', 'guns params')
 PrecachedEquipment = namedtuple('PrecachedEquipment', 'nations params')
 PrecachedOptionalDevice = namedtuple('PrecachedOptionalDevice', 'weight nations')
-PrecachedChassis = namedtuple('PrecachedChassis', 'isHydraulic, isWheeled, hasAutoSiege, isTrackWithinTrack')
+PrecachedChassis = namedtuple('PrecachedChassis', 'isHydraulic, isWheeled, hasAutoSiege, isTrackWithinTrack, isWheeledOnSpotRotation')
 PrecachedEngine = namedtuple('PrecachedEngine', 'hasTurboshaftEngine, hasRocketAcceleration')
 
 class _PrecachedEngineTypes(object):
@@ -31,22 +31,25 @@ class _PrecachedEngineTypes(object):
 
 
 class _PrecachedChassisTypes(object):
-    DEFAULT = PrecachedChassis(isHydraulic=False, isWheeled=False, hasAutoSiege=False, isTrackWithinTrack=False)
-    HYDRAULIC = PrecachedChassis(isHydraulic=True, isWheeled=False, hasAutoSiege=False, isTrackWithinTrack=False)
-    WHEELED = PrecachedChassis(isHydraulic=False, isWheeled=True, hasAutoSiege=False, isTrackWithinTrack=False)
-    HYDRAULIC_WHEELED = PrecachedChassis(isHydraulic=True, isWheeled=True, hasAutoSiege=False, isTrackWithinTrack=False)
-    HYDRAULIC_AUTO_SIEGE = PrecachedChassis(isHydraulic=True, isWheeled=False, hasAutoSiege=True, isTrackWithinTrack=False)
-    TRACK_WITHIN_TRACK = PrecachedChassis(isHydraulic=False, isWheeled=False, hasAutoSiege=False, isTrackWithinTrack=True)
+    DEFAULT = PrecachedChassis(isHydraulic=False, isWheeled=False, hasAutoSiege=False, isTrackWithinTrack=False, isWheeledOnSpotRotation=False)
+    HYDRAULIC = PrecachedChassis(isHydraulic=True, isWheeled=False, hasAutoSiege=False, isTrackWithinTrack=False, isWheeledOnSpotRotation=False)
+    WHEELED = PrecachedChassis(isHydraulic=False, isWheeled=True, hasAutoSiege=False, isTrackWithinTrack=False, isWheeledOnSpotRotation=False)
+    HYDRAULIC_WHEELED = PrecachedChassis(isHydraulic=True, isWheeled=True, hasAutoSiege=False, isTrackWithinTrack=False, isWheeledOnSpotRotation=False)
+    ON_SPOT_ROTATION_WHEELED = PrecachedChassis(isHydraulic=False, isWheeled=True, hasAutoSiege=False, isTrackWithinTrack=False, isWheeledOnSpotRotation=True)
+    HYDRAULIC_AUTO_SIEGE = PrecachedChassis(isHydraulic=True, isWheeled=False, hasAutoSiege=True, isTrackWithinTrack=False, isWheeledOnSpotRotation=False)
+    TRACK_WITHIN_TRACK = PrecachedChassis(isHydraulic=False, isWheeled=False, hasAutoSiege=False, isTrackWithinTrack=True, isWheeledOnSpotRotation=False)
     ALL = (DEFAULT,
      HYDRAULIC,
      WHEELED,
      HYDRAULIC_WHEELED,
      HYDRAULIC_AUTO_SIEGE,
-     TRACK_WITHIN_TRACK)
+     TRACK_WITHIN_TRACK,
+     ON_SPOT_ROTATION_WHEELED)
     MAP = dict((((pC.isHydraulic,
       pC.isWheeled,
       pC.hasAutoSiege,
-      pC.isTrackWithinTrack), pC) for pC in ALL))
+      pC.isTrackWithinTrack,
+      pC.isWheeledOnSpotRotation), pC) for pC in ALL))
 
 
 def isHydraulicChassis(vDescr):
@@ -57,7 +60,12 @@ def isTrackWithinTrackChassis(vChassis):
     return vChassis.isTrackWithinTrack
 
 
-class PrecachedGun(namedtuple('PrecachedGun', 'clipVehicles autoReloadVehicles dualGunVehicles  params turretsByVehicles')):
+class PrecachedGun(namedtuple('PrecachedGun', ('clipVehicles',
+ 'autoReloadVehicles',
+ 'dualGunVehicles',
+ 'dualAccuracyVehicles',
+ 'params',
+ 'turretsByVehicles'))):
 
     @property
     def clipVehiclesNames(self):
@@ -85,6 +93,9 @@ class PrecachedGun(namedtuple('PrecachedGun', 'clipVehicles autoReloadVehicles d
 
     def getTurretsForVehicle(self, vehicleCD):
         return self.turretsByVehicles.get(vehicleCD, ())
+
+    def hasDualAccuracy(self, vehicleCD):
+        return self.dualAccuracyVehicles is not None and vehicleCD in self.dualAccuracyVehicles
 
 
 def _getVehicleSuitablesByType(vehicleType, itemTypeId, turretPID=0):
@@ -195,6 +206,9 @@ class _ParamsCache(object):
     def isChassisWheeled(self, itemCD):
         return self.getPrecachedParameters(itemCD).isWheeled
 
+    def isChassisWheeledOnSpotRotation(self, itemCD):
+        return self.getPrecachedParameters(itemCD).isWheeledOnSpotRotation
+
     def isTrackWithinTrack(self, itemCD):
         return self.getPrecachedParameters(itemCD).isTrackWithinTrack
 
@@ -203,6 +217,9 @@ class _ParamsCache(object):
 
     def getWheeledChassisAxleLockAngles(self, itemCD):
         return self.__wheeledChassisParams.get(itemCD)
+
+    def hasDualAccuracy(self, itemCD, vehicleCD=None):
+        return self.getPrecachedParameters(itemCD).hasDualAccuracy(vehicleCD)
 
     def hasTurboshaftEngine(self, itemCD):
         return self.getPrecachedParameters(itemCD).hasTurboshaftEngine
@@ -304,6 +321,7 @@ class _ParamsCache(object):
                 clipVehiclesList = set()
                 autoReloadVehsList = set()
                 dualGunVehsList = set()
+                dualAccuracyVehsList = set()
                 for vDescr in vehiclesCache.generator(nationIdx):
                     del curVehicleTurretsCDs[:]
                     vehCD = vDescr.type.compactDescr
@@ -320,11 +338,13 @@ class _ParamsCache(object):
                                         autoReloadVehsList.add(vehCD)
                                     if isDualGun(gun):
                                         dualGunVehsList.add(vehCD)
+                                    if isDualAccuracy(gun):
+                                        dualAccuracyVehsList.add(vehCD)
 
                     if curVehicleTurretsCDs:
                         turretsIntCDs[vDescr.type.compactDescr] = tuple(curVehicleTurretsCDs)
 
-                self.__cache[nationIdx][ITEM_TYPES.vehicleGun][g.compactDescr] = PrecachedGun(clipVehicles=clipVehiclesList if clipVehiclesList else None, autoReloadVehicles=frozenset(autoReloadVehsList) if autoReloadVehsList else None, dualGunVehicles=frozenset(dualGunVehsList) if dualGunVehsList else None, params=calcGunParams(g, descriptors), turretsByVehicles=turretsIntCDs)
+                self.__cache[nationIdx][ITEM_TYPES.vehicleGun][g.compactDescr] = PrecachedGun(clipVehicles=clipVehiclesList if clipVehiclesList else None, autoReloadVehicles=frozenset(autoReloadVehsList) if autoReloadVehsList else None, dualGunVehicles=frozenset(dualGunVehsList) if dualGunVehsList else None, dualAccuracyVehicles=frozenset(dualAccuracyVehsList) if dualAccuracyVehsList else None, params=calcGunParams(g, descriptors), turretsByVehicles=turretsIntCDs)
 
         return
 
@@ -357,7 +377,7 @@ class _ParamsCache(object):
             for vDescr in vehiclesCache.generator(nationIdx):
                 for vChs in vDescr.type.chassis:
                     chassisCD = vChs.compactDescr
-                    cachedChassisByNation[chassisCD] = _PrecachedChassisTypes.MAP[isHydraulicChassis(vDescr), vDescr.isWheeledVehicle, vDescr.hasAutoSiegeMode, isTrackWithinTrackChassis(vChs)]
+                    cachedChassisByNation[chassisCD] = _PrecachedChassisTypes.MAP[isHydraulicChassis(vDescr), vDescr.isWheeledVehicle, vDescr.hasAutoSiegeMode, isTrackWithinTrackChassis(vChs), vDescr.isWheeledOnSpotRotation]
                     processedItems.add(chassisCD)
                     if vDescr.isWheeledVehicle:
                         chassisPhysics = vDescr.type.xphysics['chassis'][vChs.name]

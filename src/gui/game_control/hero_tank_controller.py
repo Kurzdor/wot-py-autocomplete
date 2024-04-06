@@ -11,7 +11,7 @@ from gui.shared.items_cache import CACHE_SYNC_REASON
 from gui.shared.utils.requesters import REQ_CRITERIA
 from gui.game_control.calendar_controller import CalendarOfferType
 from helpers import dependency
-from skeletons.gui.game_control import IHeroTankController, IBootcampController, ICalendarController
+from skeletons.gui.game_control import IHeroTankController, ICalendarController
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.shared import IItemsCache
 from skeletons.gui.server_events import IEventsCache
@@ -27,7 +27,6 @@ _HeroTankInfo.__new__.__defaults__ = ('', None, None, '', '')
 class HeroTankController(IHeroTankController):
     itemsCache = dependency.descriptor(IItemsCache)
     lobbyContext = dependency.descriptor(ILobbyContext)
-    bootcampController = dependency.descriptor(IBootcampController)
     calendarController = dependency.descriptor(ICalendarController)
     _eventsCache = dependency.descriptor(IEventsCache)
 
@@ -43,28 +42,28 @@ class HeroTankController(IHeroTankController):
 
     def init(self):
         self.itemsCache.onSyncCompleted += self.__updateInventoryVehiclesData
-        g_eventBus.addListener(_CALENDAR_ACTION_CHANGED, self.__updateActionInfo, EVENT_BUS_SCOPE.LOBBY)
+        g_eventBus.addListener(_CALENDAR_ACTION_CHANGED, self.__updateCalendarActionInfo, EVENT_BUS_SCOPE.LOBBY)
 
     def fini(self):
-        g_eventBus.removeListener(_CALENDAR_ACTION_CHANGED, self.__updateActionInfo, EVENT_BUS_SCOPE.LOBBY)
+        g_eventBus.removeListener(_CALENDAR_ACTION_CHANGED, self.__updateCalendarActionInfo, EVENT_BUS_SCOPE.LOBBY)
         self.itemsCache.onSyncCompleted -= self.__updateInventoryVehiclesData
 
     def __onEventsCacheSyncCompleted(self, *_):
-        self.__applyActions()
+        if self.__applyActions():
+            self.onUpdated()
 
     def onLobbyStarted(self, ctx):
         self.lobbyContext.getServerSettings().onServerSettingsChange += self.__onServerSettingsChanged
         self._eventsCache.onSyncCompleted += self.__onEventsCacheSyncCompleted
         self.__fullUpdate()
         self.__updateSettings()
-        self.onUpdated()
 
     def onAvatarBecomePlayer(self):
         self.lobbyContext.getServerSettings().onServerSettingsChange -= self.__onServerSettingsChanged
         self._eventsCache.onSyncCompleted -= self.__onEventsCacheSyncCompleted
 
     def isEnabled(self):
-        return self.__isEnabled and not self.bootcampController.isInBootcamp()
+        return self.__isEnabled
 
     def hasAdventHero(self):
         return self.__actionInfo is not None and self.__actionInfo.isEnabled
@@ -133,25 +132,19 @@ class HeroTankController(IHeroTankController):
                     return
                 self.__fullUpdate()
                 self.__updateSettings()
-                for vehIntCD in vehDiff:
-                    if vehIntCD == self.__currentTankCD:
-                        self.onUpdated()
-
             return
 
-    def __updateActionInfo(self, *_):
+    def __updateCalendarActionInfo(self, *_):
         self.__actionInfo = self.calendarController.getHeroAdventActionInfo()
         self.onUpdated()
 
     def __onServerSettingsChanged(self, diff):
         if _HERO_VEHICLES in diff:
             self.__updateSettings()
-            self.onUpdated()
 
     def __updateSettings(self):
         self.__data = {}
         heroVehiclesDict = self.lobbyContext.getServerSettings().getHeroVehicles()
-        self.__isEnabled = heroVehiclesDict.get('isEnabled', False)
         if 'vehicles' in heroVehiclesDict:
             heroVehicles = heroVehiclesDict['vehicles']
             for vCompDescr, vData in heroVehicles.iteritems():
@@ -164,6 +157,7 @@ class HeroTankController(IHeroTankController):
         self.onUpdated()
 
     def __applyActions(self):
+        hasHeroTankActions = False
         actions = self._eventsCache.getActions()
         for action in actions.itervalues():
             steps = action.getData().get('steps', [])
@@ -172,7 +166,10 @@ class HeroTankController(IHeroTankController):
             for step in steps:
                 if step.get('name') != _ADD_HERO_STEP_NAME:
                     continue
+                hasHeroTankActions = True
                 self.__addActionVehicle(step['params'])
+
+        return hasHeroTankActions
 
     def __addActionVehicle(self, params):
         vName = params.get('name')

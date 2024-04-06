@@ -2,6 +2,7 @@
 # Embedded file name: scripts/client/messenger/gui/Scaleform/view/battle/messenger_view.py
 import weakref
 import BigWorld
+from gui.battle_control import avatar_getter
 from helpers import dependency
 from helpers import i18n
 import BattleReplay
@@ -33,7 +34,7 @@ from skeletons.gui.battle_session import IBattleSessionProvider
 from ReplayEvents import g_replayEvents
 _UNKNOWN_RECEIVER_LABEL = 'N/A'
 _UNKNOWN_RECEIVER_ORDER = 100
-_CONSUMERS_LOCK_ENTER = (BATTLE_VIEW_ALIASES.RADIAL_MENU,)
+_CONSUMERS_LOCK_ENTER = (BATTLE_VIEW_ALIASES.RADIAL_MENU, BATTLE_VIEW_ALIASES.FULLSCREEN_MAP)
 
 def _getToolTipText(arenaVisitor):
     settings = g_settings.battle
@@ -245,6 +246,8 @@ class BattleMessengerView(BattleMessengerMeta, IBattleChannelView, IContactsAndP
             return
 
     def enableToSendMessage(self):
+        if self._arenaVisitor.getArenaBonusType() in (ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SOLO, ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SQUAD) and avatar_getter.isObserverSeesAll():
+            return
         self.__isEnabled = True
         self.as_enableToSendMessageS()
 
@@ -452,6 +455,10 @@ class BattleMessengerView(BattleMessengerMeta, IBattleChannelView, IContactsAndP
         else:
             self.__isFocused = False
             self.app.leaveGuiControlMode('chat')
+            ctrl = self.sessionProvider.shared.calloutCtrl
+            if ctrl is not None:
+                ctrl.resetRadialMenuData()
+        return
 
     def __restoreLastReceiverInBattle(self):
         if g_settings.userPrefs.storeReceiverInBattle:

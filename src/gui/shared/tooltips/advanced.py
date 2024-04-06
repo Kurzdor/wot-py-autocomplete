@@ -5,17 +5,16 @@ from gui.Scaleform.genConsts.BLOCKS_TOOLTIP_TYPES import BLOCKS_TOOLTIP_TYPES
 from gui.Scaleform.genConsts.FITTING_TYPES import FITTING_TYPES
 from gui.Scaleform.genConsts.STORE_CONSTANTS import STORE_CONSTANTS
 from gui.Scaleform.locale.ITEM_TYPES import ITEM_TYPES
-from gui.Scaleform.locale.MENU import MENU
 from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.goodies.goodie_items import DemountKit
 from gui.impl import backport
+from gui.impl.backport.backport_tooltip import DecoratedTooltipWindow
 from gui.impl.gen import R
 from gui.prb_control.settings import PREBATTLE_ACTION_NAME
 from gui.shared.formatters import text_styles
 from gui.shared.gui_items.artefacts import OptionalDevice
-from gui.shared.items_parameters import formatters as param_formatter
-from gui.shared.tooltips import formatters
+from gui.shared.tooltips import formatters, ToolTipBaseData
 from gui.shared.tooltips.common import BlocksTooltipData
 from helpers import dependency
 from helpers import i18n
@@ -111,13 +110,16 @@ class ComplexAdvanced(BaseAdvancedTooltip):
 
 class HangarShellAdvanced(BaseAdvancedTooltip):
     _MODERN_SUFFIX = '_MODERN'
+    _TRAY = '_TRAY'
 
     def _getBlocksList(self, *args, **kwargs):
-        movie = SHELL_MOVIES.get((self._item.type, self._item.isModernMechanics), None)
+        movie = SHELL_MOVIES.get((self._item.type, self._item.isModernMechanics, self._item.isDamageMutable()), None)
         header = backport.text(R.strings.tooltips.advanced.header.shellType.dyn(self._item.type, default=R.invalid)())
         description = self._item.type
         if self._item.isModernMechanics:
             description += self._MODERN_SUFFIX
+        if self._item.isDamageMutable():
+            description += self._TRAY
         return self._packAdvancedBlocks(movie, header, description)
 
 
@@ -127,11 +129,16 @@ class HangarBoosterAdvanced(BaseAdvancedTooltip):
         item = self._item
         itemId = item.getGUIEmblemID()
         header = self._item.userName
+        descReady = False
         if 'crewSkillBattleBooster' in item.tags:
             movie = SKILL_MOVIES[itemId]
+            affectedSkillName = item.getAffectedSkillName()
+            skillLocales = R.strings.crew_perks.dyn(affectedSkillName)
+            itemId = backport.text(skillLocales.shortDescription()) if skillLocales.isValid() else affectedSkillName
+            descReady = True
         else:
             movie = MODULE_MOVIES[itemId]
-        return self._packAdvancedBlocks(movie, header, itemId)
+        return self._packAdvancedBlocks(movie, header, itemId, descReady)
 
 
 class HangarModuleAdvanced(BaseAdvancedTooltip):
@@ -165,41 +172,23 @@ class HangarModuleAdvanced(BaseAdvancedTooltip):
 class TankmanPreviewTooltipAdvanced(BaseAdvancedTooltip):
 
     def _packBlocks(self, role, *args, **kwargs):
-        return self._packAdvancedBlocks(_TANKMAN_MOVIES[role], ITEM_TYPES.tankman_roles(role), role)
+        return self._packAdvancedBlocks(TANKMAN_MOVIES[role], ITEM_TYPES.tankman_roles(role), role)
 
 
-class TankmanTooltipAdvanced(BaseAdvancedTooltip):
-
-    def _getBlocksList(self, *args, **kwargs):
-        return self._packAdvancedBlocks(_TANKMAN_MOVIES[self._item.role], self._item.roleUserName, self._item.role)
-
-
-class SkillTooltipAdvanced(BaseAdvancedTooltip):
-
-    def _getBlocksList(self, *args, **kwargs):
-        return self._packAdvancedBlocks(SKILL_MOVIES[self._item.name], self._item.userName, self._item.name)
-
-
-class SkillExtendedTooltipAdvanced(BaseAdvancedTooltip):
-
-    def _getBlocksList(self, *args, **kwargs):
-        skillType = args[0]
-        return self._packAdvancedBlocks(SKILL_MOVIES[skillType], TOOLTIPS.skillTooltipHeader(skillType), skillType)
-
-
-class VehicleParametersAdvanced(BaseAdvancedTooltip):
+class VehicleParametersAdvanced(ToolTipBaseData):
     _movies = {'relativePower': 'statFirepower',
      'relativeArmor': 'statSurvivability',
      'relativeMobility': 'statMobility',
      'relativeCamouflage': 'statConcealment',
      'relativeVisibility': 'statSpotting'}
 
-    def _getBlocksList(self, paramName, *args, **kwargs):
-        return self._packAdvancedBlocks(VehicleParametersAdvanced._movies[paramName], MENU.tank_params(paramName), paramName)
+    def __init__(self, context):
+        super(VehicleParametersAdvanced, self).__init__(context, None)
+        return
 
-    @staticmethod
-    def readyForAdvanced(*args, **_):
-        return param_formatter.isRelativeParameter(args[0])
+    def getDisplayableData(self, paramName, *args, **kwargs):
+        from gui.impl.lobby.crew.tooltips.advanced_tooltip_view import AdvancedTooltipView
+        return DecoratedTooltipWindow(AdvancedTooltipView(self._movies[paramName], backport.text(R.strings.menu.tank_params.dyn(paramName)()), backport.text(R.strings.tooltips.advanced.dyn(paramName)())), useDecorator=False)
 
 
 class MoneyAndXpAdvanced(BaseAdvancedTooltip):
@@ -240,23 +229,31 @@ SKILL_MOVIES = {'repair': 'skillRepairs',
  'commander_universalist': 'skillJackOfAllTrades',
  'commander_expert': 'skillExpert',
  'commander_sixthSense': 'skillSixthSense',
+ 'commander_enemyShotPredictor': 'skillArtLamp',
+ 'commander_practical': 'skillPracticality',
  'gunner_rancorous': 'skillDesignatedTarget',
  'gunner_gunsmith': 'skillArmorer',
- 'gunner_sniper': 'skillDeadEye',
+ 'gunner_sniper': 'skillSniper',
  'gunner_smoothTurret': 'skillSnapShot',
+ 'gunner_focus': 'skillConcentration',
+ 'gunner_quickAiming': 'skillQuickAiming',
  'driver_rammingMaster': 'skillControlledImpact',
  'driver_badRoadsKing': 'skillOffRoadDriving',
  'driver_tidyPerson': 'skillPreventativeMaintenance',
  'driver_virtuoso': 'skillClutchBraking',
  'driver_smoothDriving': 'skillSmoothRide',
+ 'driver_motorExpert': 'skillMotorConnoisseur',
  'radioman_finder': 'skillSituationalAwareness',
  'radioman_lastEffort': 'skillCallForVengeance',
  'radioman_inventor': 'skillSignalBoosting',
  'radioman_retransmitter': 'skillRelaying',
+ 'radioman_interference': 'skillInterference',
  'loader_desperado': 'skillAdrenalineRush',
  'loader_pedant': 'skillSafeStowage',
  'loader_intuition': 'skillIntuition',
- 'commander_enemyShotPredictor': 'skillArtLamp'}
+ 'loader_ambushMaster': 'skillAmbushMaster',
+ 'loader_ammunitionImprove': 'skillShellImprovement',
+ 'loader_melee': 'skillCloseCombat'}
 MODULE_MOVIES = {'largeRepairkit': 'consumablesRepairKitBig',
  'smallRepairkit': 'consumablesRepairKitSmall',
  'largeMedkit': 'consumablesFirstAidBig',
@@ -316,13 +313,15 @@ MODULE_MOVIES = {'largeRepairkit': 'consumablesRepairKitBig',
  'additionalInvisibilityDevice': 'equipmentLowNoiseExhaustSystem',
  'improvedConfiguration': 'equipmentModifiedConfiguration',
  'turbocharger': 'equipmentTurbocharger'}
-_TANKMAN_MOVIES = {'commander': 'crewCommander',
+TANKMAN_MOVIES = {'commander': 'crewCommander',
  'driver': 'crewDriver',
  'gunner': 'crewGunner',
  'loader': 'crewLoader',
  'radioman': 'crewRadioOperator'}
-SHELL_MOVIES = {(SHELL_TYPES.ARMOR_PIERCING, False): 'bulletAP',
- (SHELL_TYPES.HOLLOW_CHARGE, False): 'bulletHEAT',
- (SHELL_TYPES.HIGH_EXPLOSIVE, False): 'bulletHE',
- (SHELL_TYPES.ARMOR_PIERCING_CR, False): 'bulletAPCR',
- (SHELL_TYPES.HIGH_EXPLOSIVE, True): 'bulletHEModern'}
+SHELL_MOVIES = {(SHELL_TYPES.ARMOR_PIERCING, False, False): 'bulletAP',
+ (SHELL_TYPES.HOLLOW_CHARGE, False, False): 'bulletHEAT',
+ (SHELL_TYPES.HIGH_EXPLOSIVE, False, False): 'bulletHE',
+ (SHELL_TYPES.ARMOR_PIERCING_CR, False, False): 'bulletAPCR',
+ (SHELL_TYPES.HIGH_EXPLOSIVE, True, False): 'bulletHEModern',
+ (SHELL_TYPES.ARMOR_PIERCING, False, True): 'bulletAPMutable',
+ (SHELL_TYPES.ARMOR_PIERCING_CR, False, True): 'bulletAPCRMutable'}

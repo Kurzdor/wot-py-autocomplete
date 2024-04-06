@@ -1,20 +1,20 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/shared/gui_items/processors/plugins.py
 import logging
+import typing
 from collections import namedtuple
 from functools import partial
-import typing
 import wg_async as future_async
 from account_helpers import isLongDisconnectedFromCenter
 from account_helpers.AccountSettings import AccountSettings
 from adisp import adisp_async, adisp_process
-from gui import DialogsInterface, makeHtmlString
+from constants import IS_EDITOR
+from gui import DialogsInterface, makeHtmlString, SystemMessages
 from gui.Scaleform.Waiting import Waiting
-from gui.Scaleform.daapi.view import dialogs
-from gui.Scaleform.daapi.view.dialogs import CheckBoxDialogMeta, CrewSkinsRemovalCompensationDialogMeta, CrewSkinsRemovalDialogMeta, DIALOG_BUTTON_ID, HtmlMessageDialogMeta, HtmlMessageLocalDialogMeta, I18nConfirmDialogMeta, I18nInfoDialogMeta, IconDialogMeta, IconPriceDialogMeta, PMConfirmationDialogMeta, TankmanOperationDialogMeta
+from gui.Scaleform.daapi.view.dialogs import CheckBoxDialogMeta, DIALOG_BUTTON_ID, HtmlMessageDialogMeta, HtmlMessageLocalDialogMeta, I18nConfirmDialogMeta, I18nInfoDialogMeta, IconDialogMeta, IconPriceDialogMeta, PMConfirmationDialogMeta
 from gui.Scaleform.daapi.view.dialogs.missions_dialogs_meta import UseAwardSheetDialogMeta
 from gui.Scaleform.locale.RES_ICONS import RES_ICONS
-from gui.game_control import restore_contoller
+from gui.SystemMessages import SM_TYPE
 from gui.goodies.demount_kit import getDemountKitForOptDevice
 from gui.impl import backport
 from gui.impl.gen import R
@@ -32,12 +32,15 @@ from helpers import dependency
 from items import tankmen
 from items.components import skills_constants
 from items.components.c11n_constants import SeasonType
-from skeletons.gui.game_control import IEpicBattleMetaGameController
+from skeletons.gui.game_control import IEpicBattleMetaGameController, IWotPlusController
 from skeletons.gui.goodies import IGoodiesCache
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.server_events import IEventsCache
 from skeletons.gui.shared import IItemsCache
 from soft_exception import SoftException
+if not IS_EDITOR:
+    from gui.impl.pub.dialog_window import DialogResult, DialogButtons, SingleDialogResult
+    from gui.impl.dialogs.gf_builders import ResDialogBuilder
 if typing.TYPE_CHECKING:
     from gui.shared.gui_items.Vehicle import Vehicle
     from post_progression_common import ACTION_TYPES
@@ -50,6 +53,10 @@ def makeSuccess(**kwargs):
 
 def makeError(msg='', **kwargs):
     return PluginResult(False, msg, kwargs)
+
+
+def showWarning(text, type=SM_TYPE.Warning):
+    SystemMessages.pushMessage(text=text, type=type)
 
 
 def _wrapHtmlMessage(message):
@@ -359,14 +366,18 @@ class VehicleSellsLeftValidator(SyncValidator):
 
 class BarracksSlotsValidator(SyncValidator):
 
-    def __init__(self, berthsNeeded=1, isEnabled=True):
+    def __init__(self, berthsNeeded=1, isEnabled=True, addWarning=False):
         super(BarracksSlotsValidator, self).__init__(isEnabled)
         self.berthsNeeded = berthsNeeded
+        self.addWarning = addWarning
 
     def _validate(self):
-        barracksTmen = self.itemsCache.items.getTankmen(~REQ_CRITERIA.TANKMAN.IN_TANK | REQ_CRITERIA.TANKMAN.ACTIVE)
-        tmenBerthsCount = self.itemsCache.items.stats.tankmenBerthsCount
-        return makeError('not_enough_space') if self.berthsNeeded > 0 and self.berthsNeeded > tmenBerthsCount - len(barracksTmen) else makeSuccess()
+        if 0 < self.berthsNeeded > self.itemsCache.items.freeTankmenBerthsCount():
+            if self.addWarning:
+                showWarning(text='', type=SM_TYPE.NotEnoughBerthWarning)
+            else:
+                return makeError('not_enough_space')
+        return makeSuccess()
 
 
 class FreeTankmanValidator(SyncValidator):
@@ -475,35 +486,6 @@ class BuyAndInstallConfirmator(ModuleBuyerConfirmator):
         return partial(showBuyModuleDialog, self.item, installedModule, self.ctx['currency'], self.ctx['installReason']) if itemTypeIdx in GUI_ITEM_TYPE.VEHICLE_MODULES else None
 
 
-class BCBuyAndInstallConfirmator(BuyAndInstallConfirmator):
-    _dialogsInterfaceMethod = staticmethod(DialogsInterface.showBCConfirmationDialog)
-    _BOOTCAM_LABELS_PATH = '../maps/icons/bootcamp/lines'
-    _VEHICLE_COMPONENTS_LABLES = {'vehicleChassis': 'bcChassis.png',
-     'vehicleTurret': 'bcTurret.png',
-     'vehicleGun': 'bcGun.png',
-     'vehicleRadio': 'bcRadio.png',
-     'vehicleWheels': 'bcWheels.png',
-     'vehicleEngine': 'bcEngine.png'}
-
-    def _gfMakeMeta(self):
-        return None
-
-    @staticmethod
-    def getPath(itemTypeName):
-        dataStr = ''
-        if itemTypeName in BCBuyAndInstallConfirmator._VEHICLE_COMPONENTS_LABLES:
-            dataStr = '/'.join((BCBuyAndInstallConfirmator._BOOTCAM_LABELS_PATH, BCBuyAndInstallConfirmator._VEHICLE_COMPONENTS_LABLES[itemTypeName]))
-        return dataStr
-
-    def _makeMeta(self):
-        dialogData = {'label': backport.text(R.strings.bootcamp.message.confirmBuyAndInstall.module.title()).format(self.item.longUserName),
-         'labelExecute': backport.text(R.strings.bootcamp.message.confirmBuyAndInstall.module.buttonLabel()),
-         'icon': BCBuyAndInstallConfirmator.getPath(self.item.itemTypeName),
-         'costValue': self.ctx['price'],
-         'isBuy': True}
-        return dialogs.BCConfirmDialogMeta(dialogData)
-
-
 class HtmlMessageConfirmator(I18nMessageAbstractConfirmator):
 
     def __init__(self, localeKey, metaPath, metaKey, ctx=None, activeHandler=None, isEnabled=True, sourceKey='text'):
@@ -515,33 +497,6 @@ class HtmlMessageConfirmator(I18nMessageAbstractConfirmator):
 
     def _makeMeta(self):
         return I18nConfirmDialogMeta(self.localeKey, self.ctx, self.ctx, meta=HtmlMessageDialogMeta(self.metaPath, self.metaKey, self.ctx, sourceKey=self.sourceKey), focusedID=DIALOG_BUTTON_ID.SUBMIT)
-
-
-class TankmanOperationConfirmator(I18nMessageAbstractConfirmator):
-
-    def __init__(self, localeKey, tankman):
-        super(TankmanOperationConfirmator, self).__init__(localeKey, tankman, None, True)
-        self.__previousPrice, _ = restore_contoller.getTankmenRestoreInfo(tankman)
-        return
-
-    @adisp_async
-    @adisp_process
-    def _confirm(self, callback):
-        if self._activeHandler():
-            isOk = yield DialogsInterface.showDialog(meta=self._makeMeta())
-            if isOk and self.__priceChanged():
-                isOk = yield DialogsInterface.showDialog(meta=self._makeMeta(True))
-            if not isOk:
-                callback(makeError())
-                return
-        callback(makeSuccess())
-
-    def _makeMeta(self, priceChanged=False):
-        return TankmanOperationDialogMeta(self.localeKey, self.ctx, focusedID=DIALOG_BUTTON_ID.SUBMIT, showPeriodEndWarning=priceChanged)
-
-    def __priceChanged(self):
-        price, _ = restore_contoller.getTankmenRestoreInfo(self.ctx)
-        return price != self.__previousPrice
 
 
 class BufferOverflowConfirmator(I18nMessageAbstractConfirmator):
@@ -559,22 +514,6 @@ class BufferOverflowConfirmator(I18nMessageAbstractConfirmator):
         if self.ctx.get('multiple'):
             msgContext['extraCount'] = self.ctx['extraCount']
         return I18nConfirmDialogMeta(self.localeKey, messageCtx=msgContext, focusedID=DIALOG_BUTTON_ID.SUBMIT)
-
-
-class CrewSkinsCompensationDialogConfirmator(I18nMessageAbstractConfirmator):
-
-    def __init__(self, localeKey, reasonSuffix, ctx=None, activeHandler=None, isEnabled=True):
-        super(CrewSkinsCompensationDialogConfirmator, self).__init__(localeKey, ctx, activeHandler, isEnabled)
-        self.reasonSuffix = reasonSuffix
-
-    def _makeMeta(self):
-        return CrewSkinsRemovalCompensationDialogMeta(self.localeKey, self.reasonSuffix, self.ctx, self.ctx, focusedID=DIALOG_BUTTON_ID.SUBMIT)
-
-
-class CrewSkinsRoleChangeRemovalConfirmator(I18nMessageAbstractConfirmator):
-
-    def _makeMeta(self):
-        return CrewSkinsRemovalDialogMeta(self.localeKey, self.ctx, self.ctx, focusedID=DIALOG_BUTTON_ID.SUBMIT)
 
 
 class IconPriceMessageConfirmator(I18nMessageAbstractConfirmator):
@@ -762,6 +701,20 @@ class CheckBoxConfirmator(DialogAbstractConfirmator):
         AccountSettings.setSettings(CheckBoxConfirmator.__ACC_SETT_MAIN_KEY, settings)
 
 
+class TmenXPAcceleratorConfirmator(AwaitConfirmator):
+
+    @future_async.wg_async
+    def _confirm(self, callback):
+        from gui.impl.dialogs import dialogs as dlg
+        builder = ResDialogBuilder()
+        builder.setMessagesAndButtons(R.strings.dialogs.xpToTmenCheckbox, buttons=R.strings.dialogs.xpToTmenCheckbox)
+        builder.setIcon(R.images.gui.maps.icons.tankmen.windows.crew_exp_speed_up())
+        result = yield future_async.wg_await(dlg.show(builder.build()))
+        if result.result != DialogButtons.SUBMIT:
+            callback(makeError())
+        callback(makeSuccess())
+
+
 class PMSelectConfirmator(CheckBoxConfirmator):
 
     def __init__(self, quest, oldQuest, settingFieldName, activeHandler=None, isEnabled=True):
@@ -894,7 +847,7 @@ class TankmanLockedValidator(SyncValidator):
         self._tankman = tankman
 
     def _validate(self):
-        return makeError('FORBIDDEN') if tankmen.ownVehicleHasTags(self._tankman.strCD, (VEHICLE_TAGS.CREW_LOCKED,)) else makeSuccess()
+        return makeError('FORBIDDEN') if self._tankman and tankmen.ownVehicleHasTags(self._tankman.strCD, (VEHICLE_TAGS.CREW_LOCKED,)) else makeSuccess()
 
 
 class TankmanChangePassportValidator(TankmanLockedValidator):
@@ -977,6 +930,21 @@ class DismountForDemountKitValidator(SyncValidator):
                 return makeError('demount_kit_disabled')
             spentDemountKits[demountKit.goodieID] = spentDemountKits.get(demountKit.goodieID, 0) + 1
             if demountKit.inventoryCount < spentDemountKits[demountKit.goodieID]:
+                return makeError()
+
+        return makeSuccess()
+
+
+class FreeToDemountValidator(SyncValidator):
+    _wotPlusCtrl = dependency.descriptor(IWotPlusController)
+
+    def __init__(self, itemsFreeToDemount):
+        super(FreeToDemountValidator, self).__init__(isEnabled=bool(itemsFreeToDemount))
+        self.itemsFreeToDemount = itemsFreeToDemount
+
+    def _validate(self):
+        for device in self.itemsFreeToDemount:
+            if not self._wotPlusCtrl.isFreeToDemount(device):
                 return makeError()
 
         return makeSuccess()
@@ -1217,3 +1185,43 @@ class PostProgressionSetSlotTypeValidator(SyncValidator):
         if not self.__vehicle.isRoleSlotActive:
             return makeError('role_slot_switch_unavailable')
         return makeError('role_slot_invalid_option') if self.__slotID not in [ slot.slotID for slot in self.__vehicle.optDevices.dynSlotTypeOptions ] else makeSuccess()
+
+
+class AsyncDialogConfirmator(AsyncConfirmator):
+
+    def __init__(self, dialogMethod, *args, **kwargs):
+        super(AsyncDialogConfirmator, self).__init__()
+        self.__dialogMethod = dialogMethod
+        self.__dialogArgs = args
+        self.__dialogKwargs = kwargs
+        self.__dialogResult = None
+        return
+
+    def getResult(self):
+        return self.__dialogResult
+
+    @adisp_async
+    def _confirm(self, callback):
+        self._makeConfirm(callback)
+
+    @future_async.wg_async
+    def _makeConfirm(self, callback):
+        Waiting.suspend()
+        dialog = self.__dialogMethod(*self.__dialogArgs, **self.__dialogKwargs)
+        self.__dialogResult = yield future_async.wg_await(dialog)
+        Waiting.resume()
+        if isinstance(self.__dialogResult, DialogResult):
+            result = self.__dialogResult.result in DialogButtons.ACCEPT_BUTTONS
+        elif isinstance(self.__dialogResult, SingleDialogResult):
+            if isinstance(self.__dialogResult.result, tuple):
+                result, _ = self.__dialogResult.result
+            else:
+                result = self.__dialogResult.result
+        elif isinstance(self.__dialogResult, tuple):
+            result, _ = self.__dialogResult
+        else:
+            result = self.__dialogResult
+        if result:
+            callback(makeSuccess())
+            return
+        callback(makeError())

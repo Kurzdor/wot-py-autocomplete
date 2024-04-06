@@ -3,6 +3,8 @@
 import typing
 import logging
 from collections import namedtuple
+from gui.collection.collections_constants import COLLECTION_ITEM_PREFIX_NAME
+from gui.server_events.bonuses import BattleTokensBonus
 from items import makeIntCompactDescrByID
 from optional_bonuses import BONUS_MERGERS
 from skeletons.gui.shared import IItemsCache
@@ -74,3 +76,15 @@ _CustomizationItemData = namedtuple('_CustomizationItemData', ('guiItemType', 'u
 def getDefaultMessage(normal='', bold=''):
     return g_settings.msgTemplates.format(DEFAULT_MESSAGE, {'normal': normal,
      'bold': bold})
+
+
+def popCollectionEntitlements(rewards):
+    entitlements = {name:data for name, data in rewards['entitlements'].iteritems() if name.startswith(COLLECTION_ITEM_PREFIX_NAME)} if 'entitlements' in rewards else {}
+    for eName in entitlements.iterkeys():
+        rewards['entitlements'].pop(eName)
+
+    return entitlements
+
+
+def parseTokenBonusCount(bonus, tokenName):
+    return bonus.getValue().get(tokenName, {}).get('count', 0) if isinstance(bonus, BattleTokensBonus) else 0

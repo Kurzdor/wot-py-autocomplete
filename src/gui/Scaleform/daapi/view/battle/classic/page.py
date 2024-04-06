@@ -2,7 +2,7 @@
 # Embedded file name: scripts/client/gui/Scaleform/daapi/view/battle/classic/page.py
 from aih_constants import CTRL_MODE_NAME
 from constants import ARENA_PERIOD
-from debug_utils import LOG_DEBUG
+from debug_utils import LOG_DEBUG, LOG_ERROR
 from gui.Scaleform.daapi.view.battle.shared import SharedPage, finish_sound_player, drone_music_player
 from gui.Scaleform.daapi.view.battle.shared.page import ComponentsConfig
 from gui.Scaleform.daapi.view.battle.shared.start_countdown_sound_player import StartCountdownSoundPlayer
@@ -17,10 +17,10 @@ class DynamicAliases(CONST_CONTAINER):
     DRONE_MUSIC_PLAYER = 'droneMusicPlayer'
 
 
-class _ClassicComponentsConfig(ComponentsConfig):
+class ClassicComponentsConfig(ComponentsConfig):
 
     def __init__(self):
-        super(_ClassicComponentsConfig, self).__init__(((BATTLE_CTRL_ID.ARENA_PERIOD, (BATTLE_VIEW_ALIASES.BATTLE_TIMER,
+        super(ClassicComponentsConfig, self).__init__(((BATTLE_CTRL_ID.ARENA_PERIOD, (BATTLE_VIEW_ALIASES.BATTLE_TIMER,
            BATTLE_VIEW_ALIASES.PREBATTLE_TIMER,
            DynamicAliases.PREBATTLE_TIMER_SOUND_PLAYER,
            BATTLE_VIEW_ALIASES.PLAYERS_PANEL,
@@ -28,6 +28,7 @@ class _ClassicComponentsConfig(ComponentsConfig):
            BATTLE_VIEW_ALIASES.HINT_PANEL,
            BATTLE_VIEW_ALIASES.PREBATTLE_AMMUNITION_PANEL,
            DynamicAliases.DRONE_MUSIC_PLAYER)),
+         (BATTLE_CTRL_ID.PERKS, (BATTLE_VIEW_ALIASES.PERKS_PANEL,)),
          (BATTLE_CTRL_ID.TEAM_BASES, (BATTLE_VIEW_ALIASES.TEAM_BASES_PANEL, DynamicAliases.DRONE_MUSIC_PLAYER)),
          (BATTLE_CTRL_ID.CALLOUT, (BATTLE_VIEW_ALIASES.CALLOUT_PANEL,)),
          (BATTLE_CTRL_ID.MAPS, (BATTLE_VIEW_ALIASES.MINIMAP,)),
@@ -35,11 +36,13 @@ class _ClassicComponentsConfig(ComponentsConfig):
          (BATTLE_CTRL_ID.BATTLE_FIELD_CTRL, (DynamicAliases.DRONE_MUSIC_PLAYER, BATTLE_VIEW_ALIASES.FRAG_CORRELATION_BAR, BATTLE_VIEW_ALIASES.PLAYERS_PANEL)),
          (BATTLE_CTRL_ID.ARENA_LOAD_PROGRESS, (DynamicAliases.DRONE_MUSIC_PLAYER,)),
          (BATTLE_CTRL_ID.GAME_MESSAGES_PANEL, (BATTLE_VIEW_ALIASES.GAME_MESSAGES_PANEL,)),
+         (BATTLE_CTRL_ID.SPECTATOR, (BATTLE_VIEW_ALIASES.SPECTATOR_VIEW,)),
          (BATTLE_CTRL_ID.PREBATTLE_SETUPS_CTRL, (BATTLE_VIEW_ALIASES.PREBATTLE_AMMUNITION_PANEL, BATTLE_VIEW_ALIASES.DAMAGE_PANEL)),
          (BATTLE_CTRL_ID.AMMO, (BATTLE_VIEW_ALIASES.PREBATTLE_AMMUNITION_PANEL, BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL))), viewsConfig=((DynamicAliases.DRONE_MUSIC_PLAYER, drone_music_player.DroneMusicPlayer), (DynamicAliases.PREBATTLE_TIMER_SOUND_PLAYER, StartCountdownSoundPlayer)))
 
 
-COMMON_CLASSIC_CONFIG = _ClassicComponentsConfig()
+BATTLE_HINTS_CONFIG = ComponentsConfig(config=((BATTLE_CTRL_ID.BATTLE_HINTS, (BATTLE_VIEW_ALIASES.BATTLE_HINT, BATTLE_VIEW_ALIASES.NEWBIE_HINT)),), viewsConfig=())
+COMMON_CLASSIC_CONFIG = ClassicComponentsConfig() + BATTLE_HINTS_CONFIG
 EXTENDED_CLASSIC_CONFIG = COMMON_CLASSIC_CONFIG + ComponentsConfig(config=((BATTLE_CTRL_ID.ARENA_PERIOD, (DynamicAliases.FINISH_SOUND_PLAYER,)), (BATTLE_CTRL_ID.TEAM_BASES, (DynamicAliases.FINISH_SOUND_PLAYER,)), (BATTLE_CTRL_ID.BATTLE_FIELD_CTRL, (DynamicAliases.FINISH_SOUND_PLAYER,))), viewsConfig=((DynamicAliases.FINISH_SOUND_PLAYER, finish_sound_player.FinishSoundPlayer),))
 
 class ClassicPage(SharedPage):
@@ -56,6 +59,7 @@ class ClassicPage(SharedPage):
 
     def _toggleRadialMenu(self, isShown, allowAction=True):
         radialMenuLinkage = BATTLE_VIEW_ALIASES.RADIAL_MENU
+        newbieHintLinkage = BATTLE_VIEW_ALIASES.NEWBIE_HINT
         radialMenu = self.getComponent(radialMenuLinkage)
         if radialMenu is None:
             return
@@ -65,14 +69,18 @@ class ClassicPage(SharedPage):
             if isShown:
                 radialMenu.show()
                 self.app.enterGuiControlMode(radialMenuLinkage, cursorVisible=False, enableAiming=False)
+                if newbieHintLinkage in self.components:
+                    self._setComponentsVisibility(hidden={newbieHintLinkage})
             else:
                 self.app.leaveGuiControlMode(radialMenuLinkage)
                 radialMenu.hide(allowAction)
+                if newbieHintLinkage in self.components:
+                    self._setComponentsVisibility(visible={newbieHintLinkage})
             return
 
     def _toggleFullStats(self, isShown, permanent=None, tabAlias=None):
         manager = self.app.containerManager
-        if manager.isModalViewsIsExists():
+        if manager.isModalViewsIsExists() and isShown:
             return
         elif not self._fullStatsAlias:
             return
@@ -102,10 +110,6 @@ class ClassicPage(SharedPage):
                     if doTabSwitch:
                         fullStats.setActiveTab(None)
                     self._fsToggling.clear()
-                if self._isInPostmortem:
-                    self.as_setPostmortemTipsVisibleS(not isShown)
-                    if self.__hideDamageLogPanel():
-                        self._setComponentsVisibility(hidden={BATTLE_VIEW_ALIASES.BATTLE_DAMAGE_LOG_PANEL})
             if isShown:
                 self.app.enterGuiControlMode(BATTLE_VIEW_ALIASES.FULL_STATS, cursorVisible=True, enableAiming=False)
             else:
@@ -189,33 +193,81 @@ class ClassicPage(SharedPage):
         if not self._fullStatsAlias or not self.as_isComponentVisibleS(self._fullStatsAlias):
             self._toggleGuiVisible()
 
+    def _onRespawnBaseMoving(self):
+        super(ClassicPage, self)._onRespawnBaseMoving()
+        if not self._canShowPostmortemTips:
+            return
+        if self._fullStatsAlias and self.as_isComponentVisibleS(self._fullStatsAlias):
+            self._fsToggling.discard(BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL)
+            self._fsToggling.add(BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL)
+        else:
+            self._reloadPostmortem()
+
+    def _hasCalloutPanel(self):
+        return True
+
     def _switchToPostmortem(self):
         super(ClassicPage, self)._switchToPostmortem()
         ctrl = self.sessionProvider.shared.calloutCtrl
         if ctrl is not None and ctrl.isRadialMenuOpened():
             self._toggleRadialMenu(False)
-        if self.as_isComponentVisibleS(BATTLE_VIEW_ALIASES.CALLOUT_PANEL):
+        if self._hasCalloutPanel() and self.as_isComponentVisibleS(BATTLE_VIEW_ALIASES.CALLOUT_PANEL):
             self._processCallout(needShow=False)
+        self._toggleFullStats(isShown=False)
+        if self._fullStatsAlias and self.as_isComponentVisibleS(self._fullStatsAlias):
+            self._setComponentsVisibility(hidden={BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL})
+            self._fsToggling.add(BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL)
         return
 
+    def _onPostMortemSwitched(self, noRespawnPossible, respawnAvailable):
+        super(ClassicPage, self)._onPostMortemSwitched(noRespawnPossible, respawnAvailable)
+        if self.sessionProvider.getCtx().isPlayerObserver():
+            self.as_onPostmortemActiveS(False)
+
     def _changeCtrlMode(self, ctrlMode):
-
-        def invalidateSiegeVehicle(vehicleType):
-            return (vehicleType.hasSiegeMode or vehicleType.isTrackWithinTrack) and not vehicleType.isWheeledVehicle and not vehicleType.isDualgunVehicle
-
-        components = {BATTLE_VIEW_ALIASES.DAMAGE_PANEL, BATTLE_VIEW_ALIASES.BATTLE_DAMAGE_LOG_PANEL, BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL}
-        if ctrlMode != CTRL_MODE_NAME.POSTMORTEM:
-            ctrl = self.sessionProvider.shared.vehicleState
-            vehicle = ctrl.getControllingVehicle()
-            if vehicle and invalidateSiegeVehicle(vehicle.typeDescriptor):
-                components.add(BATTLE_VIEW_ALIASES.SIEGE_MODE_INDICATOR)
-            if vehicle and vehicle.typeDescriptor.hasRocketAcceleration:
-                components.add(BATTLE_VIEW_ALIASES.ROCKET_ACCELERATOR_INDICATOR)
+        components = self._getComponentsVideoModeSwitching(ctrlMode)
+        battleCtx = self.sessionProvider.getCtx()
+        if battleCtx.isPlayerObserver():
+            self._setComponentsVisibility(hidden={BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL})
         if ctrlMode == CTRL_MODE_NAME.VIDEO:
             self._setComponentsVisibility(hidden=components)
         else:
             self._setComponentsVisibility(visible=components)
 
+    def _getComponentsVideoModeSwitching(self, ctrlMode):
+
+        def invalidateSiegeVehicle(vehicleDescriptor):
+            vehicleType = vehicleDescriptor.type
+            return (vehicleType.hasSiegeMode or vehicleDescriptor.isTrackWithinTrack) and not vehicleType.isWheeledVehicle and not vehicleDescriptor.isDualgunVehicle
+
+        if ctrlMode == CTRL_MODE_NAME.DEATH_FREE_CAM:
+            components = {BATTLE_VIEW_ALIASES.SPECTATOR_VIEW}
+        elif ctrlMode in (CTRL_MODE_NAME.KILL_CAM, CTRL_MODE_NAME.POSTMORTEM):
+            components = {BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL, BATTLE_VIEW_ALIASES.DAMAGE_PANEL, BATTLE_VIEW_ALIASES.BATTLE_DAMAGE_LOG_PANEL}
+        else:
+            components = {BATTLE_VIEW_ALIASES.DAMAGE_PANEL, BATTLE_VIEW_ALIASES.BATTLE_DAMAGE_LOG_PANEL, BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL}
+        if ctrlMode not in CTRL_MODE_NAME.POSTMORTEM_CONTROL_MODES:
+            ctrl = self.sessionProvider.shared.vehicleState
+            vehicle = ctrl.getControllingVehicle()
+            if vehicle is None:
+                LOG_ERROR('classic/page.py _changeCtrlMode vehicle is None in replay!')
+            if vehicle is not None and invalidateSiegeVehicle(vehicle.typeDescriptor):
+                components.add(BATTLE_VIEW_ALIASES.SIEGE_MODE_INDICATOR)
+            if vehicle and vehicle.typeDescriptor.hasRocketAcceleration:
+                components.add(BATTLE_VIEW_ALIASES.ROCKET_ACCELERATOR_INDICATOR)
+        battleCtx = self.sessionProvider.getCtx()
+        if battleCtx.isPlayerObserver():
+            components.discard(BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL)
+        return components
+
     def __hideDamageLogPanel(self):
         damageLogPanel = self.getComponent(BATTLE_VIEW_ALIASES.BATTLE_DAMAGE_LOG_PANEL)
         return not damageLogPanel.isSwitchToVehicle()
+
+    def _onKillCamSimulationStart(self):
+        self._toggleFullStats(isShown=False)
+        super(ClassicPage, self)._onKillCamSimulationStart()
+
+    def _onKillCamSimulationFinish(self):
+        self._toggleFullStats(isShown=False)
+        super(ClassicPage, self)._onKillCamSimulationFinish()

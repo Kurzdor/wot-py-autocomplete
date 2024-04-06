@@ -3,7 +3,7 @@
 from itertools import chain
 import logging
 import typing
-from constants import MAX_VEHICLE_LEVEL, MIN_VEHICLE_LEVEL
+from constants import MAX_VEHICLE_LEVEL, MIN_VEHICLE_LEVEL, BATTLE_MODE_VEHICLE_TAGS
 from gui.ClientUpdateManager import g_clientUpdateManager
 from gui.prb_control.ctrl_events import g_prbCtrlEvents
 from gui.shared.gui_items.Vehicle import Vehicle
@@ -13,6 +13,8 @@ from skeletons.gui.shared import IItemsCache
 _logger = logging.getLogger(__name__)
 
 class BaseVehiclesWatcher(object):
+    __itemsCache = dependency.descriptor(IItemsCache)
+    _BATTLE_MODE_VEHICLE_TAGS = BATTLE_MODE_VEHICLE_TAGS
     _VEH_STATE_PRIORITIES = {Vehicle.VEHICLE_STATE.UNSUITABLE_TO_QUEUE: 0}
 
     def __init__(self):
@@ -32,7 +34,10 @@ class BaseVehiclesWatcher(object):
         _logger.info("BaseVehiclesWatcher:stop() self = '%r'", self)
 
     def _getUnsuitableVehicles(self, onClear=False):
-        raise NotImplementedError
+        return self._getUnsuitableVehiclesBase()
+
+    def _getUnsuitableVehiclesBase(self):
+        return self.__itemsCache.items.getVehicles(REQ_CRITERIA.INVENTORY | REQ_CRITERIA.VEHICLE.HAS_ANY_TAG(self._BATTLE_MODE_VEHICLE_TAGS)).itervalues()
 
     def _update(self, *_):
         if self._isWatching:
@@ -40,6 +45,16 @@ class BaseVehiclesWatcher(object):
 
     def _getVehiclesCustomStates(self, onClear=False):
         return {Vehicle.VEHICLE_STATE.UNSUITABLE_TO_QUEUE: self._getUnsuitableVehicles(onClear)}
+
+    def _clearCustomsStates(self):
+        vehicles = [ v for vehicles in self._getVehiclesCustomStates(True).itervalues() for v in vehicles ]
+        intCDs = set()
+        for vehicle in vehicles:
+            vehicle.clearCustomState()
+            intCDs.add(vehicle.intCD)
+
+        if intCDs:
+            g_prbCtrlEvents.onVehicleClientStateChanged(intCDs)
 
     def __setCustomStates(self):
         states = self._getVehiclesCustomStates()
@@ -50,16 +65,6 @@ class BaseVehiclesWatcher(object):
                     continue
                 vehicle.setCustomState(state)
                 intCDs.add(vehicle.intCD)
-
-        if intCDs:
-            g_prbCtrlEvents.onVehicleClientStateChanged(intCDs)
-
-    def _clearCustomsStates(self):
-        vehicles = [ v for vehicles in self._getVehiclesCustomStates(True).itervalues() for v in vehicles ]
-        intCDs = set()
-        for vehicle in vehicles:
-            vehicle.clearCustomState()
-            intCDs.add(vehicle.intCD)
 
         if intCDs:
             g_prbCtrlEvents.onVehicleClientStateChanged(intCDs)
@@ -94,35 +99,46 @@ class LimitedLevelVehiclesWatcher(BaseVehiclesWatcher):
         raise NotImplementedError
 
 
-class ForbiddenVehiclesWatcher(BaseVehiclesWatcher):
+class RestrictedVehiclesWatcher(BaseVehiclesWatcher):
     __itemsCache = dependency.descriptor(IItemsCache)
 
     def __init__(self):
-        super(ForbiddenVehiclesWatcher, self).__init__()
-        self.__forbiddenVehicleClasses = None
+        super(RestrictedVehiclesWatcher, self).__init__()
+        self.__allowedVehicleTypes = None
         self.__forbiddenVehicleTypes = None
+        self.__forbiddenVehicleClasses = None
         return
 
     def stop(self):
-        super(ForbiddenVehiclesWatcher, self).stop()
-        self.__forbiddenVehicleTypes = None
+        super(RestrictedVehiclesWatcher, self).stop()
         self.__forbiddenVehicleClasses = None
+        self.__forbiddenVehicleTypes = None
+        self.__allowedVehicleTypes = None
         return
 
     def _getUnsuitableVehicles(self, onClear=False):
+        newAllowedTypes = self._getAllowedVehicleTypes()
         newForbiddenTypes = self._getForbiddenVehicleTypes()
         newForbiddenClasses = self._getForbiddenVehicleClasses()
-        forbiddenListChanged = newForbiddenTypes != self.__forbiddenVehicleTypes or newForbiddenClasses != self.__forbiddenVehicleClasses
-        if forbiddenListChanged and not onClear:
+        restrictedListChanged = newAllowedTypes != self.__allowedVehicleTypes
+        restrictedListChanged = restrictedListChanged or newForbiddenTypes != self.__forbiddenVehicleTypes
+        restrictedListChanged = restrictedListChanged or newForbiddenClasses != self.__forbiddenVehicleClasses
+        if restrictedListChanged and not onClear:
             self._clearCustomsStates()
-        self.__forbiddenVehicleTypes = self.__forbiddenVehicleTypes if onClear else newForbiddenTypes
-        self.__forbiddenVehicleClasses = self.__forbiddenVehicleClasses if onClear else newForbiddenClasses
-        classVehs = self.__itemsCache.items.getVehicles(REQ_CRITERIA.INVENTORY | REQ_CRITERIA.VEHICLE.CLASSES(self.__forbiddenVehicleClasses)).itervalues() if self.__forbiddenVehicleClasses is not None else []
-        typeVehs = self.__itemsCache.items.getVehicles(REQ_CRITERIA.INVENTORY | REQ_CRITERIA.VEHICLE.SPECIFIC_BY_CD(self.__forbiddenVehicleTypes)).itervalues() if self.__forbiddenVehicleTypes is not None else []
-        return chain(classVehs, typeVehs)
+        if not onClear:
+            self.__allowedVehicleTypes = newAllowedTypes
+            self.__forbiddenVehicleTypes = newForbiddenTypes
+            self.__forbiddenVehicleClasses = newForbiddenClasses
+        notAllowedTypeVehs = self.__itemsCache.items.getVehicles(REQ_CRITERIA.INVENTORY | ~REQ_CRITERIA.VEHICLE.SPECIFIC_BY_CD(self.__allowedVehicleTypes)).itervalues() if self.__allowedVehicleTypes else []
+        forbiddenTypeVehs = self.__itemsCache.items.getVehicles(REQ_CRITERIA.INVENTORY | REQ_CRITERIA.VEHICLE.SPECIFIC_BY_CD(self.__forbiddenVehicleTypes)).itervalues() if self.__forbiddenVehicleTypes else []
+        forbiddenClassVehs = self.__itemsCache.items.getVehicles(REQ_CRITERIA.INVENTORY | REQ_CRITERIA.VEHICLE.CLASSES(self.__forbiddenVehicleClasses)).itervalues() if self.__forbiddenVehicleClasses else []
+        return chain(forbiddenClassVehs, notAllowedTypeVehs, forbiddenTypeVehs)
 
-    def _getForbiddenVehicleClasses(self):
-        raise NotImplementedError
+    def _getAllowedVehicleTypes(self):
+        return None
 
     def _getForbiddenVehicleTypes(self):
-        raise NotImplementedError
+        return None
+
+    def _getForbiddenVehicleClasses(self):
+        return None

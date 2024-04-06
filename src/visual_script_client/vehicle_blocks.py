@@ -4,11 +4,16 @@ import weakref
 import random
 import BigWorld
 import GenericComponents
-from visual_script.block import Block, EDITOR_TYPE, InitParam, buildStrKeysValue
+from visual_script.block import Block, InitParam, buildStrKeysValue
 from visual_script.slot_types import SLOT_TYPE
-from visual_script.misc import ASPECT, errorVScript
+from visual_script.misc import ASPECT, EDITOR_TYPE, errorVScript
 from visual_script.tunable_event_block import TunableEventBlock
 from visual_script.vehicle_blocks import VehicleMeta
+from visual_script.vehicle_blocks_bases import NoCrewCriticalBase, OptionalDevicesBase, VehicleClassBase, GunTypeInfoBase, VehicleForwardSpeedBase, VehicleCooldownEquipmentBase, VehicleClipFullAndReadyBase, GetTankOptDevicesHPModBase, IsInHangarBase, VehicleRadioDistanceBase, NoInnerDeviceDamagedBase
+from constants import IS_VS_EDITOR, VEHICLE_CLASSES
+if not IS_VS_EDITOR:
+    from helpers import dependency, isPlayerAccount
+    from skeletons.gui.shared import IItemsCache
 
 class GetVehicleLabel(Block, VehicleMeta):
 
@@ -50,7 +55,8 @@ class OnAnyVehicleDestroyed(TunableEventBlock, VehicleMeta):
             errorVScript(self, 'can not subscribe on event')
 
     def onFinishScript(self):
-        BigWorld.player().arena.onVehicleKilled -= self.__onVehicleKilled
+        if hasattr(BigWorld.player(), 'arena'):
+            BigWorld.player().arena.onVehicleKilled -= self.__onVehicleKilled
 
     @TunableEventBlock.eventProcessor
     def __onVehicleKilled(self, targetID, attackerID, equipmentID, reason, numVehiclesAffected):
@@ -96,7 +102,8 @@ class OnAnyVehicleDamaged(TunableEventBlock, VehicleMeta):
             errorVScript(self, 'can not subscribe on event')
 
     def onFinishScript(self):
-        BigWorld.player().arena.onVehicleHealthChanged -= self.__onDamageReceived
+        if hasattr(BigWorld.player(), 'arena'):
+            BigWorld.player().arena.onVehicleHealthChanged -= self.__onDamageReceived
 
     @TunableEventBlock.eventProcessor
     def __onDamageReceived(self, vehicleId, attackerId, damage):
@@ -133,6 +140,122 @@ class IsVehicleBurning(Block, VehicleMeta):
     def _exec(self):
         v = self._vehicle.getValue()
         self._res.setValue(v.isOnFire())
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class NoCrewCritical(NoCrewCriticalBase):
+
+    def _execute(self):
+        self._outSlot.setValue(True)
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class NoInnerDeviceDamaged(NoInnerDeviceDamagedBase):
+
+    def _execute(self):
+        self._outSlot.setValue(True)
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class OptionalDevices(OptionalDevicesBase):
+
+    def _execute(self):
+        self._outSlot.setValue([])
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class GetTankOptDevicesHPMod(GetTankOptDevicesHPModBase):
+
+    def _execute(self):
+        self._outSlot.setValue(1.0)
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class VehicleClass(VehicleClassBase):
+
+    def _execute(self):
+        if isPlayerAccount():
+            from CurrentVehicle import g_currentVehicle
+            itemsCache = dependency.instance(IItemsCache)
+            vehicle = self._vehicle.getValue()
+            vehId = vehicle.vehicleID
+            if g_currentVehicle.item and g_currentVehicle.item.descriptor.type.compactDescr == vehId:
+                vehicle = g_currentVehicle.item
+            else:
+                vehicle = itemsCache.items.getItemByCD(vehId)
+            self._outSlot.setValue(next(iter(vehicle.type)))
+        else:
+            avatar = BigWorld.player()
+            if avatar:
+                tags = avatar.vehicleTypeDescriptor.type.tags
+                self._outSlot.setValue(next((classTag for classTag in VEHICLE_CLASSES if classTag in tags), ''))
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT, ASPECT.HANGAR]
+
+
+class GunTypeInfo(GunTypeInfoBase):
+
+    def _execute(self):
+        self._outSlot.setValue([])
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class VehicleForwardSpeed(VehicleForwardSpeedBase):
+
+    def _execute(self):
+        self._outSlot.setValue(0.0)
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class VehicleCooldownEquipment(VehicleCooldownEquipmentBase):
+
+    def _execute(self):
+        if isPlayerAccount():
+            from CurrentVehicle import g_currentVehicle
+            itemsCache = dependency.instance(IItemsCache)
+            vehicle = self._vehicle.getValue()
+            vehIntId = vehicle.vehicleID
+            if g_currentVehicle.item and g_currentVehicle.item.descriptor.type.compactDescr == vehIntId:
+                vehicle = g_currentVehicle.item
+            else:
+                vehicle = itemsCache.items.getItemByCD(vehIntId)
+            eqs = vehicle.getCooldownEquipment()
+            self._outSlot.setValue(eqs)
+        else:
+            self._outSlot.setValue([])
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class VehicleClipFullAndReady(VehicleClipFullAndReadyBase):
+
+    def _execute(self):
+        self._outSlot.setValue(True)
 
     @classmethod
     def blockAspects(cls):
@@ -234,6 +357,42 @@ class GameObjectToVehicle(Block, VehicleMeta):
                 return
             self._vehicle.setValue(weakref.proxy(goSyncComponent.entity))
             return
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class IsInHangar(IsInHangarBase):
+
+    def _execute(self):
+        self._outSlot.setValue(isPlayerAccount())
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class VehicleRadioDistance(VehicleRadioDistanceBase):
+
+    def _execute(self):
+        self._outSlot.setValue(256.0)
+
+    @classmethod
+    def blockAspects(cls):
+        return [ASPECT.CLIENT]
+
+
+class GetVehicleTier(Block):
+
+    def __init__(self, *args, **kwargs):
+        super(GetVehicleTier, self).__init__(*args, **kwargs)
+        self._vehicle = self._makeDataInputSlot('vehicle', SLOT_TYPE.VEHICLE)
+        self._outSlot = self._makeDataOutputSlot('tier', SLOT_TYPE.INT, self._execute)
+
+    def _execute(self):
+        v = self._vehicle.getValue()
+        self._outSlot.setValue(v.typeDescriptor.level)
 
     @classmethod
     def blockAspects(cls):

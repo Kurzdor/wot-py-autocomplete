@@ -68,6 +68,8 @@ _UNCOUNTABLE_ITEM_TYPE = {ItemPackType.CUSTOM_PREMIUM,
  ItemPackType.CUSTOM_GOLD,
  ItemPackType.CUSTOM_EVENT_COIN,
  ItemPackType.CUSTOM_EVENT_COIN_EXTERNAL,
+ ItemPackType.CUSTOM_EQUIP_COIN,
+ ItemPackType.CUSTOM_EQUIP_COIN_EXTERNAL,
  ItemPackType.CUSTOM_BPCOIN}
 _PACK_ITEMS_SORT_ORDER = list(itertools.chain(ItemPackTypeGroup.DISCOUNT, ItemPackTypeGroup.CUSTOM, ItemPackTypeGroup.TOKEN, ItemPackTypeGroup.GOODIE, ItemPackTypeGroup.CREW, ItemPackTypeGroup.STYLE, ItemPackTypeGroup.CAMOUFLAGE, ItemPackTypeGroup.DECAL, ItemPackTypeGroup.MODIFICATION, ItemPackTypeGroup.PAINT, ItemPackTypeGroup.ITEM, ItemPackTypeGroup.OFFER))
 _TOOLTIP_TYPE = {ItemPackType.ITEM_DEVICE: TOOLTIPS_CONSTANTS.SHOP_MODULE,
@@ -106,6 +108,7 @@ _TOOLTIP_TYPE = {ItemPackType.ITEM_DEVICE: TOOLTIPS_CONSTANTS.SHOP_MODULE,
  ItemPackType.PLAYER_BADGE: TOOLTIPS_CONSTANTS.SHOP_BADGE,
  ItemPackType.TRADE_IN_INFO: TOOLTIPS_CONSTANTS.TRADE_IN_INFO,
  ItemPackType.CREW_BUNDLE: TOOLTIPS_CONSTANTS.SHOP_CREW_BUNDLE,
+ ItemPackType.ITEM_CREW_SKIN: TOOLTIPS_CONSTANTS.CREW_SKIN,
  ItemPackType.CREW_BOOK: TOOLTIPS_CONSTANTS.CREW_BOOK,
  ItemPackType.CREW_BOOK_BROCHURE: TOOLTIPS_CONSTANTS.CREW_BOOK,
  ItemPackType.CREW_BOOK_GUIDE: TOOLTIPS_CONSTANTS.CREW_BOOK,
@@ -142,6 +145,8 @@ _ICONS = {ItemPackType.CAMOUFLAGE_ALL: RES_SHOP.MAPS_SHOP_REWARDS_48X48_PRIZE_CA
  ItemPackType.CUSTOM_CRYSTAL: RES_SHOP.MAPS_SHOP_REWARDS_48X48_MONEY_BONDS,
  ItemPackType.CUSTOM_EVENT_COIN: RES_SHOP.MAPS_SHOP_REWARDS_48X48_MONEY_EVENT_COIN,
  ItemPackType.CUSTOM_EVENT_COIN_EXTERNAL: RES_SHOP.MAPS_SHOP_REWARDS_48X48_MONEY_EVENT_COIN,
+ ItemPackType.CUSTOM_EQUIP_COIN: RES_SHOP.MAPS_SHOP_REWARDS_48X48_EQUIPCOIN,
+ ItemPackType.CUSTOM_EQUIP_COIN_EXTERNAL: RES_SHOP.MAPS_SHOP_REWARDS_48X48_EQUIPCOIN,
  ItemPackType.CUSTOM_BPCOIN: RES_SHOP.MAPS_SHOP_REWARDS_48X48_MONEY_BPCOIN,
  ItemPackType.CUSTOM_SLOT: RES_SHOP.MAPS_SHOP_REWARDS_48X48_PRIZE_HANGARSLOT,
  ItemPackType.CUSTOM_REFERRAL_CREW: RES_SHOP.MAPS_SHOP_REWARDS_48X48_PRIZECREW,
@@ -284,6 +289,8 @@ def getItemTitle(rawItem, item, forBox=False, additionalInfo=False):
         title = _ms(key=QUESTS.BONUSES_EVENTCOIN_DESCRIPTION, value=rawItem.count)
     elif rawItem.type == ItemPackType.CUSTOM_BPCOIN:
         title = backport.text(R.strings.quests.bonuses.bpcoin.header(), value=backport.getIntegralFormat(rawItem.count))
+    elif rawItem.type in (ItemPackType.CUSTOM_EQUIP_COIN, ItemPackType.CUSTOM_EQUIP_COIN_EXTERNAL):
+        title = backport.text(R.strings.quests.bonuses.equipCoin.description(), value=rawItem.count)
     elif rawItem.type == ItemPackType.CUSTOM_SUPPLY_POINT:
         title = _ms(EPIC_BATTLE.EPICBATTLEITEM_SUPPLYPOINTS_HEADER)
     elif rawItem.type == ItemPackType.CUSTOM_PREMIUM:
@@ -303,8 +310,12 @@ def getItemTitle(rawItem, item, forBox=False, additionalInfo=False):
             title = _ms(TOOLTIPS.CREW_HEADER)
     elif rawItem.type == ItemPackType.CUSTOM_X5_BATTLE_BONUS:
         title = backport.text(R.strings.tooltips.quests.bonuses.token.battle_bonus_x5.header())
+    elif rawItem.type == ItemPackType.CUSTOM_X3_CREW_BONUS:
+        title = backport.text(R.strings.tooltips.quests.bonuses.token.crew_bonus_x3.header())
     elif rawItem.type == ItemPackType.CREW_BOOK_RANDOM:
         title = backport.text(R.strings.tooltips.awardItem.randomBooklet.header())
+    elif rawItem.type == ItemPackType.CUSTOM_FREE_XP:
+        title = backport.text(R.strings.tooltips.awardItem.customFreeXP.header(), value=backport.getIntegralFormat(rawItem.count))
     else:
         title = rawItem.title or ''
     return title
@@ -325,6 +336,8 @@ def getItemDescription(rawItem, item):
         description = _ms(TOOLTIPS.AWARDITEM_EVENTCOIN_BODY)
     elif rawItem.type == ItemPackType.CUSTOM_BPCOIN:
         description = backport.text(R.strings.tooltips.awardItem.bp())
+    elif rawItem.type in (ItemPackType.CUSTOM_EQUIP_COIN, ItemPackType.CUSTOM_EQUIP_COIN_EXTERNAL):
+        description = backport.text(R.strings.tooltips.awardItem.equipCoin.body())
     elif rawItem.type == ItemPackType.CUSTOM_PREMIUM:
         description = backport.text(R.strings.tooltips.awardItem.premium.body())
     elif rawItem.type == ItemPackType.CUSTOM_PREMIUM_PLUS:
@@ -343,8 +356,12 @@ def getItemDescription(rawItem, item):
              ItemPackType.CUSTOM_CREW_100: CrewTypes.SKILL_100}.get(rawItem.type))
     elif rawItem.type == ItemPackType.CUSTOM_X5_BATTLE_BONUS:
         description = backport.text(R.strings.tooltips.quests.bonuses.token.battle_bonus_x5.body())
+    elif rawItem.type == ItemPackType.CUSTOM_X3_CREW_BONUS:
+        description = backport.text(R.strings.tooltips.quests.bonuses.token.crew_bonus_x3.body())
     elif rawItem.type == ItemPackType.CREW_BOOK_RANDOM:
         description = backport.text(R.strings.tooltips.awardItem.randomBooklet.body())
+    elif rawItem.type == ItemPackType.CUSTOM_FREE_XP:
+        description = backport.text(R.strings.tooltips.awardItem.freeXP.body())
     else:
         description = rawItem.description or ''
     return description
@@ -406,7 +423,7 @@ def _createItemVO(rawItem, itemsCache, goodiesCache, slotIndex, rawTooltipData=N
         overlay = fittingItem.getHighlightType() if fittingItem is not None else SLOT_HIGHLIGHT_TYPES.NO_HIGHLIGHT
         count = rawItem.count
         if rawItem.type in ItemPackTypeGroup.CREW:
-            countFormat = _formatCrew(rawItem)
+            countFormat = ''
         elif rawItem.type in _UNCOUNTABLE_ITEM_TYPE:
             if rawItem.type == ItemPackType.CUSTOM_PREMIUM_PLUS and not __getPremiumPlusIconExists(count):
                 countFormat = 'x{}'.format(count) if count > 1 else ''
@@ -422,14 +439,6 @@ def _createItemVO(rawItem, itemsCache, goodiesCache, slotIndex, rawTooltipData=N
      'slotIndex': slotIndex,
      'count': countFormat,
      'rawData': rawTooltipData}
-
-
-def _formatCrew(item):
-    if item.type in (ItemPackType.CREW_100, ItemPackType.CUSTOM_CREW_100):
-        return '100%'
-    if item.type == ItemPackType.CREW_75:
-        return '75%'
-    return '50%' if item.type == ItemPackType.CREW_50 else ''
 
 
 def _getBoxTooltipVO(rawItems, itemsCache, goodiesCache):

@@ -3,6 +3,8 @@
 import typing
 import BigWorld
 from AvatarInputHandler import AvatarInputHandler
+from aih_constants import CTRL_MODE_NAME
+from arena_bonus_type_caps import ARENA_BONUS_TYPE_CAPS
 from constants import VEHICLE_MISC_STATUS
 from gui.Scaleform.daapi.view.battle.shared.status_notifications.components import StatusNotificationItem
 from gui.Scaleform.genConsts.BATTLE_NOTIFICATIONS_TIMER_TYPES import BATTLE_NOTIFICATIONS_TIMER_TYPES
@@ -53,6 +55,10 @@ class _VehicleStateSN(StatusNotificationItem):
     _sessionProvider = dependency.descriptor(IBattleSessionProvider)
     _HIDE_STATES_TRIGGERS = (VEHICLE_VIEW_STATE.DESTROYED, VEHICLE_VIEW_STATE.CREW_DEACTIVATED, VEHICLE_VIEW_STATE.SWITCHING)
 
+    def __init__(self, updateCallback):
+        super(_VehicleStateSN, self).__init__(updateCallback)
+        self._isCameraFixed = True
+
     def start(self):
         super(_VehicleStateSN, self).start()
         ctrl = self._sessionProvider.shared.vehicleState
@@ -89,6 +95,15 @@ class _VehicleStateSN(StatusNotificationItem):
         super(_VehicleStateSN, self).destroy()
         return
 
+    def isVisible(self):
+        return self._isVisible and self._isCameraFixed
+
+    def _setIsCameraFixed(self, value):
+        wasVisible = self.isVisible()
+        self._isCameraFixed = value
+        if wasVisible != self.isVisible():
+            self._sendUpdate()
+
     def _getTitle(self, value):
         pass
 
@@ -112,12 +127,11 @@ class _VehicleStateSN(StatusNotificationItem):
         pass
 
     def __onCameraChanged(self, ctrlMode, vehicleID=None):
-        if ctrlMode == 'video':
-            self._hide()
+        self._setIsCameraFixed(ctrlMode != CTRL_MODE_NAME.VIDEO)
 
     def __onVehicleStateUpdated(self, state, value):
         if state in self._HIDE_STATES_TRIGGERS:
-            self._hide()
+            self._setVisible(False)
         elif state == self.getItemID():
             self.__update(value)
 
@@ -194,6 +208,30 @@ class _DeathZoneSN(LocalizationProvider, _DestroyTimerSN):
             self._sendUpdate()
             return
         self._setVisible(False)
+
+
+class StaticDeathZoneSN(_DestroyTimerSN):
+
+    def getItemID(self):
+        return VEHICLE_VIEW_STATE.DEATHZONE
+
+    def getViewTypeID(self):
+        return BATTLE_NOTIFICATIONS_TIMER_TYPES.SECTOR_AIRSTRIKE
+
+    def _getDescription(self, value):
+        return backport.text(R.strings.ingame_gui.statusNotificationTimers.staticDeathZone())
+
+    def _update(self, value):
+        visible, playerEntering, strikeTime, waveDuration = value
+        self._isVisible = visible
+        if playerEntering:
+            self._updateTimeParams(waveDuration, strikeTime)
+        else:
+            self._updateTimeParams(0, 0)
+        self._sendUpdate()
+
+    def _getSupportedLevel(self):
+        return None
 
 
 class DeathZoneDamagingSN(_DeathZoneSN):
@@ -273,7 +311,8 @@ class _OverturnedBaseSN(LocalizationProvider, DestroyMiscTimerSN):
         return VEHICLE_MISC_STATUS.VEHICLE_IS_OVERTURNED
 
     def _getDescription(self, value=None):
-        pass
+        liftOverEnabled = ARENA_BONUS_TYPE_CAPS.checkAny(BigWorld.player().arenaBonusType, ARENA_BONUS_TYPE_CAPS.LIFT_OVER)
+        return backport.text(R.strings.ingame_gui.destroyTimer.liftOver()) if liftOverEnabled else ''
 
 
 class OverturnedSN(_OverturnedBaseSN):

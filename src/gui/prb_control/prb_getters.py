@@ -6,7 +6,6 @@ from constants import QUEUE_TYPE, PREBATTLE_TYPE_NAMES, ARENA_GUI_TYPE, PREBATTL
 from gui.prb_control.settings import makePrebattleSettings, VEHICLE_MAX_LEVEL
 from helpers import dependency
 from skeletons.gui.game_control import IGameSessionController
-from skeletons.gui.game_control import IBootcampController
 from skeletons.gui.lobby_context import ILobbyContext
 from soft_exception import SoftException
 from PlayerEvents import g_playerEvents
@@ -18,11 +17,6 @@ if TYPE_CHECKING:
 
 def getQueueType():
     return getattr(BigWorld.player(), 'battleQueueType', QUEUE_TYPE.UNKNOWN)
-
-
-@dependency.replace_none_kwargs(bootcampController=IBootcampController)
-def isInBootcampAccount(bootcampController=None):
-    return bootcampController is not None and bootcampController.isInBootcampAccount()
 
 
 def getClientPrebattle():
@@ -112,7 +106,8 @@ _ARENA_GUI_TYPE_BY_QUEUE_TYPE = {QUEUE_TYPE.RANDOMS: ARENA_GUI_TYPE.RANDOM,
  QUEUE_TYPE.BATTLE_ROYALE_TOURNAMENT: ARENA_GUI_TYPE.BATTLE_ROYALE,
  QUEUE_TYPE.MAPBOX: ARENA_GUI_TYPE.MAPBOX,
  QUEUE_TYPE.MAPS_TRAINING: ARENA_GUI_TYPE.MAPS_TRAINING,
- QUEUE_TYPE.COMP7: ARENA_GUI_TYPE.COMP7}
+ QUEUE_TYPE.COMP7: ARENA_GUI_TYPE.COMP7,
+ QUEUE_TYPE.WINBACK: ARENA_GUI_TYPE.WINBACK}
 
 def getArenaGUIType(prbType=None, queueType=None):
     if prbType is None:

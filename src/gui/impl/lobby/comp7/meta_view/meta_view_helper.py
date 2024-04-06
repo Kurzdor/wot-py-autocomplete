@@ -5,40 +5,47 @@ import typing
 from gui.impl.gen.view_models.views.lobby.comp7.meta_view.progression_division import Division, State
 from gui.impl.gen.view_models.views.lobby.comp7.meta_view.progression_division import ProgressionDivision
 from gui.impl.gen.view_models.views.lobby.comp7.meta_view.progression_item_base_model import Rank
+from gui.impl.lobby.comp7 import comp7_shared
 from helpers import dependency
 from intervals import Interval
 from skeletons.gui.game_control import IComp7Controller
 from skeletons.gui.lobby_context import ILobbyContext
-from gui.impl.lobby.comp7 import comp7_shared
 if typing.TYPE_CHECKING:
     from comp7_ranks_common import Comp7Division
     from gui.impl.gen.view_models.views.lobby.comp7.meta_view.progression_base_model import ProgressionBaseModel
     from gui.impl.gen.view_models.views.lobby.comp7.meta_view.progression_item_base_model import ProgressionItemBaseModel
-    from helpers.server_settings import Comp7PrestigeRanksConfig
+    from helpers.server_settings import Comp7RanksConfig
 _logger = logging.getLogger(__name__)
 
 def setProgressionItemData(itemModel, parentModel, rankIdx, ranksConfig):
-    setRankData(itemModel, parentModel, rankIdx, ranksConfig)
+    setRankData(itemModel, rankIdx, ranksConfig)
+    setCurrentProgressionIdx(parentModel, rankIdx, ranksConfig)
     setDivisionData(itemModel, getRankDivisions(rankIdx, ranksConfig))
 
 
-@dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
-def setRankData(itemModel, parentModel, rankIdx, ranksConfig, comp7Controller=None):
-    sortedDivisions = getRankDivisions(rankIdx, ranksConfig)
+def setRankData(itemModel, rank, ranksConfig):
+    sortedDivisions = getRankDivisions(rank, ranksConfig)
     rankLimits = Interval(sortedDivisions[0].range.begin, sortedDivisions[-1].range.end)
-    isRankElite = rankIdx == _getEliteRank()
-    if not isRankElite or comp7Controller.isElite:
-        if comp7Controller.rating in rankLimits:
-            parentModel.setCurrentItemIndex(rankIdx)
-    itemModel.setRank(comp7_shared.getRankEnumValue(sortedDivisions[0]))
+    itemModel.setRank(comp7_shared.getRankById(rank))
     itemModel.setFrom(rankLimits.begin)
     itemModel.setTo(rankLimits.end + 1)
 
 
-def getRankDivisions(rankIdx, ranksConfig):
+@dependency.replace_none_kwargs(comp7Controller=IComp7Controller)
+def setCurrentProgressionIdx(model, rank, ranksConfig, comp7Controller=None):
+    sortedDivisions = getRankDivisions(rank, ranksConfig)
+    rankLimits = Interval(sortedDivisions[0].range.begin, sortedDivisions[-1].range.end)
+    isRankElite = rank == _getEliteRank()
+    if not isRankElite or comp7Controller.isElite:
+        if comp7Controller.rating in rankLimits:
+            rankIdx = ranksConfig.ranksOrder.index(rank)
+            model.setCurrentItemIndex(rankIdx)
+
+
+def getRankDivisions(rank, ranksConfig):
     if len(ranksConfig.ranksOrder) != len(Rank):
         _logger.error('Config/ enum ranks length mismatch')
-    sortedDivisions = ranksConfig.divisionsByRank[rankIdx]
+    sortedDivisions = ranksConfig.divisionsByRank[rank]
     if len(sortedDivisions) > len(Division):
         _logger.error('Config/ enum divisions length mismatch')
     return sortedDivisions
@@ -71,6 +78,6 @@ def getDivisionState(division, comp7Controller=None):
 
 @dependency.replace_none_kwargs(lobbyCtx=ILobbyContext)
 def _getEliteRank(lobbyCtx=None):
-    ranksConfig = lobbyCtx.getServerSettings().comp7PrestigeRanksConfig
-    eliteRank = len(ranksConfig.ranksOrder) - 1
+    ranksConfig = lobbyCtx.getServerSettings().comp7RanksConfig
+    eliteRank = ranksConfig.ranksOrder[-1]
     return eliteRank

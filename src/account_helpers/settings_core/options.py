@@ -9,9 +9,10 @@ import sys
 import fractions
 import itertools
 import weakref
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from operator import itemgetter
 import logging
+import AvatarInputHandler.control_modes
 from aih_constants import CTRL_MODE_NAME
 import GUI
 from AvatarInputHandler.cameras import FovExtended
@@ -39,13 +40,13 @@ import CommandMapping
 from helpers import i18n
 from Event import Event
 from AvatarInputHandler import INPUT_HANDLER_CFG, AvatarInputHandler
-from AvatarInputHandler.DynamicCameras import ArcadeCamera, SniperCamera, StrategicCamera, ArtyCamera, DualGunCamera
-from AvatarInputHandler.control_modes import PostMortemControlMode, SniperControlMode
+from AvatarInputHandler.DynamicCameras import ArcadeCamera, SniperCamera, StrategicCamera, ArtyCamera, DualGunCamera, kill_cam_camera, free_camera
+from AvatarInputHandler.control_modes import SniperControlMode
 from debug_utils import LOG_NOTE, LOG_DEBUG, LOG_ERROR, LOG_CURRENT_EXCEPTION, LOG_WARNING
 from gui.Scaleform.managers.windows_stored_data import g_windowsStoredData
 from messenger import g_settings as messenger_settings
-from account_helpers.AccountSettings import AccountSettings, SPEAKERS_DEVICE
-from account_helpers.settings_core.settings_constants import SOUND, SPGAimEntranceModeOptions
+from account_helpers.AccountSettings import AccountSettings, SPEAKERS_DEVICE, COLOR_SETTINGS_TAB_IDX, APPLIED_COLOR_SETTINGS
+from account_helpers.settings_core.settings_constants import SOUND, SPGAimEntranceModeOptions, GRAPHICS, COLOR_GRADING_TECHNIQUE_DEFAULT
 from messenger.storage import storage_getter
 from shared_utils import CONST_CONTAINER, forEach
 from gui import GUI_SETTINGS
@@ -61,6 +62,9 @@ from messenger.proto import proto_getter
 from skeletons.account_helpers.settings_core import ISettingsCore
 from skeletons.connection_mgr import IConnectionManager
 from skeletons.gui.lobby_context import ILobbyContext
+from skeletons.gui.shared import IItemsCache
+from skeletons.gui.battle_hints.newbie_battle_hints_controller import INewbieBattleHintsController
+from skeletons.gui.prebattle_hints.newbie_controller import INewbiePrebattleHintsController
 from skeletons.gui.sounds import ISoundsController
 from gui import makeHtmlString
 from skeletons.gui.game_control import ISpecialSoundCtrl, IAnonymizerController, IVehiclePostProgressionController
@@ -186,6 +190,15 @@ class SettingAbstract(ISetting):
 
     def isEqual(self, value):
         return self.get() == value
+
+
+class EnablingSettingMixin(object):
+
+    def pack(self):
+        return SettingsExtraData(self._get(), self._getOptions(), {'enabled': self._isEnabled()})._asdict()
+
+    def _isEnabled(self):
+        raise NotImplementedError
 
 
 class SettingsContainer(ISetting):
@@ -574,13 +587,28 @@ class PreferencesSetting(SettingAbstract):
         pass
 
 
-class PostMortemDelaySetting(StorageDumpSetting):
+class PostMortemModeSetting(StorageDumpSetting):
+
+    class OPTIONS(Enum):
+        ANALYSIS = 'analysis'
+        SIMPLE = 'simple'
+        ENEMY = 'enemy'
+        SELF = 'self'
+
+    POST_MORTEM_MODES = (OPTIONS.ANALYSIS,
+     OPTIONS.SIMPLE,
+     OPTIONS.ENEMY,
+     OPTIONS.SELF)
+
+    def _getOptions(self):
+        settingsKey = '#settings:game/%s/%s'
+        return [ settingsKey % (self.settingName, cType.value) for cType in self.POST_MORTEM_MODES ]
 
     def getDefaultValue(self):
-        return PostMortemControlMode.getIsPostmortemDelayEnabled()
+        return self.POST_MORTEM_MODES.index(self.OPTIONS.ANALYSIS)
 
-    def setSystemValue(self, value):
-        PostMortemControlMode.setIsPostmortemDelayEnabled(value)
+    def getNoviceValue(self):
+        return self.POST_MORTEM_MODES.index(self.OPTIONS.SIMPLE)
 
 
 class PlayersPanelSetting(StorageDumpSetting):
@@ -592,6 +620,31 @@ class PlayersPanelSetting(StorageDumpSetting):
 
     def getDefaultValue(self):
         return AccountSettings.getSettingsDefault(self._settingKey).get(self._settingSubKey)
+
+
+class PlayersPanelStateSetting(AccountDumpSetting):
+    itemsCache = dependency.descriptor(IItemsCache)
+    DEFAULT_STATE = 3
+
+    def getDefaultValue(self):
+        return self.DEFAULT_STATE
+
+
+class MinimapSizeSetting(AccountDumpSetting):
+    settingsCore = dependency.descriptor(ISettingsCore)
+    MINIMAP_SIZE_INDEX = OrderedDict([(1300, 4),
+     (1050, 3),
+     (900, 2),
+     (0, 1)])
+    MINIMAP_SIZE_INDEX_WITH_SCALE = OrderedDict([(1050, 3), (900, 2), (0, 1)])
+
+    def getDefaultValue(self):
+        currentWindowHeight = g_monitorSettings.screenResolution.height
+        scale = self.settingsCore.interfaceScale.getScaleByIndex(0)
+        minimapSizeStorage = self.MINIMAP_SIZE_INDEX if scale < 2 else self.MINIMAP_SIZE_INDEX_WITH_SCALE
+        for monitorHeightDeps in minimapSizeStorage:
+            if currentWindowHeight >= monitorHeightDeps:
+                return minimapSizeStorage[monitorHeightDeps]
 
 
 class VOIPSetting(AccountSetting):
@@ -776,14 +829,23 @@ class GameplaySetting(StorageAccountSetting):
 
 
 class RandomOnly10ModeSetting(StorageAccountSetting):
-    _RandomOnly10ModeSettingStruct = namedtuple('_RandomOnly10ModeSettingStruct', 'current options extraData')
     lobbyContext = dependency.descriptor(ILobbyContext)
 
     def pack(self):
-        return self._RandomOnly10ModeSettingStruct(self._get(), self._getOptions(), self.getExtraData())._asdict()
+        return SettingsExtraData(self._get(), self._getOptions(), self.getExtraData())._asdict()
 
     def getExtraData(self):
         return {'enabled': self.lobbyContext.getServerSettings().isOnly10ModeEnabled()}
+
+
+class DevMapsSetting(StorageAccountSetting):
+    lobbyContext = dependency.descriptor(ILobbyContext)
+
+    def pack(self):
+        return SettingsExtraData(self._get(), self._getOptions(), self.getExtraData())._asdict()
+
+    def getExtraData(self):
+        return {'enabled': self.lobbyContext.getServerSettings().isMapsInDevelopmentEnabled()}
 
 
 class TripleBufferedSetting(SettingAbstract):
@@ -951,6 +1013,31 @@ class GraphicSetting(SettingAbstract):
     def refresh(self):
         self._currentValue = graphics.getGraphicsSetting(self.name)
         super(GraphicSetting, self).refresh()
+
+
+class ColorGradingSetting(GraphicSetting):
+    settingsCore = dependency.descriptor(ISettingsCore)
+
+    def __refreshLastAppliedValue(self):
+        appliedColorSetting = AccountSettings.getSettings(APPLIED_COLOR_SETTINGS)
+        selectedTabIdx = AccountSettings.getSettings(COLOR_SETTINGS_TAB_IDX)
+        if appliedColorSetting:
+            appliedTabValues = appliedColorSetting.get(selectedTabIdx)
+            if self._currentValue.value == appliedTabValues.get(GRAPHICS.COLOR_GRADING_TECHNIQUE):
+                return
+        else:
+            appliedTabValues = self.__getDefaultValues()
+        appliedColorSetting[selectedTabIdx] = appliedTabValues
+        AccountSettings.setSettings(APPLIED_COLOR_SETTINGS, appliedColorSetting)
+        self._set(appliedTabValues[GRAPHICS.COLOR_GRADING_TECHNIQUE])
+
+    @staticmethod
+    def __getDefaultValues():
+        return {GRAPHICS.COLOR_GRADING_TECHNIQUE: COLOR_GRADING_TECHNIQUE_DEFAULT}
+
+    def refresh(self):
+        self.__refreshLastAppliedValue()
+        super(ColorGradingSetting, self).refresh()
 
 
 class IGBHardwareAccelerationSetting(UserPrefsBoolSetting):
@@ -1409,9 +1496,11 @@ class SPGAimSetting(StorageDumpSetting):
 class _BaseAimContourSetting(StorageDumpSetting):
     _RES_ROOT = None
     _OPTIONS_NUMBER = None
+    _LOW_QUALITY_PRESETS = ('LOW', 'MIN')
+    _DEFAULT_VALUE = None
 
     def getDefaultValue(self):
-        return AccountSettings.getSettingsDefault('contour').get(self.settingName, None)
+        return self._DEFAULT_VALUE if self._isHighQualityPreset() else AccountSettings.getSettingsDefault('contour').get(self.settingName, None)
 
     def setSystemValue(self, value):
         raise NotImplementedError
@@ -1424,10 +1513,17 @@ class _BaseAimContourSetting(StorageDumpSetting):
         return [ {'data': value,
          'label': backport.text(self._RES_ROOT.dyn('type{}'.format(value))())} for value in xrange(self._OPTIONS_NUMBER) ]
 
+    def _isHighQualityPreset(self):
+        presetIndx = BigWorld.detectGraphicsPresetFromSystemSettings()
+        lowQualityPresets = [ BigWorld.getSystemPerformancePresetIdFromName(pName) for pName in self._LOW_QUALITY_PRESETS ]
+        isHighQualityPreset = presetIndx not in lowQualityPresets
+        return isHighQualityPreset
+
 
 class ContourSetting(_BaseAimContourSetting):
     _RES_ROOT = R.strings.settings.cursor.contour
     _OPTIONS_NUMBER = 2
+    _DEFAULT_VALUE = 1
 
     def setSystemValue(self, value):
         BigWorld.enableEdgeDrawerVisual(not value)
@@ -1444,6 +1540,7 @@ class ContourSetting(_BaseAimContourSetting):
 class ContourPenetratableZoneSetting(_BaseAimContourSetting):
     _RES_ROOT = R.strings.settings.cursor.contourPenetrableZone
     _OPTIONS_NUMBER = 3
+    _DEFAULT_VALUE = 2
 
     def setSystemValue(self, value):
         BigWorld.setEdgeDrawerPenetratableZoneOverlay(value)
@@ -1452,6 +1549,7 @@ class ContourPenetratableZoneSetting(_BaseAimContourSetting):
 class ContourImpenetratableZoneSetting(_BaseAimContourSetting):
     _RES_ROOT = R.strings.settings.cursor.contourImpenetrableZone
     _OPTIONS_NUMBER = 3
+    _DEFAULT_VALUE = 1
 
     def setSystemValue(self, value):
         BigWorld.setEdgeDrawerImpenetratableZoneOverlay(value)
@@ -1636,6 +1734,24 @@ class BattleLoadingTipSetting(AccountDumpSetting):
         return [ settingsKey % (self.key, tType) for tType in self.OPTIONS.TIPS_TYPES ]
 
 
+class NewbiePrebattleHintsSetting(EnablingSettingMixin, StorageSetting):
+
+    def _isEnabled(self):
+        return dependency.instance(INewbiePrebattleHintsController).isEnabled() and not BattleReplay.isPlaying()
+
+    def getDefaultValue(self):
+        return True
+
+
+class NewbieBattleHintsSetting(EnablingSettingMixin, StorageSetting):
+
+    def _isEnabled(self):
+        return dependency.instance(INewbieBattleHintsController).isEnabled() and not BattleReplay.isPlaying()
+
+    def getDefaultValue(self):
+        return True
+
+
 class ShowMarksOnGunSetting(StorageAccountSetting):
 
     def _get(self):
@@ -1668,7 +1784,9 @@ class MouseSetting(ControlSetting):
      CTRL_MODE_NAME.SNIPER: (SniperCamera.getCameraAsSettingsHolder, 'sniperMode/camera'),
      CTRL_MODE_NAME.STRATEGIC: (StrategicCamera.getCameraAsSettingsHolder, 'strategicMode/camera'),
      CTRL_MODE_NAME.ARTY: (ArtyCamera.getCameraAsSettingsHolder, 'artyMode/camera'),
-     CTRL_MODE_NAME.DUAL_GUN: (DualGunCamera.getCameraAsSettingsHolder, 'dualGunMode/camera')}
+     CTRL_MODE_NAME.DUAL_GUN: (DualGunCamera.getCameraAsSettingsHolder, 'dualGunMode/camera'),
+     CTRL_MODE_NAME.KILL_CAM: (kill_cam_camera.getCameraAsSettingsHolder, 'killCamMode/camera'),
+     CTRL_MODE_NAME.DEATH_FREE_CAM: (free_camera.getCameraAsSettingsHolder, 'freeVideoMode/camera')}
 
     def __init__(self, mode, setting, default, isPreview=False, masterSwitch=''):
         super(MouseSetting, self).__init__(isPreview)

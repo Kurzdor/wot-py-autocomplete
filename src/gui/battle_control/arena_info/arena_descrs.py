@@ -3,6 +3,7 @@
 import weakref
 import BattleReplay
 from constants import IS_DEVELOPMENT, ARENA_GUI_TYPE
+from frontline.gui.frontline_helpers import FLBattleTypeDescription
 from gui.impl import backport
 from gui.impl.gen import R
 from gui.Scaleform import getNecessaryArenaFrameName
@@ -10,8 +11,9 @@ from gui.Scaleform.locale.MENU import MENU
 from gui.battle_control.arena_info import settings
 from gui.prb_control.formatters import getPrebattleFullDescription
 from gui.shared.utils import toUpper, functions
-from helpers import i18n
+from helpers import i18n, dependency
 from gui.shared.system_factory import registerArenaDescrs, collectArenaDescrs
+from skeletons.gui.lobby_context import ILobbyContext
 
 def _getDefaultTeamName(isAlly):
     return i18n.makeString(MENU.LOADING_TEAMS_ALLIES) if isAlly else i18n.makeString(MENU.LOADING_TEAMS_ENEMIES)
@@ -42,6 +44,9 @@ class IArenaGuiDescription(object):
         raise NotImplementedError
 
     def getFrameLabel(self):
+        raise NotImplementedError
+
+    def getBattleTypeIconPath(self, sizeFolder='c_136x136'):
         raise NotImplementedError
 
     def getLegacyFrameLabel(self):
@@ -117,6 +122,10 @@ class DefaultArenaGuiDescription(IArenaGuiDescription):
 
     def getFrameLabel(self):
         pass
+
+    def getBattleTypeIconPath(self, sizeFolder='c_136x136'):
+        iconRes = R.images.gui.maps.icons.battleTypes.dyn(sizeFolder).dyn(self.getFrameLabel())
+        return backport.image(iconRes()) if iconRes.exists() else ''
 
     def getLegacyFrameLabel(self):
         return self._visitor.getArenaGuiType() + 1
@@ -206,6 +215,9 @@ class ArenaWithL10nDescription(IArenaGuiDescription):
     def isBaseExists(self):
         return self._decorated.isBaseExists()
 
+    def getBattleTypeIconPath(self, sizeFolder='c_136x136'):
+        return self._decorated.getBattleTypeIconPath(sizeFolder=sizeFolder)
+
     def getTypeName(self, isInBattle=True):
         return self._decorated.getTypeName(isInBattle)
 
@@ -246,17 +258,6 @@ class ArenaWithL10nDescription(IArenaGuiDescription):
         return self._decorated.getSelectedQuestInfo()
 
 
-class BootcampBattleDescription(ArenaWithLabelDescription):
-    __slots__ = ()
-
-    def getWinString(self, isInBattle=True):
-        lessonId = self._visitor.getArenaExtraData().get('lessonId', 0)
-        return i18n.makeString('#arenas:type/{}/description{}'.format(functions.getArenaSubTypeName(self._visitor.type.getID()), lessonId))
-
-    def getScreenIcon(self):
-        return settings.DEFAULT_SCREEN_MAP_IMAGE_RES_PATH
-
-
 class BattleRoyaleDescription(ArenaWithLabelDescription):
     __slots__ = ()
 
@@ -269,13 +270,21 @@ class BattleRoyaleDescription(ArenaWithLabelDescription):
 
 class EpicBattlesDescription(ArenaWithLabelDescription):
     __slots__ = ()
+    __lobbyContext = dependency.descriptor(ILobbyContext)
+    __battleTypeDescription = FLBattleTypeDescription()
 
     def getWinString(self, isInBattle=True):
-        return functions.getBattleSubTypeWinText(self._visitor.type.getID(), self._team)
+        return self.__battleTypeDescription.getDescription()
 
     def isInvitationEnabled(self):
         replayCtrl = BattleReplay.g_replayCtrl
         return not replayCtrl.isPlaying
+
+    def getBattleTypeIconPath(self, sizeFolder='c_136x136'):
+        return self.__battleTypeDescription.getBattleTypeIconPath(sizeFolder)
+
+    def getDescriptionString(self, isInBattle=True):
+        return self.__battleTypeDescription.getTitle()
 
     def getTeamName(self, team):
         from epic_constants import EPIC_BATTLE_TEAM_ID
@@ -301,13 +310,14 @@ registerArenaDescrs(ARENA_GUI_TYPE.RANDOM, ArenaWithBasesDescription)
 registerArenaDescrs(ARENA_GUI_TYPE.EPIC_RANDOM, ArenaWithBasesDescription)
 registerArenaDescrs(ARENA_GUI_TYPE.TRAINING, ArenaWithBasesDescription)
 registerArenaDescrs(ARENA_GUI_TYPE.EPIC_RANDOM_TRAINING, ArenaWithBasesDescription)
-registerArenaDescrs(ARENA_GUI_TYPE.BOOTCAMP, BootcampBattleDescription)
 for guiType in ARENA_GUI_TYPE.EPIC_RANGE:
     registerArenaDescrs(guiType, EpicBattlesDescription)
 
 registerArenaDescrs(ARENA_GUI_TYPE.BATTLE_ROYALE, BattleRoyaleDescription)
 registerArenaDescrs(ARENA_GUI_TYPE.MAPBOX, MapboxArenaDescription)
 registerArenaDescrs(ARENA_GUI_TYPE.COMP7, Comp7BattlesDescription)
+registerArenaDescrs(ARENA_GUI_TYPE.TOURNAMENT_COMP7, Comp7BattlesDescription)
+registerArenaDescrs(ARENA_GUI_TYPE.TRAINING_COMP7, Comp7BattlesDescription)
 
 def createDescription(arenaVisitor):
     guiVisitor = arenaVisitor.gui

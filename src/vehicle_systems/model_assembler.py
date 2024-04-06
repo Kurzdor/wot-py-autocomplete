@@ -51,7 +51,7 @@ def prepareCollisionAssembler(vehicleDesc, isTurretDetached, worldID):
     bspModels = []
     for partName, hitTester in hitTestersByPart.iteritems():
         partId = TankPartNames.getIdx(partName)
-        bspModel = (partId, hitTester.bspModelName, (0.0, 0.0, 0.0))
+        bspModel = (partId, hitTester.bspModelName)
         bspModels.append(bspModel)
 
     trackPairs = vehicleDesc.chassis.trackPairs[1:]
@@ -547,6 +547,7 @@ def createVehicleFilter(typeDescriptor):
         vehicleFilter.addTriangle((p1[0], 0, p1[1]), (p2[0], 0, p2[1]), (p3[0], 0, p3[1]))
 
     vehicleFilter.forceGroundPlacingMatrix(typeDescriptor.isPitchHullAimingAvailable)
+    vehicleFilter.enablePitchHullAiming(typeDescriptor.isPitchHullAimingAvailable)
     return vehicleFilter
 
 
@@ -827,7 +828,7 @@ def assembleTracks(resourceRefs, vehicleDesc, appearance, splineTracksImpl, inst
 
 def assembleCollisionObstaclesCollector(appearance, lodStateLink, desc):
     isWheeledVehicle = 'wheeledVehicle' in desc.type.tags
-    collisionObstaclesCollector = appearance.createComponent(Vehicular.CollisionObstaclesCollector, appearance.compoundModel, isWheeledVehicle)
+    collisionObstaclesCollector = appearance.createComponent(Vehicular.CollisionObstaclesCollector, appearance.compoundModel, appearance.spaceID, isWheeledVehicle)
     if lodStateLink is not None:
         collisionObstaclesCollector.setLodLink(lodStateLink)
         collisionObstaclesCollector.setLodSettings(shared_components.LodSettings(appearance.typeDescriptor.chassis.chassisLodDistance, DEFAULT_MAX_LOD_PRIORITY))
@@ -896,6 +897,8 @@ def loadAppearancePrefab(prefab, appearance, posloadCallback=None):
 
     def _onLoaded(gameObject):
         appearance.undamagedStateChildren.append(gameObject)
+        if IS_UE_EDITOR:
+            gameObject.removeComponentByType(GenericComponents.DynamicModelComponent)
         gameObject.createComponent(GenericComponents.RedirectorComponent, appearance.gameObject)
         gameObject.createComponent(GenericComponents.DynamicModelComponent, appearance.compoundModel)
         if posloadCallback:

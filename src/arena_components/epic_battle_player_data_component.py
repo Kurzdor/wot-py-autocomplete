@@ -38,6 +38,7 @@ class EpicBattlePlayerDataComponent(PlayerDataComponent):
         self.onPlayerXPUpdated = Event.Event(self._eventManager)
         self.onFrontlineCenterUpdated = Event.Event(self._eventManager)
         self.onRespawnOffsetsUpdated = Event.Event(self._eventManager)
+        self.purchasedAbilities = []
         return
 
     def activate(self):
@@ -128,6 +129,9 @@ class EpicBattlePlayerDataComponent(PlayerDataComponent):
         self.__playerXP = xp
         self.onPlayerXPUpdated(xp)
 
+    def setPurchasedAbilities(self, purchasedAbilities):
+        self.purchasedAbilities = purchasedAbilities
+
     def setPlayerLaneByPlayerGroups(self):
         playerId = avatar_getter.getPlayerVehicleID()
         playerGroups = self.playerGroups
@@ -142,7 +146,7 @@ class EpicBattlePlayerDataComponent(PlayerDataComponent):
             try:
                 return timesToAdd[idInPlayerGroup - 1]
             except (TypeError, IndexError, KeyError):
-                LOG_CURRENT_EXCEPTION(["Failed to get 'gameTimeToAddPerCapture' from arena sector sync data for zone '{}'!".format(idInPlayerGroup), timesToAdd])
+                LOG_CURRENT_EXCEPTION(tags=("Failed to get 'gameTimeToAddPerCapture' from arena sector sync data for zone '{}'!".format(idInPlayerGroup), timesToAdd))
 
         return 0.0
 
@@ -162,7 +166,7 @@ class EpicBattlePlayerDataComponent(PlayerDataComponent):
         if arena is not None:
             key = 'playerGroup'
             gameModeStats = dict(((vehID, {key: playerGroup}) for vehID, playerGroup in args.iteritems()))
-            arena.onGameModeSpecificStats(False, gameModeStats)
+            arena.updateGameModeSpecificStats(False, gameModeStats)
         self.onPlayerGroupsUpdated(args)
         playerId = avatar_getter.getPlayerVehicleID()
         if playerId is not 0 and playerId in args:
@@ -233,7 +237,7 @@ class EpicBattlePlayerDataComponent(PlayerDataComponent):
         gameModeStats = dict(((vehID, {'playerGroup': group,
           'physicalSector': sectorID}) for vehID, (sectorID, group) in args.iteritems()))
         self.onPlayerGroupsUpdated(args)
-        arena.onGameModeSpecificStats(False, gameModeStats)
+        arena.updateGameModeSpecificStats(False, gameModeStats)
 
     def __onLivesPerTeamGroupUpdated(self, args):
         if BigWorld.player().arena.period != ARENA_PERIOD.BATTLE:
@@ -265,4 +269,4 @@ class EpicBattlePlayerDataComponent(PlayerDataComponent):
         if not arena:
             return
         gameModeStats = dict(((vehID, {'hasRespawns': hasRespawns}) for vehID in playerList))
-        arena.onGameModeSpecificStats(False, gameModeStats)
+        arena.updateGameModeSpecificStats(False, gameModeStats)

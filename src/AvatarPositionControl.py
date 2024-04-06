@@ -36,7 +36,7 @@ class ConsistentMatrices(object):
             self.notifyVehicleChanged(avatar)
         elif vehicle.id == avatar.playerVehicleID:
             self.__linkOwnVehicle(vehicle)
-            self.__setTarget(vehicle.matrix, False)
+            self.__setTarget(vehicle.cameraTargetMatrix, False)
 
     def notifyPreBind(self, avatar):
         vehicle = avatar.getVehicleAttached()
@@ -44,20 +44,21 @@ class ConsistentMatrices(object):
             bindMatrix = self.attachedVehicleMatrix
             useStatic = True
         else:
-            bindMatrix = vehicle.matrix
+            bindMatrix = vehicle.cameraTargetMatrix
             useStatic = False
         self.__setTarget(bindMatrix, useStatic)
         return
 
     def notifyVehicleChanged(self, avatar, updateStopped=False):
-        if avatar.vehicle is None or not updateStopped and not avatar.vehicle.isStarted:
+        vehicle = avatar.vehicle
+        if vehicle is None or not updateStopped and not vehicle.isStarted and not vehicle.isHidden:
             self.__attachedVehicleMatrix.target = None
             self.onVehicleMatrixBindingChanged(True)
             return
         else:
-            if avatar.vehicle.id == avatar.playerVehicleID:
-                self.__linkOwnVehicle(avatar.vehicle)
-            self.__setTarget(avatar.vehicle.matrix, False)
+            if vehicle.id == avatar.playerVehicleID:
+                self.__linkOwnVehicle(vehicle)
+            self.__setTarget(vehicle.cameraTargetMatrix, False)
             return
 
     def notifyViewPointChanged(self, avatar, staticPosition=None):
@@ -75,13 +76,11 @@ class ConsistentMatrices(object):
         return
 
     def __linkOwnVehicle(self, vehicle):
+        self.__ownVehicleMProv.target = vehicle.matrix
         if isinstance(vehicle.filter, BigWorld.WGVehicleFilter):
-            self.__ownVehicleMProv.target = vehicle.filter.bodyMatrix
             self.__ownVehicleTurretMProv.target = vehicle.filter.turretMatrix
-        else:
-            self.__ownVehicleMProv.target = vehicle.matrix
-            if vehicle.appearance:
-                self.__ownVehicleTurretMProv.target = vehicle.appearance.turretMatrix
+        elif vehicle.appearance:
+            self.__ownVehicleTurretMProv.target = vehicle.appearance.turretMatrix
 
 
 class AvatarPositionControl(CallbackDelayer):
@@ -102,13 +101,18 @@ class AvatarPositionControl(CallbackDelayer):
 
     def bindToVehicle(self, bValue=True, vehicleID=None):
         if vehicleID is None:
+            if self.__avatar.isObserver():
+                return
             vehicleID = self.__avatar.playerVehicleID
-        BigWorld.player().consistentMatrices.notifyPreBind(BigWorld.player())
-        if bValue:
-            self.__doBind(vehicleID)
+        if self.__avatar.vehicle and self.__avatar.vehicle.id == vehicleID:
+            return
         else:
-            self.__doUnbind(vehicleID)
-        return
+            BigWorld.player().consistentMatrices.notifyPreBind(BigWorld.player())
+            if bValue:
+                self.__doBind(vehicleID)
+            else:
+                self.__doUnbind(vehicleID)
+            return
 
     def followCamera(self, bValue=True):
         self.__bFollowCamera = bValue

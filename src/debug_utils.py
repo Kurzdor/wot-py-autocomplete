@@ -2,6 +2,8 @@
 # Embedded file name: scripts/common/debug_utils.py
 import sys
 import re
+import inspect
+import subprocess
 import BigWorld
 import excepthook
 import time
@@ -29,11 +31,6 @@ class LOG_LEVEL:
     RELEASE = 5
 
 
-class LOG_TAGS:
-    BOOTCAMP = '[BOOTCAMP]'
-    STATISTIC = '[STATISTIC]'
-
-
 if CURRENT_REALM == 'DEV':
     _logLevel = LOG_LEVEL.DEV
 elif CURRENT_REALM == 'ST':
@@ -58,6 +55,14 @@ class _LogWrapper(object):
 
 
 class CriticalError(BaseException):
+    pass
+
+
+class HandledError(BaseException):
+    pass
+
+
+class SentryError(BaseException):
     pass
 
 
@@ -130,16 +135,18 @@ def CRITICAL_ERROR(msg, *kargs):
 
 
 @_LogWrapper(LOG_LEVEL.RELEASE)
-def LOG_CURRENT_EXCEPTION(tags=None, frame=1):
-    msg = _makeMsgHeader(sys._getframe(frame)) + '\n'
-    etype, value, tb = sys.exc_info()
-    msg += ''.join(format_exception(etype, value, tb, None))
-    with _g_logLock:
-        BigWorld.logError('EXCEPTION', _addTagsToMsg(tags, msg), None)
-        extMsg = excepthook.extendedTracebackAsString(_src_file_trim_to, None, None, etype, value, tb)
-        if extMsg:
-            BigWorld.logError('EXCEPTION', _addTagsToMsg(tags, extMsg), None)
-    return
+def LOG_CURRENT_EXCEPTION(tags=()):
+    _, value, tb = sys.exc_info()
+    error = HandledError(value, tags)
+    sys.excepthook(HandledError, error, tb)
+
+
+@_LogWrapper(LOG_LEVEL.RELEASE)
+def LOG_SENTRY(msg, *kargs):
+    error = SentryError('{} {}'.format(msg, kargs))
+    frame = inspect.currentframe()
+    BigWorld.logExceptionFrame(SentryError, error, frame.f_back)
+    del frame
 
 
 LOG_EXPECTED_EXCEPTION = LOG_CURRENT_EXCEPTION
@@ -180,22 +187,9 @@ def LOG_ERROR(msg, *kargs, **kwargs):
     _doLog('ERROR', msg, kargs, kwargs)
 
 
-@_LogWrapper(LOG_LEVEL.RELEASE)
-def LOG_SENTRY(msg, *kargs):
-    try:
-        raise SoftException('{} {}'.format(msg, kargs))
-    except:
-        LOG_CURRENT_EXCEPTION(frame=2)
-
-
 @_LogWrapper(LOG_LEVEL.DEV)
 def LOG_ERROR_DEV(msg, *kargs, **kwargs):
     _doLog('ERROR', msg, kargs, kwargs)
-
-
-@_LogWrapper(LOG_LEVEL.DEV)
-def LOG_ACHTUNG(msg, *kargs, **kwargs):
-    _doLog('ACHTUNG', msg, kargs, kwargs)
 
 
 @_LogWrapper(LOG_LEVEL.RELEASE)
@@ -222,6 +216,12 @@ def LOG_DEBUG_DEV(msg, *kargs, **kwargs):
     _doLog('DEBUG', msg, kargs, kwargs)
 
 
+@_LogWrapper(LOG_LEVEL.DEV)
+def LOG_DEBUG_DEV_NICE(msg, *kargs, **kwargs):
+    kwargs['nice'] = True
+    _doLog('DEBUG', msg, kargs, kwargs)
+
+
 @_LogWrapper(LOG_LEVEL.RELEASE)
 def LOG_UNEXPECTED(msg, *kargs):
     _doLog('LOG_UNEXPECTED', msg, kargs)
@@ -241,7 +241,12 @@ def _doLog(category, msg, args=None, kwargs={}, frameDepth=2):
     if not logFunc:
         logFunc = BigWorld.logDebug
     if args:
-        output = u' '.join(map(unicode, [header, msg, args]))
+        if kwargs.get('nice'):
+            parts = [header, u' ', msg]
+            parts.extend(args)
+            output = u''.join(map(unicode, parts))
+        else:
+            output = u' '.join(map(unicode, [header, msg, args]))
     else:
         output = u' '.join(map(unicode, [header, msg]))
     tags = kwargs.pop('tags', None)
@@ -398,6 +403,31 @@ def memoryLeaksSafeDump(id, _):
         BigWorld.delTimer(id)
 
 
+def printConnections(ports):
+    portsRE = '\\|'.join(map(lambda p: str(p), ports))
+    ns = subprocess.Popen(['netstat', '-atupn'], stdout=subprocess.PIPE)
+    gr = subprocess.Popen(['grep', portsRE], stdin=ns.stdout, stdout=subprocess.PIPE)
+    output = gr.communicate()[0].splitlines()
+    for line in output:
+        LOG_DEBUG('Connection: ', line)
+
+
+def printProcesses():
+    ps = subprocess.Popen(['ps',
+     '-eo',
+     'pid,etimes,args',
+     '--sort',
+     'start_time'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    procs = ps.communicate()[0].splitlines()
+    procsCnt = 0
+    for proc in procs:
+        if 'app' in proc and 'bigworld' in proc:
+            LOG_DEBUG('Process: ', proc)
+            procsCnt += 1
+
+    LOG_DEBUG('Total processes: ', procsCnt)
+
+
 def initMemoryLeaksLogging(repeatOffset=300):
 
     def detectMemoryLeaksTimerCallback(id, userArg):
@@ -434,6 +464,27 @@ def traceCalls(func):
         return ret
 
     return wrapper
+
+
+def wg_extract_stack(f=None, limit=None):
+    if f is None:
+        f = sys._getframe().f_back
+    if limit is None:
+        if hasattr(sys, 'tracebacklimit'):
+            limit = sys.tracebacklimit
+    list = []
+    n = 0
+    while f is not None and (limit is None or n < limit):
+        lineno = f.f_lineno
+        co = f.f_code
+        filename = co.co_filename
+        name = co.co_name
+        list.append((filename, lineno, name))
+        f = f.f_back
+        n = n + 1
+
+    list.reverse()
+    return list
 
 
 def traceMethodCalls(obj, *names):

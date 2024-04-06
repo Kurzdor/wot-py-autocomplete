@@ -1,13 +1,18 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/game_control/hangar_loading_controller.py
 import Event
+from account_helpers.settings_core.settings_constants import GuiSettingsBehavior
+from gui.shared.account_settings_helper import AccountSettingsHelper
+from gui.shared.event_dispatcher import showCrew5075Welcome
 from helpers import dependency
-from skeletons.gui.game_control import IHangarLoadingController, IBootcampController
+from skeletons.gui.game_control import IHangarLoadingController
+from skeletons.gui.shared import IItemsCache
 from skeletons.gui.shared.utils import IHangarSpace
+CREW_WELCOME_SCREEN_BATTLES_COUNT = 100
 
 class HangarLoadingController(IHangarLoadingController):
-    __bootcamp = dependency.descriptor(IBootcampController)
     __hangarSpace = dependency.descriptor(IHangarSpace)
+    __itemsCache = dependency.descriptor(IItemsCache)
 
     def __init__(self):
         super(HangarLoadingController, self).__init__()
@@ -33,15 +38,24 @@ class HangarLoadingController(IHangarLoadingController):
         self.__hangarSpace.onSpaceCreate -= self.__hangarLoadedAfterLoginNotify
 
     def onLobbyInited(self, event):
-        if self.__isHangarLoadedAfterLogin():
+        if self.isHangarLoadedAfterLogin():
             if self.__hangarSpace.spaceInited:
                 self.__hangarLoadedAfterLoginNotify()
             else:
                 self.__hangarSpace.onSpaceCreate += self.__hangarLoadedAfterLoginNotify
 
+    def __processCrewWelcomeScreen(self):
+        if AccountSettingsHelper.isWelcomeScreenShown(GuiSettingsBehavior.CREW_5075_WELCOME_SHOWN):
+            return
+        if self.__itemsCache.items.getAccountDossier().getTotalStats().getBattlesCount() > CREW_WELCOME_SCREEN_BATTLES_COUNT:
+            showCrew5075Welcome()
+        else:
+            AccountSettingsHelper.welcomeScreenShown(GuiSettingsBehavior.CREW_5075_WELCOME_SHOWN)
+
     def __hangarLoadedAfterLoginNotify(self):
         self.__hangarSpace.onSpaceCreate -= self.__hangarLoadedAfterLoginNotify
+        self.__processCrewWelcomeScreen()
         self.onHangarLoadedAfterLogin()
 
-    def __isHangarLoadedAfterLogin(self):
-        return self.__isConnectedAsAccount and not self.__bootcamp.isInBootcamp() and not self.__bootcamp.isInBootcampAccount()
+    def isHangarLoadedAfterLogin(self):
+        return self.__isConnectedAsAccount

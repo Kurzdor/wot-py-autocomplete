@@ -8,7 +8,8 @@ from gui.Scaleform.Waiting import Waiting
 from gui.prb_control.settings import FUNCTIONAL_FLAG
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
 from gui.shared.actions.chains import ActionsChain
-from gui.shared.events import LoginEventEx, GUICommonEvent
+from gui.shared.events import LoginEvent, LoginEventEx, GUICommonEvent
+from gui.winback.winback_helpers import leaveWinbackMode
 from helpers import dependency
 from predefined_hosts import g_preDefinedHosts, getHostURL
 from skeletons.connection_mgr import IConnectionManager
@@ -16,7 +17,7 @@ from skeletons.gameplay import IGameplayLogic
 from skeletons.gui.app_loader import IAppLoader
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.login_manager import ILoginManager
-from constants import WGC_STATE
+from constants import WINBACK_BATTLE_TOKEN_DRAW_REASON
 __all__ = ('LeavePrbModalEntity', 'DisconnectFromPeriphery', 'ConnectToPeriphery', 'PrbInvitesInit', 'ActionsChain')
 
 class Action(object):
@@ -39,6 +40,7 @@ class Action(object):
         return self._completed
 
 
+DISCONNECT_FROM_PERIPHERY_DELAY = 0.3
 CONNECT_TO_PERIPHERY_DELAY = 2.0
 
 class LeavePrbModalEntity(Action):
@@ -151,6 +153,8 @@ class DisconnectFromPeriphery(Action):
     def __init__(self, loginViewPreselectedPeriphery=None):
         super(DisconnectFromPeriphery, self).__init__()
         self.__peripheryId = loginViewPreselectedPeriphery
+        self.__endTime = None
+        return
 
     def isInstantaneous(self):
         return False
@@ -159,10 +163,17 @@ class DisconnectFromPeriphery(Action):
         self._running = True
         if self.__peripheryId is not None:
             self.loginManager.servers.setServerPreselection(self.__peripheryId)
-        self.gameplay.goToLoginByRQ()
+        self.__endTime = BigWorld.time() + DISCONNECT_FROM_PERIPHERY_DELAY
+        g_eventBus.handleEvent(LoginEvent(LoginEvent.DISCONNECTION_STARTED))
         return
 
     def isRunning(self):
+        if self.__endTime:
+            if self.__endTime <= BigWorld.time():
+                self.__endTime = None
+                self.gameplay.goToLoginByRQ()
+            else:
+                return self._running
         app = self.appLoader.getApp()
         if app:
             from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
@@ -198,12 +209,12 @@ class ConnectToPeriphery(Action):
     def invoke(self):
         if self.__host and self.__credentials:
             if len(self.__credentials) < 2:
-                self._completed = False
+                self.__connectionFailed()
                 LOG_ERROR('Connect action. Login info is invalid')
                 return
             login, token2 = self.__credentials
             if not login or not token2:
-                self._completed = False
+                self.__connectionFailed()
                 LOG_ERROR('Connect action. Login info is invalid')
                 return
             self._running = True
@@ -211,7 +222,7 @@ class ConnectToPeriphery(Action):
             Waiting.show('login')
         else:
             LOG_ERROR('Connect action. Login info is invalid')
-            self._completed = False
+            self.__connectionFailed()
             self._running = False
 
     def __doConnect(self):
@@ -244,6 +255,10 @@ class ConnectToPeriphery(Action):
         self._completed = False
         self._running = False
         LOG_DEBUG('Connect action. Player exit from login queue')
+
+    def __connectionFailed(self):
+        self._completed = False
+        g_eventBus.handleEvent(LoginEvent(LoginEvent.CONNECTION_FAILED))
 
 
 class PrbInvitesInit(Action):
@@ -326,3 +341,22 @@ class OnLobbyInitedAction(Action):
         self.__isLobbyInited = True
         g_eventBus.removeListener(GUICommonEvent.LOBBY_VIEW_LOADED, self.__onLobbyInited)
         self.invoke()
+
+
+class LeaveWinbackModeEntity(Action):
+
+    def __init__(self):
+        super(LeaveWinbackModeEntity, self).__init__()
+        self._running = False
+
+    def invoke(self):
+        self._running = True
+        self.__doLeave()
+
+    def isInstantaneous(self):
+        return False
+
+    def __doLeave(self):
+        leaveWinbackMode(WINBACK_BATTLE_TOKEN_DRAW_REASON.SQUAD)
+        self._completed = True
+        self._running = False

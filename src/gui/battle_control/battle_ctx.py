@@ -5,7 +5,8 @@ import Settings
 from gui.battle_control.arena_info import player_format
 from gui.impl import backport
 from gui.impl.gen import R
-from unit_roster_config import SquadRoster, EpicRoster
+from gui.shared.system_factory import collectSquadFinder
+from unit_roster_config import SquadRoster
 from helpers import dependency
 from skeletons.gui.battle_session import IBattleSessionProvider, IBattleContext
 _logger = logging.getLogger(__name__)
@@ -135,6 +136,12 @@ class BattleContext(IBattleContext):
     def getFrameLabel(self):
         return self.__arenaDP.getPersonalDescription().getFrameLabel()
 
+    def getBattleTypeIconPathBig(self):
+        return self.__arenaDP.getPersonalDescription().getBattleTypeIconPath('c_136x136')
+
+    def getBattleTypeIconPathSmall(self):
+        return self.__arenaDP.getPersonalDescription().getBattleTypeIconPath('c_64x64')
+
     def getGuiEventType(self):
         return self.__arenaDP.getPersonalDescription().getGuiEventType()
 
@@ -148,9 +155,9 @@ class BattleContext(IBattleContext):
         limit = False
         sessionProvider = dependency.instance(IBattleSessionProvider)
         arenaVisitor = sessionProvider.arenaVisitor
-        isEpicBattle = arenaVisitor.gui.isEpicBattle()
         vInfo = self.__arenaDP.getVehicleInfo()
-        maxSlots = SquadRoster.MAX_SLOTS if not isEpicBattle else EpicRoster.MAX_SLOTS
+        _, rosterClass = collectSquadFinder(arenaVisitor.gui.guiType)
+        maxSlots = rosterClass.MAX_SLOTS if rosterClass else SquadRoster.MAX_SLOTS
         if vInfo.isSquadMan():
             if vInfo.isSquadCreator():
                 limit = self.__arenaDP.getVehiclesCountInPrebattle(vInfo.team, vInfo.prebattleID) >= maxSlots

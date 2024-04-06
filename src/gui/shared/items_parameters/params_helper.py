@@ -2,15 +2,17 @@
 # Embedded file name: scripts/client/gui/shared/items_parameters/params_helper.py
 import copy
 import typing
+from itertools import chain
 from debug_utils import LOG_CURRENT_EXCEPTION, LOG_ERROR, LOG_WARNING
 from gui import GUI_SETTINGS
 from gui.Scaleform.genConsts.HANGAR_ALIASES import HANGAR_ALIASES
-from gui.shared.gui_items import GUI_ITEM_TYPE
+from gui.shared.gui_items import GUI_ITEM_TYPE, KPI
 from gui.shared.items_parameters import params, RELATIVE_PARAMS, MAX_RELATIVE_VALUE
 from gui.shared.items_parameters.comparator import VehiclesComparator, ItemsComparator, PARAM_STATE
 from gui.shared.items_parameters.functions import getBasicShell
+from gui.shared.items_parameters.params import HIDDEN_PARAM_DEFAULTS
 from gui.shared.items_parameters.params_cache import g_paramsCache
-from gui.shared.utils import AUTO_RELOAD_PROP_NAME, MAX_STEERING_LOCK_ANGLE, TURBOSHAFT_SPEED_MODE_SPEED, WHEELED_SPEED_MODE_SPEED, DUAL_GUN_CHARGE_TIME, TURBOSHAFT_ENGINE_POWER, TURBOSHAFT_INVISIBILITY_STILL_FACTOR, TURBOSHAFT_INVISIBILITY_MOVING_FACTOR, TURBOSHAFT_SWITCH_TIME, CHASSIS_REPAIR_TIME, ROCKET_ACCELERATION_ENGINE_POWER, ROCKET_ACCELERATION_SPEED_LIMITS, ROCKET_ACCELERATION_REUSE_AND_DURATION
+from gui.shared.utils import AUTO_RELOAD_PROP_NAME, MAX_STEERING_LOCK_ANGLE, TURBOSHAFT_SPEED_MODE_SPEED, WHEELED_SPEED_MODE_SPEED, DUAL_GUN_CHARGE_TIME, TURBOSHAFT_ENGINE_POWER, TURBOSHAFT_INVISIBILITY_STILL_FACTOR, SHOT_DISPERSION_ANGLE, TURBOSHAFT_INVISIBILITY_MOVING_FACTOR, TURBOSHAFT_SWITCH_TIME, CHASSIS_REPAIR_TIME, ROCKET_ACCELERATION_ENGINE_POWER, ROCKET_ACCELERATION_SPEED_LIMITS, ROCKET_ACCELERATION_REUSE_AND_DURATION, DUAL_ACCURACY_COOLING_DELAY, BURST_FIRE_RATE
 from helpers import dependency
 from items import vehicles, ITEM_TYPES
 from shared_utils import findFirst, first
@@ -23,7 +25,7 @@ RELATIVE_POWER_PARAMS = ('avgDamage',
  AUTO_RELOAD_PROP_NAME,
  'reloadTimeSecs',
  'clipFireRate',
- 'burstFireRate',
+ BURST_FIRE_RATE,
  'turboshaftBurstFireRate',
  DUAL_GUN_CHARGE_TIME,
  'turretRotationSpeed',
@@ -31,7 +33,8 @@ RELATIVE_POWER_PARAMS = ('avgDamage',
  'pitchLimits',
  'gunYawLimits',
  'aimingTime',
- 'shotDispersionAngle',
+ SHOT_DISPERSION_ANGLE,
+ DUAL_ACCURACY_COOLING_DELAY,
  'avgDamagePerMinute')
 RELATIVE_ARMOR_PARAMS = ('maxHealth',
  'hullArmor',
@@ -62,11 +65,50 @@ PARAMS_GROUPS = {'relativePower': RELATIVE_POWER_PARAMS,
  'relativeMobility': RELATIVE_MOBILITY_PARAMS,
  'relativeCamouflage': RELATIVE_CAMOUFLAGE_PARAMS,
  'relativeVisibility': RELATIVE_VISIBILITY_PARAMS}
-EXTRA_POWER_PARAMS = ('vehicleGunShotDispersion', 'vehicleGunShotDispersionChassisMovement', 'vehicleGunShotDispersionChassisRotation', 'vehicleGunShotDispersionTurretRotation', 'vehicleGunShotDispersionWhileGunDamaged', 'vehicleGunShotDispersionAfterShot', 'vehicleReloadTimeAfterShellChange')
-EXTRA_ARMOR_PARAMS = ('vehicleRepairSpeed', 'vehicleRamOrExplosionDamageResistance', 'crewHitChance', 'crewRepeatedStunDuration', 'crewStunDuration', 'vehicleChassisStrength', 'vehicleChassisFallDamage', 'vehicleAmmoBayEngineFuelStrength', 'vehPenaltyForDamageEngineAndCombat', 'vehicleFireChance', 'vehicleRamDamageResistance', 'damageEnemiesByRamming')
-EXTRA_MOBILITY_PARAMS = ('vehicleSpeedGain',)
-EXTRA_CAMOUFLAGE_PARAMS = ('vehicleOwnSpottingTime',)
-EXTRA_VISIBILITY_PARAMS = ('vehicleEnemySpottingTime', 'demaskFoliageFactor', 'demaskMovingFactor')
+EXTRA_POWER_PARAMS = (KPI.Name.VEHICLE_GUN_SHOT_DISPERSION,
+ KPI.Name.VEHICLE_GUN_SHOT_DISPERSION_CHASSIS_MOVEMENT,
+ KPI.Name.VEHICLE_GUN_SHOT_DISPERSION_CHASSIS_ROTATION,
+ KPI.Name.VEHICLE_GUN_SHOT_DISPERSION_TURRET_ROTATION,
+ KPI.Name.VEHICLE_GUN_SHOT_DISPERSION_WHILE_GUN_DAMAGED,
+ KPI.Name.VEHICLE_GUN_SHOT_DISPERSION_AFTER_SHOT,
+ KPI.Name.VEHICLE_RELOAD_TIME_AFTER_SHELL_CHANGE,
+ KPI.Name.DAMAGE_AND_PIERCING_DISTRIBUTION_LOWER_BOUND,
+ KPI.Name.DAMAGE_AND_PIERCING_DISTRIBUTION_UPPER_BOUND,
+ KPI.Name.ENEMY_MODULES_CREW_CRIT_CHANCE,
+ KPI.Name.VEHICLE_DAMAGE_ENEMIES_BY_RAMMING)
+EXTRA_ARMOR_PARAMS = (KPI.Name.CREW_HIT_CHANCE,
+ KPI.Name.CREW_REPEATED_STUN_DURATION,
+ KPI.Name.CREW_STUN_DURATION,
+ KPI.Name.EQUIPMENT_PREPARATION_TIME,
+ KPI.Name.VEHICLE_AMMO_BAY_ENGINE_FUEL_STRENGTH,
+ KPI.Name.VEHICLE_AMMO_BAY_STRENGTH,
+ KPI.Name.VEHICLE_CHASSIS_FALL_DAMAGE,
+ KPI.Name.VEHICLE_CHASSIS_STRENGTH,
+ KPI.Name.VEHICLE_FIRE_CHANCE,
+ KPI.Name.VEHICLE_RAM_DAMAGE_RESISTANCE,
+ KPI.Name.VEHICLE_RAM_OR_EXPLOSION_DAMAGE_RESISTANCE,
+ KPI.Name.VEHICLE_REPAIR_SPEED,
+ KPI.Name.VEHICLE_PENALTY_FOR_DAMAGED_ENGINE_AND_COMBAT,
+ KPI.Name.STUN_RESISTANCE_EFFECT_FACTOR,
+ KPI.Name.VEHICLE_FUEL_TANK_LESION_CHANCE,
+ KPI.Name.VEHICLE_RAM_CHASSIS_DAMAGE_RESISTANCE,
+ KPI.Name.RADIOMAN_HIT_CHANCE,
+ KPI.Name.RADIOMAN_ACTIVITY_TIME_AFTER_VEHICLE_DESTROY,
+ KPI.Name.FIRE_EXTINGUISHING_RATE,
+ KPI.Name.COMMANDER_HIT_CHANCE,
+ KPI.Name.WOUNDED_CREW_EFFICIENCY)
+EXTRA_MOBILITY_PARAMS = (KPI.Name.VEHICLE_SPEED_GAIN,
+ KPI.Name.VEHICLE_WEAK_SOIL_RESISTANCE,
+ KPI.Name.VEHICLE_AVERAGE_SOIL_RESISTANCE,
+ KPI.Name.WHEELS_ROTATION_SPEED)
+EXTRA_CAMOUFLAGE_PARAMS = (KPI.Name.VEHICLE_OWN_SPOTTING_TIME, KPI.Name.FOLIAGE_MASKING_FACTOR)
+EXTRA_VISIBILITY_PARAMS = (KPI.Name.VEHICLE_ENEMY_SPOTTING_TIME,
+ KPI.Name.DEMASK_FOLIAGE_FACTOR,
+ KPI.Name.DEMASK_MOVING_FACTOR,
+ KPI.Name.CIRCULAR_VISION_RADIUS_WHILE_SURVEYING_DEVICE_DAMAGED,
+ KPI.Name.ART_NOTIFICATION_DELAY_FACTOR,
+ KPI.Name.DAMAGED_MODULES_DETECTION_TIME,
+ KPI.Name.VEHICLE_ALLY_RADIO_DISTANCE)
 EXTRA_PARAMS_GROUP = {'relativePower': EXTRA_POWER_PARAMS,
  'relativeArmor': EXTRA_ARMOR_PARAMS,
  'relativeMobility': EXTRA_MOBILITY_PARAMS,
@@ -85,6 +127,12 @@ _STATE_TO_HIGHLIGHT = {PARAM_STATE.WORSE: HANGAR_ALIASES.VEH_PARAM_RENDERER_HIGH
  PARAM_STATE.BETTER: HANGAR_ALIASES.VEH_PARAM_RENDERER_HIGHLIGHT_POSITIVE,
  PARAM_STATE.NOT_APPLICABLE: HANGAR_ALIASES.VEH_PARAM_RENDERER_HIGHLIGHT_NONE,
  PARAM_STATE.NORMAL: HANGAR_ALIASES.VEH_PARAM_RENDERER_HIGHLIGHT_NONE}
+_PARAMS_WITH_AVAILABLE_ZERO_VALUES = {DUAL_ACCURACY_COOLING_DELAY: lambda v: v is not None}
+
+def isValidEmptyValue(paramName, paramValue):
+    func = _PARAMS_WITH_AVAILABLE_ZERO_VALUES.get(paramName)
+    return func(paramValue) if func is not None else False
+
 
 def _getParamsProvider(item, vehicleDescr=None):
     if vehicles.isVehicleDescr(item.descriptor):
@@ -132,16 +180,15 @@ def getCompatibles(item, vehicleDescr=None):
     return get(item, vehicleDescr).get('compatible')
 
 
-def idealCrewComparator(vehicle):
+def similarCrewComparator(vehicle):
     vehicleParamsObject = params.VehicleParams(vehicle)
     vehicleParams = vehicleParamsObject.getParamsDict()
     bonuses = vehicleParamsObject.getBonuses(vehicle)
-    penalties = vehicleParamsObject.getPenalties(vehicle)
     compatibleArtefacts = g_paramsCache.getCompatibleArtefacts(vehicle)
-    idealCrewVehicle = copy.copy(vehicle)
-    idealCrewVehicle.crew = vehicle.getPerfectCrew()
-    perfectVehicleParams = params.VehicleParams(idealCrewVehicle).getParamsDict()
-    return VehiclesComparator(vehicleParams, perfectVehicleParams, compatibleArtefacts, bonuses, penalties)
+    similarCrewVehicle = copy.copy(vehicle)
+    similarCrewVehicle.crew = vehicle.getSimilarCrew()
+    perfectVehicleParams = params.VehicleParams(similarCrewVehicle).getParamsDict()
+    return VehiclesComparator(vehicleParams, perfectVehicleParams, compatibleArtefacts, bonuses)
 
 
 def itemOnVehicleComparator(vehicle, item):
@@ -178,6 +225,20 @@ def itemOnVehicleComparator(vehicle, item):
         withItemParams = params.VehicleParams(vehicle).getParamsDict()
         vehicle.descriptor.installComponent(removedModule[0])
     return VehiclesComparator(withItemParams, vehicleParams)
+
+
+def skillOnSimilarCrewComparator(vehicle, skillName=None):
+    vehicleWithIdealCrew = copy.copy(vehicle)
+    vehicleWithIdealCrew.crew = vehicle.getSimilarCrew()
+    vehicleParamsObject = params.VehicleParams(vehicleWithIdealCrew)
+    vehicleParams = vehicleParamsObject.getParamsDict()
+    bonuses = vehicleParamsObject.getBonuses(vehicleWithIdealCrew)
+    penalties = vehicleParamsObject.getPenalties(vehicleWithIdealCrew)
+    compatibleArtefacts = g_paramsCache.getCompatibleArtefacts(vehicleWithIdealCrew)
+    newVehicle = copy.copy(vehicle)
+    newVehicle.crew = newVehicle.getCrewWithSkill(skillName)
+    newVehicleParams = params.VehicleParams(newVehicle).getParamsDict()
+    return VehiclesComparator(newVehicleParams, vehicleParams, suitableArtefacts=compatibleArtefacts, bonuses=bonuses, penalties=penalties)
 
 
 def artifactComparator(vehicle, item, slotIdx, compareWithEmptySlot=False):
@@ -285,10 +346,29 @@ def getGroupBonuses(groupName, comparator):
 
 def hasGroupPenalties(groupName, comparator):
     for paramName in PARAMS_GROUPS[groupName]:
-        if comparator.getExtendedData(paramName).penalties:
+        if comparator.getPenalties(paramName):
             return True
 
     return False
+
+
+def __hasEffect(groupName, comparator, targetState):
+    for paramName in chain(PARAMS_GROUPS[groupName], EXTRA_PARAMS_GROUP[groupName]):
+        state = comparator.getExtendedData(paramName).state
+        if type(state[0]) is not tuple:
+            state = (state,)
+        if any([ status == targetState for status, _ in state ]):
+            return True
+
+    return False
+
+
+def hasNegativeEffect(groupName, comparator):
+    return __hasEffect(groupName, comparator, PARAM_STATE.WORSE)
+
+
+def hasPositiveEffect(groupName, comparator):
+    return __hasEffect(groupName, comparator, PARAM_STATE.BETTER)
 
 
 def getCommonParam(state, name, parentID='', highlight=HANGAR_ALIASES.VEH_PARAM_RENDERER_HIGHLIGHT_NONE):
@@ -313,7 +393,7 @@ class SimplifiedBarVO(dict):
 
 class VehParamsBaseGenerator(object):
 
-    def getFormattedParams(self, comparator, expandedGroups=None, vehIntCD=None, diffParams=None):
+    def getFormattedParams(self, comparator, expandedGroups=None, vehIntCD=None, diffParams=None, hasNormalization=False):
         result = []
         if not GUI_SETTINGS.technicalInfo:
             return result
@@ -329,7 +409,7 @@ class VehParamsBaseGenerator(object):
                     result.append(bottomVo)
                 if isOpened:
                     for paramName in PARAMS_GROUPS[groupName]:
-                        param = comparator.getExtendedData(paramName)
+                        param = comparator.getExtendedData(paramName, hasNormalization)
                         highlight = diffParams.get(paramName, HANGAR_ALIASES.VEH_PARAM_RENDERER_HIGHLIGHT_NONE)
                         formattedParam = self._makeAdvancedParamVO(param, groupName, highlight)
                         if formattedParam:
@@ -370,6 +450,8 @@ class VehParamsBaseGenerator(object):
             hasExtraParams = False
             for extraParamName in EXTRA_PARAMS_GROUP[groupName]:
                 param = comparator.getExtendedData(extraParamName)
+                if extraParamName in HIDDEN_PARAM_DEFAULTS and param.value == HIDDEN_PARAM_DEFAULTS[extraParamName]:
+                    continue
                 highlight = diffParams.get(extraParamName, HANGAR_ALIASES.VEH_PARAM_RENDERER_HIGHLIGHT_NONE)
                 formattedParam, nSlashCount = self._makeExtraParamVO(param, groupName, highlight)
                 if formattedParam:

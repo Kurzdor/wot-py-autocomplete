@@ -2,6 +2,7 @@
 # Embedded file name: scripts/client/gui/shared/utils/requesters/StatsRequester.py
 from collections import namedtuple
 import json
+import typing
 import BigWorld
 from account_helpers.premium_info import PremiumInfo
 from adisp import adisp_async
@@ -14,6 +15,8 @@ from skeletons.gui.game_control import IWalletController
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.shared.utils.requesters import IStatsRequester
 from nation_change.nation_change_helpers import NationalGroupDataAccumulator
+if typing.TYPE_CHECKING:
+    from typing import List, Tuple
 _ADDITIONAL_XP_DATA_KEY = '_additionalXPCache'
 _ControllableXPData = namedtuple('_ControllableXPData', ('vehicleID', 'bonusType', 'extraXP', 'extraFreeXP', 'extraTmenXP', 'isXPToTMan'))
 
@@ -109,6 +112,15 @@ class StatsRequester(AbstractSyncDataRequester, IStatsRequester):
     def applyAdditionalXPCount(self):
         maxCount = self.lobbyContext.getServerSettings().getAdditionalBonusConfig().get('applyCount', 0)
         return max(maxCount - self.getCacheValue('applyAdditionalXPCount', maxCount), 0)
+
+    @property
+    def applyAdditionalWoTPlusXPCount(self):
+        maxCount = self.lobbyContext.getServerSettings().getAdditionalWoTPlusXPCount()
+        return max(maxCount - self.getCacheValue('applyAdditionalWoTPlusXPCount', maxCount), 0)
+
+    @property
+    def dailyAppliedAdditionalXP(self):
+        return self.dummySessionStats.get('totalDailyAppliedAdditionalXP', 0)
 
     @property
     def multipliedRankedVehicles(self):
@@ -290,16 +302,16 @@ class StatsRequester(AbstractSyncDataRequester, IStatsRequester):
         return self.getCacheValue('comp7', {})
 
     @property
-    def tutorialsCompleted(self):
-        return self.getCacheValue('tutorialsCompleted', 0)
-
-    @property
     def oldVehInvIDs(self):
         return self.getCacheValue('oldVehInvIDs', ())
 
     @property
     def dynamicCurrencies(self):
         return self.getCacheValue('dynamicCurrencies', {})
+
+    @property
+    def isEmergencyModeEnabled(self):
+        return self.getCacheValue('isEmergencyModeEnabled', False)
 
     def getMapsBlackList(self):
         blackList = self.getCacheValue('preferredMaps', {}).get('blackList', ())
@@ -322,6 +334,14 @@ class StatsRequester(AbstractSyncDataRequester, IStatsRequester):
 
     def getWeeklyVehicleCrystals(self, vehCD):
         return self.getCacheValue('weeklyVehicleCrystals', {}).get(vehCD, 0)
+
+    @property
+    def luiVersion(self):
+        return self.getCacheValue('limitedUi', {}).get('ver', 1)
+
+    @property
+    def newbieHintsGroup(self):
+        return self.getCacheValue('abFeatureTest', {}).get('newbieHints')
 
     @adisp_async
     def _requestCache(self, callback):

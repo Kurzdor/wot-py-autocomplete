@@ -52,6 +52,9 @@ class SettingsWindowMeta(AbstractWindowView):
     def openColorSettings(self):
         self._printOverrideError('openColorSettings')
 
+    def restartNewbieBattleHints(self):
+        self._printOverrideError('restartNewbieBattleHints')
+
     def as_setDataS(self, settingsData):
         return self.flashObject.as_setData(settingsData) if self._isDAAPIInited() else None
 
@@ -63,6 +66,9 @@ class SettingsWindowMeta(AbstractWindowView):
 
     def as_confirmWarningDialogS(self, isOk, dialogID):
         return self.flashObject.as_confirmWarningDialog(isOk, dialogID) if self._isDAAPIInited() else None
+
+    def as_showLimitedUISettingS(self, isVisible):
+        return self.flashObject.as_showLimitedUISetting(isVisible) if self._isDAAPIInited() else None
 
     def as_ConfirmationOfApplicationS(self, isApplied):
         return self.flashObject.as_ConfirmationOfApplication(isApplied) if self._isDAAPIInited() else None
@@ -90,3 +96,6 @@ class SettingsWindowMeta(AbstractWindowView):
 
     def as_setFeedbackDataProviderS(self, dataProvider):
         return self.flashObject.as_setFeedbackDataProvider(dataProvider) if self._isDAAPIInited() else None
+
+    def as_setDisabledTabsOverlayS(self, tabIndexes, text):
+        return self.flashObject.as_setDisabledTabsOverlay(tabIndexes, text) if self._isDAAPIInited() else None

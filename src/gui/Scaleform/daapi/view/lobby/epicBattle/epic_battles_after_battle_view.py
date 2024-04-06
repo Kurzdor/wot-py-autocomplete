@@ -1,5 +1,6 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/Scaleform/daapi/view/lobby/epicBattle/epic_battles_after_battle_view.py
+import collections
 import SoundGroups
 from constants import EPIC_ABILITY_PTS_NAME
 from epic_constants import EPIC_SELECT_BONUS_NAME
@@ -22,6 +23,7 @@ from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.server_events import IEventsCache
 from uilogging.epic_battle.constants import EpicBattleLogKeys, EpicBattleLogActions, EpicBattleLogButtons
 from uilogging.epic_battle.loggers import EpicBattleTooltipLogger
+from skeletons.gui.battle_results import IBattleResultsService
 
 class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
     _MAX_VISIBLE_AWARDS = 6
@@ -29,7 +31,7 @@ class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
      'abilityPts': 2,
      'crystal': 3,
      'goodies': 4,
-     'epicSelectToken': 5,
+     EPIC_SELECT_BONUS_NAME: 5,
      'crewBooks': 6}
     _MIDDLE_PRIORITY = 50
     _awardsFormatter = EpicCurtailingAwardsComposer(_MAX_VISIBLE_AWARDS, getEpicBattleViewAwardPacker())
@@ -37,6 +39,7 @@ class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
     __epicController = dependency.descriptor(IEpicBattleMetaGameController)
     __battlePass = dependency.descriptor(IBattlePassController)
     __lobbyContext = dependency.descriptor(ILobbyContext)
+    __battleResultsService = dependency.descriptor(IBattleResultsService)
 
     def __init__(self, ctx=None):
         super(EpicBattlesAfterBattleView, self).__init__()
@@ -46,7 +49,6 @@ class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
         self.__isViewWatchedLogStopped = False
         self.__rewardsSelectionWindow = None
         self.__awardsWindow = None
-        self.__rewardSelectionLogged = False
         self.__uiEpicBattleLogger = EpicBattleTooltipLogger()
         return
 
@@ -61,6 +63,9 @@ class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
 
     def onNextBtnClick(self):
         self.__uiEpicBattleLogger.log(EpicBattleLogActions.CLICK.value, EpicBattleLogButtons.NEXT.value, parentScreen=EpicBattleLogKeys.HANGAR.value)
+        arenaUniqueID = self.__ctx['levelUpInfo'].get('arenaUniqueID')
+        if arenaUniqueID and self.__battleResultsService.areResultsPosted(arenaUniqueID):
+            self.__battleResultsService.notifyBattleResultsPosted(arenaUniqueID, True)
         self.destroy()
 
     def onEscapePress(self):
@@ -95,7 +100,8 @@ class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
 
         self.__stopViewWatchedLog()
         self.__uiEpicBattleLogger.startAction(EpicBattleLogActions.VIEW_WATCHED.value)
-        self.__rewardsSelectionWindow = showEpicRewardsSelectionWindow(onRewardsReceivedCallback=_onRewardReceived, onCloseCallback=_logRewardSelectionClosed, onLoadedCallback=self.destroy, isAutoDestroyWindowsOnReceivedRewards=False)
+        currLvl, _ = self.__epicController.getPlayerLevelInfo()
+        self.__rewardsSelectionWindow = showEpicRewardsSelectionWindow(level=currLvl, onRewardsReceivedCallback=_onRewardReceived, onCloseCallback=_logRewardSelectionClosed, onLoadedCallback=self.destroy, isAutoDestroyWindowsOnReceivedRewards=False)
 
     def onWindowClose(self):
         self.destroy()
@@ -135,7 +141,22 @@ class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
         achievedRank = max(levelUpInfo.get('playerRank', 0), 1)
         rankNameId = R.strings.epic_battle.rank.dyn('rank' + str(achievedRank))
         rankName = toUpper(backport.text(rankNameId())) if rankNameId.exists() else ''
-        bonuses = sorted(mergeBonuses(self.__getBonuses(prevPMetaLevel, pMetaLevel)), key=lambda item: self._BONUS_ORDER_PRIORITY.get(item.getName(), self._MIDDLE_PRIORITY))
+        sourceBonuses = self.__getBonuses(prevPMetaLevel, pMetaLevel)
+        tokenBonusesGroups = collections.defaultdict(list)
+        otherBonuses = []
+        for sourceBonus in sourceBonuses:
+            if sourceBonus.getName() == EPIC_SELECT_BONUS_NAME:
+                for key in sourceBonus.getValue():
+                    splitKey = key.rsplit(':', 2)[0]
+                    tokenBonusesGroups[splitKey].append(sourceBonus)
+
+            otherBonuses.append(sourceBonus)
+
+        tokenBonuses = []
+        for tokenBonusesGroup in tokenBonusesGroups.values():
+            tokenBonuses += mergeBonuses(tokenBonusesGroup)
+
+        bonuses = sorted(mergeBonuses(otherBonuses) + tokenBonuses, key=lambda item: self._BONUS_ORDER_PRIORITY.get(item.getName(), self._MIDDLE_PRIORITY))
         tooltipToBonusNameMapping = {}
         awardsVO = self.__markAnimationBonuses(self._awardsFormatter.getFormattedBonuses(bonuses, size=AWARDS_SIZES.BIG))
         for idx, bonus in enumerate(bonuses):
@@ -143,7 +164,7 @@ class EpicBattlesAfterBattleView(EpicBattlesAfterBattleViewMeta):
             if awardTooltip is not None:
                 tooltipToBonusNameMapping[str(awardTooltip)] = bonus.getName()
 
-        self.__uiEpicBattleLogger.initialize(EpicBattleLogKeys.AFTER_BATTLE_VIEW.value, skipAdditionalInfoTooltips=(TOOLTIPS_CONSTANTS.EPIC_BATTLE_RECERTIFICATION_FORM_TOOLTIP, TOOLTIPS_CONSTANTS.EPIC_BATTLE_INSTRUCTION_TOOLTIP), overrideTooltipsId=tooltipToBonusNameMapping)
+        self.__uiEpicBattleLogger.initialize(EpicBattleLogKeys.AFTER_BATTLE_VIEW.value, skipAdditionalInfoTooltips=(TOOLTIPS_CONSTANTS.EPIC_BATTLE_RECERTIFICATION_FORM_TOOLTIP,), overrideTooltipsId=tooltipToBonusNameMapping)
         fameBarVisible = True
         dailyQuestAvailable = False
         if prevPMetaLevel >= maxMetaLevel or pMetaLevel >= maxMetaLevel:

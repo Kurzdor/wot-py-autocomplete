@@ -38,6 +38,7 @@ from gui.hangar_cameras.hangar_camera_common import CameraMovementStates, Camera
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
 from gui.ClientHangarSpace import hangarCFG
 from gui.battle_control.vehicle_getter import hasTurretRotator
+from cgf_components.hangar_camera_manager import HangarCameraManager
 import GenericComponents
 import CGF
 if TYPE_CHECKING:
@@ -46,6 +47,9 @@ if TYPE_CHECKING:
 _SHOULD_CHECK_DECAL_UNDER_GUN = True
 _PROJECTION_DECAL_OVERLAPPING_FACTOR = 0.7
 _HANGAR_TURRET_SHIFT = math.pi / 8
+_CAMERA_CAPSULE_GUN_SCALE = Math.Vector3(1.0, 1.0, 1.1)
+_CAMERA_CAPSULE_SCALE = Math.Vector3(1.5, 1.5, 1.5)
+_CAMERA_MIN_DIST_FACTOR = 0.8
 AnchorLocation = namedtuple('AnchorLocation', ['position', 'normal', 'up'])
 AnchorId = namedtuple('AnchorId', ('slotType', 'areaId', 'regionIdx'))
 AnchorHelper = namedtuple('AnchorHelper', ['location',
@@ -322,14 +326,8 @@ class HangarVehicleAppearance(ScriptGameObject):
          'vEntityId': self.__vEntity.id,
          'intCD': self.__vDesc.type.compactDescr}), scope=EVENT_BUS_SCOPE.DEFAULT)
         cfg = hangarCFG()
-        gunScale = Math.Vector3(1.0, 1.0, 1.1)
-        capsuleScale = Math.Vector3(1.5, 1.5, 1.5)
-        loadedGunScale = cfg.get('cam_capsule_gun_scale', gunScale)
-        if loadedGunScale is not None:
-            gunScale = loadedGunScale
-        loadedCapsuleScale = cfg.get('cam_capsule_scale', capsuleScale)
-        if loadedCapsuleScale is not None:
-            capsuleScale = loadedCapsuleScale
+        gunScale = cfg.get('cam_capsule_gun_scale', _CAMERA_CAPSULE_GUN_SCALE)
+        capsuleScale = cfg.get('cam_capsule_scale', _CAMERA_CAPSULE_SCALE)
         hitTesterManagers = {TankPartNames.CHASSIS: vDesc.chassis.hitTesterManager,
          TankPartNames.HULL: vDesc.hull.hitTesterManager,
          TankPartNames.TURRET: vDesc.turret.hitTesterManager,
@@ -344,13 +342,31 @@ class HangarVehicleAppearance(ScriptGameObject):
                 crashedBspModel = (partId, htManager.crashedModelHitTester.bspModelName)
                 crashedBspModels = crashedBspModels + (crashedBspModel,)
 
-        bspModels = bspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 1, vDesc.hull.hitTesterManager.modelHitTester.bspModelName, capsuleScale), (TankPartNames.getIdx(TankPartNames.GUN) + 2, vDesc.turret.hitTesterManager.modelHitTester.bspModelName, capsuleScale), (TankPartNames.getIdx(TankPartNames.GUN) + 3, vDesc.gun.hitTesterManager.modelHitTester.bspModelName, gunScale))
+        bspModels = bspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 1,
+          vDesc.hull.hitTesterManager.modelHitTester.bspModelName,
+          capsuleScale,
+          True), (TankPartNames.getIdx(TankPartNames.GUN) + 2,
+          vDesc.turret.hitTesterManager.modelHitTester.bspModelName,
+          capsuleScale,
+          True), (TankPartNames.getIdx(TankPartNames.GUN) + 3,
+          vDesc.gun.hitTesterManager.modelHitTester.bspModelName,
+          gunScale,
+          True))
         if vDesc.hull.hitTesterManager.crashedModelHitTester:
-            crashedBspModels = crashedBspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 1, vDesc.hull.hitTesterManager.crashedModelHitTester.bspModelName, capsuleScale),)
+            crashedBspModels = crashedBspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 1,
+              vDesc.hull.hitTesterManager.crashedModelHitTester.bspModelName,
+              capsuleScale,
+              True),)
         if vDesc.turret.hitTesterManager.crashedModelHitTester:
-            crashedBspModels = crashedBspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 2, vDesc.turret.hitTesterManager.crashedModelHitTester.bspModelName, capsuleScale),)
+            crashedBspModels = crashedBspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 2,
+              vDesc.turret.hitTesterManager.crashedModelHitTester.bspModelName,
+              capsuleScale,
+              True),)
         if vDesc.gun.hitTesterManager.crashedModelHitTester:
-            crashedBspModels = crashedBspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 3, vDesc.gun.hitTesterManager.crashedModelHitTester.bspModelName, gunScale),)
+            crashedBspModels = crashedBspModels + ((TankPartNames.getIdx(TankPartNames.GUN) + 3,
+              vDesc.gun.hitTesterManager.crashedModelHitTester.bspModelName,
+              gunScale,
+              True),)
         modelCA = BigWorld.CollisionAssembler(bspModels, self.__spaceId)
         modelCA.name = 'ModelCollisions'
         resources.append(modelCA)
@@ -407,6 +423,8 @@ class HangarVehicleAppearance(ScriptGameObject):
             self.turretRotator = SimpleTurretRotator(self.compoundModel, self.__staticTurretYaw, self.__vDesc.hull.turretPositions[0], self.__vDesc.hull.turretPitches[0], easingCls=math_utils.Easing.squareEasing)
             self.__applyAttachmentsVisibility()
             self.__fireResourcesLoadedEvent()
+            if succesLoaded:
+                self.__doFinalSetup(buildInd)
             super(HangarVehicleAppearance, self).activate()
             return
 
@@ -498,10 +516,10 @@ class HangarVehicleAppearance(ScriptGameObject):
                 self.dirtComponent.setBase()
             outfitData = camouflages.getOutfitData(self, self.__outfit, self.__vDesc, self.__vState != 'undamaged')
             self.c11nComponent = self.createComponent(Vehicular.C11nEditComponent, self.__fashions, self.compoundModel, outfitData)
-            self.__updateDecals(self.__outfit)
-            self.__updateSequences(self.__outfit)
             if self.__outfit.style and self.__outfit.style.isProgression:
                 self.__updateStyleProgression(self.__outfit)
+            self.__updateDecals(self.__outfit)
+            self.__updateSequences(self.__outfit)
         else:
             self.__fashions = VehiclePartsTuple(BigWorld.WGVehicleFashion(), BigWorld.WGBaseFashion(), BigWorld.WGBaseFashion(), BigWorld.WGBaseFashion())
             self.__vEntity.model.setupFashions(self.__fashions)
@@ -552,7 +570,6 @@ class HangarVehicleAppearance(ScriptGameObject):
         self.__assembleModel()
         matrix = math_utils.createSRTMatrix(Math.Vector3(1.0, 1.0, 1.0), Math.Vector3(self.__vEntity.yaw, self.__vEntity.pitch, self.__vEntity.roll), self.__vEntity.position)
         self.__vEntity.model.matrix = matrix
-        self.__doFinalSetup(buildIdx)
         self.__vEntity.typeDescriptor = self.__vDesc
         typeDescr = self.__vDesc
         wheelConfig = typeDescr.chassis.generalWheelsAnimatorConfig
@@ -590,6 +607,11 @@ class HangarVehicleAppearance(ScriptGameObject):
         if state != CameraMovementStates.FROM_OBJECT:
             colliderData = (self.collisions.getColliderID(), (TankPartNames.getIdx(TankPartNames.GUN) + 1, TankPartNames.getIdx(TankPartNames.GUN) + 2, TankPartNames.getIdx(TankPartNames.GUN) + 3))
             BigWorld.appendCameraCollider(colliderData)
+            cameraManager = CGF.getManager(self.__spaceId, HangarCameraManager)
+            if cameraManager:
+                cfg = hangarCFG()
+                minDistFactor = cfg.get('cam_min_dist_vehicle_hull_length_k', _CAMERA_MIN_DIST_FACTOR)
+                cameraManager.setMinDist(minDistFactor * self.computeVehicleLength())
         else:
             BigWorld.removeCameraCollider(self.collisions.getColliderID())
 
@@ -684,13 +706,12 @@ class HangarVehicleAppearance(ScriptGameObject):
     def __applyCustomization(self, outfit, callback):
         if outfit.style and outfit.style.isProgression:
             outfit = self.__getStyleProgressionOutfitData(outfit)
+            self.__updateStyleProgression(outfit)
         self.__updateCamouflage(outfit)
         self.__updatePaint(outfit)
         self.__updateDecals(outfit)
         self.__updateProjectionDecals(outfit)
         self.__updateSequences(outfit)
-        if outfit.style and outfit.style.isProgression:
-            self.__updateStyleProgression(outfit)
         if callback is not None:
             callback()
         return

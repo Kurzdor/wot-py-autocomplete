@@ -3,11 +3,12 @@
 import logging
 import typing
 import weakref
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from math import fabs, ceil
 import BigWorld
 import CommandMapping
 import Event
+from arena_bonus_type_caps import ARENA_BONUS_TYPE_CAPS as BONUS_CAPS
 from constants import VEHICLE_SETTING, ReloadRestriction
 from shared_utils import CONST_CONTAINER
 from debug_utils import LOG_CODEPOINT_WARNING, LOG_ERROR
@@ -147,7 +148,7 @@ class IGunReloadingState(IGunReloadingSnapshot):
     def getSnapshot(self):
         raise NotImplementedError
 
-    def startPredictedReloading(self):
+    def startPredictedReloading(self, usePrediction):
         raise NotImplementedError
 
     def stopPredicateReloading(self):
@@ -201,8 +202,8 @@ class ReloadingTimeState(ReloadingTimeSnapshot, IGunReloadingState):
     def getSnapshot(self):
         return ReloadingTimeSnapshot(actualTime=self._actualTime, baseTime=self._baseTime, startTime=self._startTime, updateTime=self._updateTime, waitReloadingStartResponse=self._waitReloadingStartResponse)
 
-    def startPredictedReloading(self):
-        self._waitReloadingStartResponse = True
+    def startPredictedReloading(self, usePrediction):
+        self._waitReloadingStartResponse = usePrediction
 
     def stopPredicateReloading(self):
         self._waitReloadingStartResponse = False
@@ -399,7 +400,7 @@ class _AutoReloadingBoostStateCtrl(object):
 
 
 class AmmoController(MethodsRules, ViewComponentsController):
-    __slots__ = ('__eManager', 'onShellsAdded', 'onShellsUpdated', 'onNextShellChanged', 'onCurrentShellChanged', 'onGunSettingsSet', 'onGunReloadTimeSet', 'onGunAutoReloadTimeSet', 'onGunAutoReloadBoostUpdated', '_autoReloadingBoostState', 'onShellsCleared', '__ammo', '_order', '__currShellCD', '__nextShellCD', '__gunSettings', '_reloadingState', '_autoReloadingState', '__autoShoots', '__weakref__', 'onDebuffStarted', '__quickChangerActive', 'onQuickShellChangerUpdated', '__shellChangeTime', '__quickChangerFactor', '__dualGunShellChangeTime', '__dualGunQuickChangeReady', '__quickChangerInProcess')
+    __slots__ = ('__eManager', 'onShellsAdded', 'onShellsUpdated', 'onNextShellChanged', 'onCurrentShellChanged', 'onGunSettingsSet', 'onGunReloadTimeSet', 'onGunAutoReloadTimeSet', 'onGunAutoReloadBoostUpdated', '_autoReloadingBoostState', 'onShellsCleared', '__ammo', '_order', '__currShellCD', '__nextShellCD', '__gunSettings', '_reloadingState', '_autoReloadingState', '__autoShoots', '__weakref__', 'onDebuffStarted', '__quickChangerActive', 'onQuickShellChangerUpdated', '__shellChangeTime', '__quickChangerFactor', '__dualGunShellChangeTime', '__dualGunQuickChangeReady', '__quickChangerInProcess', '__infinity')
     __guiSessionProvider = dependency.descriptor(IBattleSessionProvider)
 
     def __init__(self, reloadingState=None):
@@ -418,6 +419,7 @@ class AmmoController(MethodsRules, ViewComponentsController):
         self.onQuickShellChangerUpdated = Event.Event(self.__eManager)
         self.onShellsCleared = Event.Event(self.__eManager)
         self.__ammo = {}
+        self.__infinity = defaultdict(int)
         self._order = []
         self._reloadingState = reloadingState or ReloadingTimeState()
         self._autoReloadingState = ReloadingTimeState()
@@ -476,7 +478,7 @@ class AmmoController(MethodsRules, ViewComponentsController):
     def getGunSettings(self):
         return self.__gunSettings
 
-    def updateForNewSetup(self, gun, shells, resetShells=True):
+    def updateForNewSetup(self, gun, shells):
         currentShellCD, nextShellCD = self.getCurrentShellCD(), self.getNextShellCD()
         self.clear(leave=False)
         self.setGunSettings(gun)
@@ -538,12 +540,12 @@ class AmmoController(MethodsRules, ViewComponentsController):
         return self.__currShellCD
 
     @MethodsRules.delayable('setShells')
-    def setCurrentShellCD(self, intCD):
+    def setCurrentShellCD(self, intCD, usePrediction=True):
         result = False
         if intCD in self.__ammo:
             if self.__currShellCD != intCD:
                 self.__currShellCD = intCD
-                self._reloadingState.startPredictedReloading()
+                self._reloadingState.startPredictedReloading(usePrediction)
                 self.__onCurrentShellChanged(intCD)
                 result = True
         else:
@@ -611,8 +613,14 @@ class AmmoController(MethodsRules, ViewComponentsController):
     def getGunReloadingState(self):
         return self._reloadingState.getSnapshot()
 
+    def getAutoReloadingState(self):
+        return self._autoReloadingState.getSnapshot()
+
     def isGunReloading(self):
         return not self._reloadingState.isReloadingFinished()
+
+    def getShellChangeTime(self):
+        return self.__shellChangeTime
 
     @MethodsRules.delayable('setGunReloadTime')
     def refreshGunReloading(self):
@@ -637,11 +645,13 @@ class AmmoController(MethodsRules, ViewComponentsController):
         for intCD in self._order:
             descriptor = self.__gunSettings.getShellDescriptor(intCD)
             quantity, quantityInClip = self.__ammo[intCD]
+            isInfinite = self.__isInfiniteShell(intCD)
             result.append((intCD,
              descriptor,
              quantity,
              quantityInClip,
-             self.__gunSettings))
+             self.__gunSettings,
+             isInfinite))
 
         return result
 
@@ -692,7 +702,8 @@ class AmmoController(MethodsRules, ViewComponentsController):
             self._order.append(intCD)
             result |= SHELL_SET_RESULT.ADDED
             descriptor = self.__gunSettings.getShellDescriptor(intCD)
-            self.onShellsAdded(intCD, descriptor, quantity, quantityInClip, self.__gunSettings)
+            isInfinite = self.__isInfiniteShell(intCD)
+            self.onShellsAdded(intCD, descriptor, quantity, quantityInClip, self.__gunSettings, isInfinite)
         if self.canQuickShellChange():
             self.onQuickShellChangerUpdated(True, self.getQuickShellChangeTime())
         return result
@@ -720,7 +731,7 @@ class AmmoController(MethodsRules, ViewComponentsController):
             code = self.getNextSettingCode(intCD)
             if code is None:
                 return False
-            avatar_getter.updateVehicleSetting(code, intCD, avatar)
+            avatar_getter.predictVehicleSetting(code, intCD, avatar)
             avatar_getter.changeVehicleSetting(code, intCD, avatar)
             return True
 
@@ -748,6 +759,7 @@ class AmmoController(MethodsRules, ViewComponentsController):
 
     def clearAmmo(self):
         self.__ammo.clear()
+        self.__infinity.clear()
         self._order = []
         self.__currShellCD = None
         self.__nextShellCD = None
@@ -804,6 +816,13 @@ class AmmoController(MethodsRules, ViewComponentsController):
         if any([ component.isActive for component in self._viewComponents ]):
             for component in self._viewComponents:
                 component.handleAmmoKey(key)
+
+    def __isInfiniteShell(self, intCD):
+        if intCD not in self.__infinity:
+            arena = avatar_getter.getArena()
+            isInfiniteBonusCap = BONUS_CAPS.checkAny(arena.bonusType, BONUS_CAPS.INFINITE_AMMO) if arena else False
+            self.__infinity[intCD] = isInfiniteBonusCap or self.__gunSettings.getShellDescriptor(intCD).isInfinite
+        return self.__infinity[intCD]
 
     def __onCurrentShellChanged(self, intCD):
         self.onCurrentShellChanged(intCD)
@@ -894,5 +913,5 @@ class AmmoReplayPlayer(AmmoController):
             intCD = self._order[idx]
             code = self.getNextSettingCode(intCD)
             if code is not None:
-                avatar_getter.updateVehicleSetting(code, intCD)
+                avatar_getter.predictVehicleSetting(code, intCD)
             return

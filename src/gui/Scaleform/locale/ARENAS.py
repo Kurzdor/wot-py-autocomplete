@@ -35,12 +35,6 @@ class ARENAS(object):
     TYPE_FALLOUT6_NAME = '#arenas:type/fallout6/name'
     TYPE_FALLOUT6_DESCRIPTION = '#arenas:type/fallout6/description'
     TYPE_FALLOUTMUTLITEAM_DESCRIPTION = '#arenas:type/falloutMutliteam/description'
-    TYPE_BOOTCAMP_DESCRIPTION0 = '#arenas:type/bootcamp/description0'
-    TYPE_BOOTCAMP_DESCRIPTION1 = '#arenas:type/bootcamp/description1'
-    TYPE_BOOTCAMP_DESCRIPTION2 = '#arenas:type/bootcamp/description2'
-    TYPE_BOOTCAMP_DESCRIPTION3 = '#arenas:type/bootcamp/description3'
-    TYPE_BOOTCAMP_DESCRIPTION4 = '#arenas:type/bootcamp/description4'
-    TYPE_BOOTCAMP_DESCRIPTION5 = '#arenas:type/bootcamp/description5'
     TYPE_CTF30X30_NAME = '#arenas:type/ctf30x30/name'
     TYPE_CTF30X30_DESCRIPTION = '#arenas:type/ctf30x30/description'
     TYPE_DOMINATION30X30_NAME = '#arenas:type/domination30x30/name'
@@ -156,8 +150,16 @@ class ARENAS(object):
     C_252_BR_BATTLE_CITY4_DESCRIPTION = '#arenas:252_br_battle_city4/description'
     C_128_LAST_FRONTIER_V_NAME = '#arenas:128_last_frontier_v/name'
     C_128_LAST_FRONTIER_V_DESCRIPTION = '#arenas:128_last_frontier_v/description'
+    C_108_NORMANDY_NOM_NAME = '#arenas:108_normandy_nom/name'
+    C_108_NORMANDY_NOM_DESCRIPTION = '#arenas:108_normandy_nom/description'
+    C_14_SIEGFRIED_LINE_NOM_NAME = '#arenas:14_siegfried_line_nom/name'
+    C_14_SIEGFRIED_LINE_NOM_DESCRIPTION = '#arenas:14_siegfried_line_nom/description'
     C_121_LOST_PARADISE_V_NAME = '#arenas:121_lost_paradise_v/name'
     C_121_LOST_PARADISE_V_DESCRIPTION = '#arenas:121_lost_paradise_v/description'
+    TYPE_WINBACK_NAME = '#arenas:type/winback/name'
+    TYPE_WINBACK_DESCRIPTION = '#arenas:type/winback/description'
+    C_210_BF_EPIC_DESERT_NAME = '#arenas:210_bf_epic_desert/name'
+    C_210_BF_EPIC_DESERT_DESCRIPTION = '#arenas:210_bf_epic_desert/description'
     ALL_ENUM = (TYPE_CTF_NAME,
      TYPE_CTF_DESCRIPTION,
      TYPE_DOMINATION_NAME,
@@ -190,12 +192,6 @@ class ARENAS(object):
      TYPE_FALLOUT6_NAME,
      TYPE_FALLOUT6_DESCRIPTION,
      TYPE_FALLOUTMUTLITEAM_DESCRIPTION,
-     TYPE_BOOTCAMP_DESCRIPTION0,
-     TYPE_BOOTCAMP_DESCRIPTION1,
-     TYPE_BOOTCAMP_DESCRIPTION2,
-     TYPE_BOOTCAMP_DESCRIPTION3,
-     TYPE_BOOTCAMP_DESCRIPTION4,
-     TYPE_BOOTCAMP_DESCRIPTION5,
      TYPE_CTF30X30_NAME,
      TYPE_CTF30X30_DESCRIPTION,
      TYPE_DOMINATION30X30_NAME,
@@ -311,8 +307,16 @@ class ARENAS(object):
      C_252_BR_BATTLE_CITY4_DESCRIPTION,
      C_128_LAST_FRONTIER_V_NAME,
      C_128_LAST_FRONTIER_V_DESCRIPTION,
+     C_108_NORMANDY_NOM_NAME,
+     C_108_NORMANDY_NOM_DESCRIPTION,
+     C_14_SIEGFRIED_LINE_NOM_NAME,
+     C_14_SIEGFRIED_LINE_NOM_DESCRIPTION,
      C_121_LOST_PARADISE_V_NAME,
-     C_121_LOST_PARADISE_V_DESCRIPTION)
+     C_121_LOST_PARADISE_V_DESCRIPTION,
+     TYPE_WINBACK_NAME,
+     TYPE_WINBACK_DESCRIPTION,
+     C_210_BF_EPIC_DESERT_NAME,
+     C_210_BF_EPIC_DESERT_DESCRIPTION)
 
     @classmethod
     def all(cls, key0):

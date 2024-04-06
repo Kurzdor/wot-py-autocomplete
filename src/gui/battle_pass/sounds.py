@@ -13,27 +13,39 @@ class SOUNDS(CONST_CONTAINER):
     ACTIVATE_CHAPTER_STATE = 'STATE_overlay_hangar_general'
     ACTIVATE_CHAPTER_STATE_ON = 'STATE_overlay_hangar_general_on'
     ACTIVATE_CHAPTER_STATE_OFF = 'STATE_overlay_hangar_general_off'
+    HOLIDAY_SOUND_SPACE = 'tasks_holiday'
+    HOLIDAY_STATE_PLACE = 'STATE_hangar_place'
+    HOLIDAY_STATE_PLACE_TASKS = 'STATE_hangar_place_tasks'
+    HOLIDAY_TASKS_ENTER = 'tasks_holiday_enter'
+    HOLIDAY_TASKS_EXIT = 'tasks_holiday_exit'
 
 
 ACTIVATE_CHAPTER_SOUND_SPACE = CommonSoundSpaceSettings(name=SOUNDS.ACTIVATE_CHAPTER_STATE, entranceStates={SOUNDS.ACTIVATE_CHAPTER_STATE: SOUNDS.ACTIVATE_CHAPTER_STATE_ON}, exitStates={SOUNDS.ACTIVATE_CHAPTER_STATE: SOUNDS.ACTIVATE_CHAPTER_STATE_OFF}, persistentSounds=(), stoppableSounds=(), priorities=(), autoStart=True, enterEvent='', exitEvent='')
+HOLIDAY_TASKS_SOUND_SPACE = CommonSoundSpaceSettings(name=SOUNDS.HOLIDAY_SOUND_SPACE, entranceStates={SOUNDS.HOLIDAY_STATE_PLACE: SOUNDS.HOLIDAY_STATE_PLACE_TASKS}, exitStates={}, enterEvent=SOUNDS.HOLIDAY_TASKS_ENTER, exitEvent=SOUNDS.HOLIDAY_TASKS_EXIT, persistentSounds=(), stoppableSounds=(), priorities=(), autoStart=True)
 
 class BattlePassSounds(CONST_CONTAINER):
     _OVERLAY = 'bp_overlay'
     CONFIRM_BUY = 'bp_overlay_pay'
     REWARD_SCREEN = 'bp_reward_screen'
     TANK_POINTS_CAP = 'bp_tank_point_done'
-    VIDEO_STYLE_G42_MAUS_2 = 'bp_s10_video_maus_level_2_start'
-    VIDEO_STYLE_G42_MAUS_3 = 'bp_s10_video_maus_level_3_start'
-    VIDEO_STYLE_G42_MAUS_4 = 'bp_s10_video_maus_level_4_start'
-    VIDEO_STYLE_IT15_RINOCERONTE_2 = 'bp_s10_video_rinoceronte_level_2_start'
-    VIDEO_STYLE_IT15_RINOCERONTE_3 = 'bp_s10_video_rinoceronte_level_3_start'
-    VIDEO_STYLE_IT15_RINOCERONTE_4 = 'bp_s10_video_rinoceronte_level_4_start'
-    VIDEO_STYLE_S28_UDES_15_16_2 = 'bp_s10_video_udes_level_2_start'
-    VIDEO_STYLE_S28_UDES_15_16_3 = 'bp_s10_video_udes_level_3_start'
-    VIDEO_STYLE_S28_UDES_15_16_4 = 'bp_s10_video_udes_level_4_start'
+    VIDEO_STYLE_J20_Type_2605_2 = 'bp_s11_video_type_5_level_2_start'
+    VIDEO_STYLE_J20_Type_2605_3 = 'bp_s11_video_type_5_level_3_start'
+    VIDEO_STYLE_J20_Type_2605_4 = 'bp_s11_video_type_5_level_4_start'
+    VIDEO_STYLE_F64_AMX_50_FOCH_B_2 = 'bp_s11_video_foch_b_level_2_start'
+    VIDEO_STYLE_F64_AMX_50_FOCH_B_3 = 'bp_s11_video_foch_b_level_3_start'
+    VIDEO_STYLE_F64_AMX_50_FOCH_B_4 = 'bp_s11_video_foch_b_level_4_start'
+    VIDEO_STYLE_A67_T57_58_2 = 'bp_s11_video_t57_level_2_start'
+    VIDEO_STYLE_A67_T57_58_3 = 'bp_s11_video_t57_level_3_start'
+    VIDEO_STYLE_A67_T57_58_4 = 'bp_s11_video_t57_level_4_start'
     VIDEO_PAUSE = 'bp_video_pause'
     VIDEO_RESUME = 'bp_video_resume'
     VIDEO_STOP = 'bp_video_stop'
+    VOICEOVER_STOP = 'bp_voiceovers_stop'
+    REGULAR_VOICEOVER_STOP = 'bp_regular_voiceovers_stop'
+    HOLIDAY_VOICEOVER_STOP = 'bp_holiday_voiceovers_stop'
+    HOLIDAY_REWARD_SCREEN = 'bp_holiday_reward_screen'
+    SPECIAL_TASKS_ENTER = 'tasks_special_enter'
+    SPECIAL_TASKS_EXIT = 'tasks_special_exit'
 
     @classmethod
     def getOverlay(cls, count):
@@ -51,15 +63,15 @@ class AwardVideoSoundControl(IVideoSoundManager):
     __LANGUAGE_STATES = {'ru': BattlePassLanguageSwitch.RU,
      'en': BattlePassLanguageSwitch.EN,
      'cn': BattlePassLanguageSwitch.CN}
-    __VIDEO_TO_SOUND = {'c_192332_2': BattlePassSounds.VIDEO_STYLE_G42_MAUS_2,
-     'c_192332_3': BattlePassSounds.VIDEO_STYLE_G42_MAUS_3,
-     'c_192332_4': BattlePassSounds.VIDEO_STYLE_G42_MAUS_4,
-     'c_180812_2': BattlePassSounds.VIDEO_STYLE_IT15_RINOCERONTE_2,
-     'c_180812_3': BattlePassSounds.VIDEO_STYLE_IT15_RINOCERONTE_3,
-     'c_180812_4': BattlePassSounds.VIDEO_STYLE_IT15_RINOCERONTE_4,
-     'c_192588_2': BattlePassSounds.VIDEO_STYLE_S28_UDES_15_16_2,
-     'c_192588_3': BattlePassSounds.VIDEO_STYLE_S28_UDES_15_16_3,
-     'c_192588_4': BattlePassSounds.VIDEO_STYLE_S28_UDES_15_16_4}
+    __VIDEO_TO_SOUND = {'c_201292_2': BattlePassSounds.VIDEO_STYLE_J20_Type_2605_2,
+     'c_201292_3': BattlePassSounds.VIDEO_STYLE_J20_Type_2605_3,
+     'c_201292_4': BattlePassSounds.VIDEO_STYLE_J20_Type_2605_4,
+     'c_201548_2': BattlePassSounds.VIDEO_STYLE_F64_AMX_50_FOCH_B_2,
+     'c_201548_3': BattlePassSounds.VIDEO_STYLE_F64_AMX_50_FOCH_B_3,
+     'c_201548_4': BattlePassSounds.VIDEO_STYLE_F64_AMX_50_FOCH_B_4,
+     'c_202316_2': BattlePassSounds.VIDEO_STYLE_A67_T57_58_2,
+     'c_202316_3': BattlePassSounds.VIDEO_STYLE_A67_T57_58_3,
+     'c_202316_4': BattlePassSounds.VIDEO_STYLE_A67_T57_58_4}
 
     def __init__(self, videoID):
         self.__videoID = videoID

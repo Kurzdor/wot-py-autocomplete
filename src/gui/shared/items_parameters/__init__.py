@@ -3,14 +3,18 @@
 import math
 import sys
 from math import ceil
-from gui.shared.utils import SHELLS_COUNT_PROP_NAME, RELOAD_TIME_PROP_NAME, RELOAD_MAGAZINE_TIME_PROP_NAME, SHELL_RELOADING_TIME_PROP_NAME, DISPERSION_RADIUS_PROP_NAME, AIMING_TIME_PROP_NAME, PIERCING_POWER_PROP_NAME, DAMAGE_PROP_NAME, SHELLS_PROP_NAME, STUN_DURATION_PROP_NAME, GUARANTEED_STUN_DURATION_PROP_NAME, AUTO_RELOAD_PROP_NAME, DUAL_GUN_CHARGE_TIME, DUAL_GUN_RATE_TIME, RELOAD_TIME_SECS_PROP_NAME
+from constants import DAMAGE_INTERPOLATION_DIST_LAST
+from gui.shared.utils import SHELLS_COUNT_PROP_NAME, RELOAD_TIME_PROP_NAME, RELOAD_MAGAZINE_TIME_PROP_NAME, SHELL_RELOADING_TIME_PROP_NAME, DISPERSION_RADIUS_PROP_NAME, AIMING_TIME_PROP_NAME, PIERCING_POWER_PROP_NAME, DAMAGE_PROP_NAME, SHELLS_PROP_NAME, STUN_DURATION_PROP_NAME, GUARANTEED_STUN_DURATION_PROP_NAME, AUTO_RELOAD_PROP_NAME, DUAL_GUN_CHARGE_TIME, DUAL_GUN_RATE_TIME, RELOAD_TIME_SECS_PROP_NAME, DUAL_ACCURACY_COOLING_DELAY, BURST_FIRE_RATE, MAX_MUTABLE_DAMAGE_PROP_NAME, MIN_MUTABLE_DAMAGE_PROP_NAME
 from helpers import i18n, time_utils
+from helpers_common import computeDamageAtDist
 from items import vehicles, artefacts
+from items.components import component_constants
 RELATIVE_PARAMS = ('relativePower', 'relativeArmor', 'relativeMobility', 'relativeCamouflage', 'relativeVisibility')
 MAX_RELATIVE_VALUE = 1000
 NO_DATA = 'no data'
 _AUTO_RELOAD_TAG = 'autoreload'
 _DUAL_GUN_TAG = 'dualGun'
+_DUAL_ACCURACY_TAG = 'dualAccuracy'
 
 def _updateMinMaxValues(targetDict, key, value):
     targetDict[key] = (min(targetDict[key][0], value), max(targetDict[key][1], value))
@@ -40,6 +44,14 @@ def isDualGun(gun):
     return _DUAL_GUN_TAG in gun.tags if gun is not None else False
 
 
+def isDualAccuracy(gun):
+    return _DUAL_ACCURACY_TAG in gun.tags if gun is not None else False
+
+
+def isBurstGun(gunDescr):
+    return gunDescr.burst != component_constants.DEFAULT_GUN_BURST if gunDescr is not None else False
+
+
 def getShotsPerMinute(descriptor, reloadTime, autoReloadGun=False):
     clip = descriptor.clip
     burst = descriptor.burst
@@ -58,16 +70,20 @@ def calcGunParams(gunDescr, descriptors):
      RELOAD_MAGAZINE_TIME_PROP_NAME: (sys.maxint, -1),
      RELOAD_TIME_SECS_PROP_NAME: [],
      SHELL_RELOADING_TIME_PROP_NAME: (sys.maxint, -1),
+     BURST_FIRE_RATE: [],
      DISPERSION_RADIUS_PROP_NAME: (sys.maxint, -1),
      AIMING_TIME_PROP_NAME: (sys.maxint, -1),
      PIERCING_POWER_PROP_NAME: [],
      DAMAGE_PROP_NAME: [],
+     MAX_MUTABLE_DAMAGE_PROP_NAME: [],
+     MIN_MUTABLE_DAMAGE_PROP_NAME: [],
      SHELLS_PROP_NAME: [],
      STUN_DURATION_PROP_NAME: [],
      GUARANTEED_STUN_DURATION_PROP_NAME: [],
      AUTO_RELOAD_PROP_NAME: [],
      DUAL_GUN_RATE_TIME: (sys.maxint, -1),
-     DUAL_GUN_CHARGE_TIME: []}
+     DUAL_GUN_CHARGE_TIME: [],
+     DUAL_ACCURACY_COOLING_DELAY: (sys.maxint, -1)}
     for descr in descriptors:
         currShellsCount = descr.clip[0]
         if currShellsCount > 1:
@@ -97,12 +113,18 @@ def calcGunParams(gunDescr, descriptors):
         _updateMinMaxValues(result, DUAL_GUN_RATE_TIME, rateTime)
         result[DUAL_GUN_CHARGE_TIME] = chargeTime
         result[RELOAD_TIME_SECS_PROP_NAME] = reloadTimeSecs
+        if isBurstGun(descr):
+            burstSize, burstInterval = descr.burst
+            result[BURST_FIRE_RATE].extend([burstInterval, burstSize])
 
     for shot in gunDescr.shots:
         shell = shot.shell
         result[PIERCING_POWER_PROP_NAME].append(shot.piercingPower[0])
-        result[DAMAGE_PROP_NAME].append(shell.damage[0])
-        result[SHELLS_PROP_NAME].append(i18n.makeString('#item_types:shell/kinds/' + shell.kind))
+        result[DAMAGE_PROP_NAME].append(shell.armorDamage[0])
+        shellKind = i18n.makeString('#item_types:shell/kinds/' + shell.kind)
+        result[MAX_MUTABLE_DAMAGE_PROP_NAME].append(shell.armorDamage[0])
+        result[MIN_MUTABLE_DAMAGE_PROP_NAME].append(computeDamageAtDist(shell.armorDamage, min(shot.maxDistance, DAMAGE_INTERPOLATION_DIST_LAST)) if shell.isDamageMutable else shell.armorDamage[0])
+        result[SHELLS_PROP_NAME].append(shellKind)
         if shell.hasStun:
             stun = shell.stun
             stunDuration = stun.stunDuration
@@ -111,9 +133,12 @@ def calcGunParams(gunDescr, descriptors):
 
     for key in (PIERCING_POWER_PROP_NAME,
      DAMAGE_PROP_NAME,
+     MAX_MUTABLE_DAMAGE_PROP_NAME,
+     MIN_MUTABLE_DAMAGE_PROP_NAME,
      SHELLS_PROP_NAME,
      STUN_DURATION_PROP_NAME,
-     GUARANTEED_STUN_DURATION_PROP_NAME):
+     GUARANTEED_STUN_DURATION_PROP_NAME,
+     BURST_FIRE_RATE):
         result[key] = tuple(result[key])
 
     if AUTO_RELOAD_PROP_NAME in result:
@@ -130,7 +155,7 @@ def calcShellParams(descriptors):
         ppRand = shell.piercingPowerRandomization
         damageRand = shell.damageRandomization
         curPiercingPower = (int(piercingPower - piercingPower * ppRand), int(ceil(piercingPower + piercingPower * ppRand)))
-        damage = shell.damage[0]
+        damage = shell.armorDamage[0]
         curDamage = (int(damage - damage * damageRand), int(ceil(damage + damage * damageRand)))
         result[PIERCING_POWER_PROP_NAME] = (min(result[PIERCING_POWER_PROP_NAME][0], curPiercingPower[0]), max(result[PIERCING_POWER_PROP_NAME][1], curPiercingPower[1]))
         result[DAMAGE_PROP_NAME] = (min(result[DAMAGE_PROP_NAME][0], curDamage[0]), max(result[DAMAGE_PROP_NAME][1], curDamage[1]))
@@ -143,7 +168,7 @@ def getEquipmentParameters(eqpDescr):
     eqDescrType = type(eqpDescr)
     if eqDescrType is artefacts.RageArtillery:
         shellDescr = vehicles.getItemByCompactDescr(eqpDescr.shellCompactDescr)
-        params.update({'damage': (shellDescr.damage[0],) * 2,
+        params.update({'damage': (shellDescr.armorDamage[0],) * 2,
          'piercingPower': eqpDescr.piercingPower,
          'caliber': shellDescr.caliber,
          'shotsNumberRange': eqpDescr.shotsNumber,
@@ -151,7 +176,7 @@ def getEquipmentParameters(eqpDescr):
          'artDelayRange': eqpDescr.delay})
     elif eqDescrType is artefacts.RageBomber:
         shellDescr = vehicles.getItemByCompactDescr(eqpDescr.shellCompactDescr)
-        params.update({'bombDamage': (shellDescr.damage[0],) * 2,
+        params.update({'bombDamage': (shellDescr.armorDamage[0],) * 2,
          'piercingPower': eqpDescr.piercingPower,
          'bombsNumberRange': eqpDescr.bombsNumber,
          'areaSquare': eqpDescr.areaLength * eqpDescr.areaWidth,

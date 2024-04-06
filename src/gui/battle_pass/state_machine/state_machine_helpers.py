@@ -2,10 +2,10 @@
 # Embedded file name: scripts/client/gui/battle_pass/state_machine/state_machine_helpers.py
 import logging
 import typing
-from battle_pass_common import BattlePassState, BATTLE_PASS_OFFER_TOKEN_PREFIX, BATTLE_PASS_TOKEN_3D_STYLE, BattlePassRewardReason, BattlePassConsts
-from gui.battle_pass.battle_pass_helpers import getStyleInfoForChapter, getOfferTokenByGift
+from battle_pass_common import BATTLE_PASS_OFFER_TOKEN_PREFIX, BATTLE_PASS_TOKEN_3D_STYLE, BattlePassConsts, BattlePassRewardReason, BattlePassState, getBattlePassPassEntitlementName, getBattlePassShopEntitlementName
+from gui.battle_pass.battle_pass_helpers import getOfferTokenByGift, getStyleInfoForChapter, makeChapterMediaName
 from gui.impl.gen import R
-from gui.impl.pub.notification_commands import NotificationEvent, EventNotificationCommand
+from gui.impl.pub.notification_commands import EventNotificationCommand, NotificationEvent
 from gui.server_events.events_dispatcher import showMissionsBattlePass
 from helpers import dependency
 from skeletons.gui.game_control import IBattlePassController
@@ -24,37 +24,20 @@ def isProgressionComplete(_, battlePass=None):
     return isCompleteState and isAllChosen and isAllChaptersBought
 
 
-@dependency.replace_none_kwargs(battlePass=IBattlePassController, offers=IOffersDataProvider)
-def separateRewards(rewards, battlePass=None, offers=None):
-    rewardsToChoose = []
+def separateRewards(rewards):
     styleTokens = []
     chosenStyle = None
     defaultRewards = rewards[:]
     blocksToRemove = []
-    hasRareRewardToChoose = False
-    if battlePass.isOfferEnabled():
-        for reward in defaultRewards:
-            for tokenID in reward.get('tokens', {}).iterkeys():
-                if _isRewardChoiceToken(tokenID, offers=offers):
-                    splitToken = tokenID.split(':')
-                    if battlePass.isRareLevel(chapterID=int(splitToken[-2]), level=int(splitToken[-1])):
-                        hasRareRewardToChoose = True
-                        break
-
     for index, rewardBlock in enumerate(defaultRewards):
         if 'tokens' in rewardBlock:
             for tokenID in rewardBlock['tokens'].iterkeys():
-                if hasRareRewardToChoose and _isRewardChoiceToken(tokenID, offers=offers):
-                    rewardsToChoose.append(tokenID)
                 if tokenID.startswith(BATTLE_PASS_TOKEN_3D_STYLE):
                     styleTokens.append(tokenID)
                     chapter = int(tokenID.split(':')[3])
                     intCD, _ = getStyleInfoForChapter(chapter)
                     if intCD is not None:
                         chosenStyle = chapter
-
-        for tokenID in rewardsToChoose:
-            rewardBlock.get('tokens', {}).pop(tokenID, None)
 
         for tokenID in styleTokens:
             rewardBlock.get('tokens', {}).pop(tokenID, None)
@@ -68,8 +51,7 @@ def separateRewards(rewards, battlePass=None, offers=None):
     for index in sorted(blocksToRemove, reverse=True):
         defaultRewards.pop(index)
 
-    rewardsToChoose.sort(key=lambda x: (int(x.split(':')[-1]), x.split(':')[-2]))
-    return (rewardsToChoose, defaultRewards, chosenStyle)
+    return (defaultRewards, chosenStyle)
 
 
 @dependency.replace_none_kwargs(battlePass=IBattlePassController)
@@ -86,6 +68,7 @@ def packStartEvent(rewards, data, packageRewards, eventMethod, battlePass=None):
         newLevel = data['newLevel']
         chapter = data['chapter']
         prevLevel = data['prevLevel']
+        data.update({'needVideo': needToShowVideo(chapter, newLevel, battlePass=battlePass)})
         isFinalLevel = battlePass.isFinalLevel(chapter, newLevel)
         isRareLevel = False
         if newLevel is not None:
@@ -94,7 +77,11 @@ def packStartEvent(rewards, data, packageRewards, eventMethod, battlePass=None):
                     isRareLevel = True
                     break
 
-        rewards.pop('entitlements', None)
+        if 'entitlements' in rewards:
+            rewards['entitlements'].pop(getBattlePassPassEntitlementName(battlePass.getSeasonID()), None)
+            rewards['entitlements'].pop(getBattlePassShopEntitlementName(battlePass.getSeasonID()), None)
+            if not rewards['entitlements']:
+                rewards.pop('entitlements')
         return None if not isPremiumPurchase and not isRareLevel and not isFinalLevel or not rewards else EventNotificationCommand(NotificationEvent(method=eventMethod, rewards=[rewards], data=data, packageRewards=packageRewards))
 
 
@@ -117,6 +104,11 @@ def defaultEventMethod(rewards, data, packageRewards, battlePass=None):
 def packToken(tokenID):
     return {'tokens': {tokenID: {'count': 1,
                           'expires': {'after': 1}}}}
+
+
+@dependency.replace_none_kwargs(battlePass=IBattlePassController)
+def needToShowVideo(chapterID, level, battlePass=None):
+    return R.videos.battle_pass.dyn(makeChapterMediaName(chapterID)).exists() and battlePass.isFinalLevel(chapterID, level) and (battlePass.isExtraChapter(chapterID) or battlePass.isHoliday())
 
 
 @dependency.replace_none_kwargs(offers=IOffersDataProvider)

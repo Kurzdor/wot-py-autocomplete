@@ -30,7 +30,7 @@ from web.web_client_api import w2c, W2CSchema, Field, WebCommandException
 from web.web_client_api.common import ItemPackType, ItemPackEntry, SPA_ID_TYPES
 from gui.wgcg.utils.contexts import SPAAccountAttributeCtx, PlatformFetchProductListCtx
 from web.web_client_api.ui.vehicle import _VehicleCustomizationPreviewSchema
-from items import makeIntCompactDescrByID
+from items import makeIntCompactDescrByID, parseIntCompactDescr
 from items.components.crew_books_constants import CrewBookCacheType
 if typing.TYPE_CHECKING:
     from gui.Scaleform.framework.entities.abstract.ToolTipMgrMeta import ToolTipMgrMeta
@@ -126,6 +126,12 @@ class _ShowAdditionalRewardsTooltipSchema(W2CSchema):
     y = Field(required=True, type=int)
 
 
+class _ShowCollectionItemTooltipSchema(W2CSchema):
+    cd = Field(required=True, type=basestring)
+    x = Field(required=True, type=int)
+    y = Field(required=True, type=int)
+
+
 class UtilWebApiMixin(object):
     itemsCache = dependency.descriptor(IItemsCache)
     goodiesCache = dependency.descriptor(IGoodiesCache)
@@ -191,6 +197,8 @@ class UtilWebApiMixin(object):
         itemType = cmd.type
         if itemType == ItemPackType.CREW_BOOK:
             itemId = makeIntCompactDescrByID('crewBook', CrewBookCacheType.CREW_BOOK, cmd.id)
+        elif itemType == ItemPackType.ITEM_CREW_SKIN:
+            _, _, itemId = parseIntCompactDescr(cmd.id)
         else:
             itemId = getCDFromId(itemType=cmd.type, itemId=cmd.id)
         rawItem = ItemPackEntry(type=itemType, id=itemId, count=cmd.count or 1, extra=cmd.extra or {})
@@ -224,6 +232,10 @@ class UtilWebApiMixin(object):
             bonuses.extend(getNonQuestBonuses(key, value))
 
         self.__getTooltipMgr().onCreateWulfTooltip(TC.ADDITIONAL_REWARDS, [bonuses], cmd.x, cmd.y)
+
+    @w2c(_ShowCollectionItemTooltipSchema, 'show_collection_item_tooltip')
+    def showCollectionItemTooltip(self, cmd):
+        self.__getTooltipMgr().onCreateWulfTooltip(TC.COLLECTION_ITEM, [cmd.cd, False], cmd.x, cmd.y)
 
     @w2c(W2CSchema, 'server_timestamp')
     def getCurrentLocalServerTimestamp(self, _):

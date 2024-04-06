@@ -3,19 +3,22 @@
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, namedtuple
-import typing
+from typing import TYPE_CHECKING, Optional
 import BigWorld
 import constants
 import dossiers2
 import nations
 import wg_async as future_async
+from PlayerEvents import g_playerEvents
 from account_shared import LayoutIterator
 from adisp import adisp_async, adisp_process
 from battle_pass_common import BATTLE_PASS_PDATA_KEY
 from constants import CustomizationInvData, SkinInvData
 from debug_utils import LOG_DEBUG, LOG_WARNING, LOG_NOTE
 from goodies.goodie_constants import GOODIE_STATE
-from gui.shared.gui_items import GUI_ITEM_TYPE, GUI_ITEM_TYPE_NAMES, ItemsCollection, getVehicleSuitablesByType
+from gui.game_loading.resources.consts import Milestones
+from gui.shared.gui_items import GUI_ITEM_TYPE, GUI_ITEM_TYPE_NAMES, ItemsCollection, getVehicleSuitablesByType, checkForTags
+from gui.shared.gui_items.Vehicle import VEHICLE_TAGS
 from gui.shared.gui_items.gui_item_economics import ITEM_PRICE_EMPTY
 from gui.shared.utils.requesters import vehicle_items_getter
 from helpers import dependency, isPlayerAvatar
@@ -27,9 +30,10 @@ from shared_utils.account_helpers.diff_utils import synchronizeDicts
 from skeletons.gui.game_control import IVehiclePostProgressionController
 from skeletons.gui.shared import IItemsCache, IItemsRequester
 from skeletons.gui.shared.gui_items import IGuiItemsFactory
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import skeletons.gui.shared.utils.requesters as requesters
     from gui.shared.gui_items.Tankman import Tankman
+    from gui.shared.gui_items.Vehicle import Vehicle
     from gui.veh_post_progression.models.progression import PostProgressionItem
     from items.vehicles import VehicleType
 DO_LOG_BROKEN_SYNC = False
@@ -220,7 +224,8 @@ class VehsMultiNationSuitableCriteria(VehsSuitableCriteria):
 
 class REQ_CRITERIA(object):
     EMPTY = RequestCriteria()
-    NONE = RequestCriteria(lambda i: False)
+    ALL = RequestCriteria(PredicateCondition(lambda i: True))
+    NONE = RequestCriteria(PredicateCondition(lambda i: False))
     CUSTOM = staticmethod(lambda predicate: RequestCriteria(PredicateCondition(predicate)))
     HIDDEN = RequestCriteria(PredicateCondition(operator.attrgetter('isHidden')))
     SECRET = RequestCriteria(PredicateCondition(operator.attrgetter('isSecret')))
@@ -263,9 +268,10 @@ class REQ_CRITERIA(object):
         ACTIVE_RENT = RequestCriteria(InventoryPredicateCondition(lambda item: item.isRented and not item.rentalIsOver))
         EXPIRED_RENT = RequestCriteria(PredicateCondition(lambda item: item.isRented and item.rentalIsOver))
         IS_OUTFIT_LOCKED = RequestCriteria(PredicateCondition(lambda item: item.isOutfitLocked))
+        IS_STORAGE_HIDDEN = RequestCriteria(PredicateCondition(lambda item: item.isStorageHidden))
         EXPIRED_IGR_RENT = RequestCriteria(PredicateCondition(lambda item: item.isRented and item.rentalIsOver and item.isPremiumIGR))
         RENT_PROMOTION = RequestCriteria(PredicateCondition(lambda item: item.isRentPromotion))
-        WOTPLUS_RENT = RequestCriteria(PredicateCondition(lambda item: item.isWotPlusRent))
+        WOT_PLUS_VEHICLE = RequestCriteria(PredicateCondition(lambda item: item.isWotPlus))
         TELECOM_RENT = RequestCriteria(PredicateCondition(lambda item: item.isTelecomRent))
         SEASON_RENT = RequestCriteria(PredicateCondition(lambda item: item.isSeasonRent))
         DISABLED_IN_PREM_IGR = RequestCriteria(PredicateCondition(lambda item: item.isDisabledInPremIGR))
@@ -273,6 +279,7 @@ class REQ_CRITERIA(object):
         ELITE = RequestCriteria(PredicateCondition(lambda item: item.isElite))
         IS_BOT = RequestCriteria(PredicateCondition(lambda item: item.name.endswith('_bot')))
         IS_CREW_LOCKED = RequestCriteria(PredicateCondition(lambda item: item.isCrewLocked))
+        IS_CREW_HIDDEN = RequestCriteria(PredicateCondition(lambda item: item.isCrewHidden))
         FULLY_ELITE = RequestCriteria(PredicateCondition(lambda item: item.isFullyElite))
         EVENT = RequestCriteria(PredicateCondition(lambda item: item.isEvent))
         EVENT_BATTLE = RequestCriteria(PredicateCondition(lambda item: item.isOnlyForEventBattles))
@@ -280,7 +287,9 @@ class REQ_CRITERIA(object):
         BATTLE_ROYALE = RequestCriteria(PredicateCondition(lambda item: item.isOnlyForBattleRoyaleBattles))
         MAPS_TRAINING = RequestCriteria(PredicateCondition(lambda item: item.isOnlyForMapsTrainingBattles))
         CLAN_WARS = RequestCriteria(PredicateCondition(lambda item: item.isOnlyForClanWarsBattles))
+        FUN_RANDOM = RequestCriteria(PredicateCondition(lambda item: item.isOnlyForFunRandomBattles))
         COMP7 = RequestCriteria(PredicateCondition(lambda item: item.isOnlyForComp7Battles))
+        MODE_HIDDEN = RequestCriteria(PredicateCondition(lambda item: item.isModeHidden))
         HAS_XP_FACTOR = RequestCriteria(PredicateCondition(lambda item: item.dailyXPFactor != -1))
         IS_RESTORE_POSSIBLE = RequestCriteria(PredicateCondition(lambda item: item.isRestorePossible()))
         CAN_TRADE_IN = RequestCriteria(PredicateCondition(lambda item: item.canTradeIn))
@@ -295,13 +304,30 @@ class REQ_CRITERIA(object):
         HAS_TAGS = staticmethod(lambda tags: RequestCriteria(PredicateCondition(lambda item: item.tags.issuperset(tags))))
         HAS_ANY_TAG = staticmethod(lambda tags: RequestCriteria(PredicateCondition(lambda item: bool(item.tags & tags))))
         FOR_ITEM = staticmethod(lambda style: RequestCriteria(PredicateCondition(style.mayInstall)))
+        HAS_ROLE = staticmethod(lambda roleName: RequestCriteria(PredicateCondition(lambda item: roleName in {roles[0] for roles in item.descriptor.type.crewRoles})))
+        HAS_ROLES = staticmethod(lambda tankmanRoles: RequestCriteria(PredicateCondition(lambda item: any((roles[0] in tankmanRoles for roles in item.descriptor.type.crewRoles)))))
 
     class TANKMAN(object):
         IN_TANK = RequestCriteria(PredicateCondition(lambda item: item.isInTank))
         ROLES = staticmethod(lambda roles=tankmen.ROLES: RequestCriteria(PredicateCondition(lambda item: item.descriptor.role in roles)))
+        TANKMAN_HAS_ROLE = staticmethod(lambda role: RequestCriteria(PredicateCondition(lambda item: tankmen.tankmenGroupHasRole(item.descriptor.nationID, item.descriptor.gid, item.descriptor.isPremium, role))))
         NATIVE_TANKS = staticmethod(lambda vehiclesList=[]: RequestCriteria(PredicateCondition(lambda item: item.vehicleNativeDescr.type.compactDescr in vehiclesList)))
+        SPECIFIC_BY_NAME = staticmethod(lambda name: RequestCriteria(PredicateCondition(lambda item: item.isSearchableByName(name))))
+        SPECIFIC_BY_NAME_OR_SKIN = staticmethod(lambda name: RequestCriteria(PredicateCondition(lambda item: item.isSearchableByName(name) or item.isSearchableBySkinName(name))))
+        VEHICLE_BATTLE_ROYALE = RequestCriteria(PredicateCondition(lambda item: False if not item.vehicleDescr else checkForTags(item.vehicleDescr.type.tags, VEHICLE_TAGS.BATTLE_ROYALE)))
+        VEHICLE_HIDDEN_IN_HANGAR = RequestCriteria(PredicateCondition(lambda item: False if not item.vehicleDescr else checkForTags(item.vehicleDescr.type.tags, VEHICLE_TAGS.MODE_HIDDEN)))
+        VEHICLE_NATIVE_TYPE = staticmethod(lambda vehicleNativeType: RequestCriteria(PredicateCondition(lambda item: item.vehicleNativeType == vehicleNativeType)))
+        VEHICLE_NATIVE_TYPES = staticmethod(lambda vehicleNativeTypes: RequestCriteria(PredicateCondition(lambda item: item.vehicleNativeType in vehicleNativeTypes)))
+        VEHICLE_NATIVE_LEVELS = staticmethod(lambda levels: RequestCriteria(PredicateCondition(lambda item: item.vehicleNativeDescr.level in levels)))
+        NATION = staticmethod(lambda nationNames: RequestCriteria(PredicateCondition(lambda item: nations.NAMES[item.nationID] in nationNames)))
+        IS_LOCK_CREW = staticmethod(lambda isLockCrew=False: RequestCriteria(PredicateCondition(lambda item: item.isLockedByVehicle() in isLockCrew)))
         DISMISSED = RequestCriteria(PredicateCondition(lambda item: item.isDismissed))
         ACTIVE = ~DISMISSED
+
+    class RECRUIT(object):
+        ROLES = staticmethod(lambda roles=tankmen.ROLES: RequestCriteria(PredicateCondition(lambda item: (any([ role in roles for role in item.getRoles() ]) if item.getRoles() else True))))
+        NATION = staticmethod(lambda _nations=nations.NAMES: RequestCriteria(PredicateCondition(lambda item: any([ nation in _nations for nation in item.getNations() ]))))
+        SPECIFIC_BY_NAME = staticmethod(lambda name: RequestCriteria(PredicateCondition(lambda item: name.lower() in unicode(item.getFullUserName()).lower())))
 
     class CREW_ITEM(object):
         IN_ACCOUNT = RequestCriteria(PredicateCondition(lambda item: item.inAccount()))
@@ -317,7 +343,7 @@ class REQ_CRITERIA(object):
         BOOSTER_CATEGORIES = staticmethod(lambda boosterCategories: RequestCriteria(PredicateCondition(lambda item: item.category in boosterCategories)))
         IN_BOOSTER_ID_LIST = staticmethod(lambda boostersList: RequestCriteria(PredicateCondition(lambda item: item.boosterID in boostersList)))
         QUALITY = staticmethod(lambda qualityValues: RequestCriteria(PredicateCondition(lambda item: item.quality in qualityValues)))
-        LIMITED = RequestCriteria(PredicateCondition(lambda item: item.expiryTime))
+        LIMITED = RequestCriteria(PredicateCondition(lambda item: item.isExpirable))
 
     class DEMOUNT_KIT(object):
         IS_ENABLED = RequestCriteria(PredicateCondition(lambda item: item.enabled))
@@ -375,9 +401,12 @@ class REQ_CRITERIA(object):
         FULL_INVENTORY = RequestCriteria(PredicateCondition(lambda item: item.fullInventoryCount() > 0))
         ON_ACCOUNT = RequestCriteria(PredicateCondition(lambda item: item.fullCount() > 0))
 
+    class CREW_SKINS(object):
+        NATIONS = staticmethod(lambda nationNames: RequestCriteria(PredicateCondition(lambda item: item.getNation() in nationNames or item.getNation() is None)))
+
 
 class RESEARCH_CRITERIA(object):
-    VEHICLE_TO_UNLOCK = ~REQ_CRITERIA.SECRET | ~REQ_CRITERIA.HIDDEN | ~REQ_CRITERIA.VEHICLE.PREMIUM | ~REQ_CRITERIA.VEHICLE.IS_PREMIUM_IGR | ~REQ_CRITERIA.VEHICLE.EVENT | ~REQ_CRITERIA.VEHICLE.BATTLE_ROYALE | ~REQ_CRITERIA.VEHICLE.MAPS_TRAINING
+    VEHICLE_TO_UNLOCK = ~REQ_CRITERIA.SECRET | ~REQ_CRITERIA.HIDDEN | ~REQ_CRITERIA.VEHICLE.PREMIUM | ~REQ_CRITERIA.VEHICLE.IS_PREMIUM_IGR | ~REQ_CRITERIA.VEHICLE.MAPS_TRAINING | ~REQ_CRITERIA.VEHICLE.HAS_ANY_TAG(constants.BATTLE_MODE_VEHICLE_TAGS) | ~REQ_CRITERIA.VEHICLE.BATTLE_ROYALE
 
 
 class ItemsRequester(IItemsRequester):
@@ -388,9 +417,12 @@ class ItemsRequester(IItemsRequester):
      'seasons',
      'ranked',
      'dogTag',
-     'battleRoyaleStats'])
+     'battleRoyaleStats',
+     'wtr',
+     'layout',
+     'layoutState'])
 
-    def __init__(self, inventory, stats, dossiers, goodies, shop, recycleBin, vehicleRotation, ranked, battleRoyale, badges, epicMetaGame, tokens, festivityRequester, blueprints=None, sessionStatsRequester=None, anonymizerRequester=None, battlePassRequester=None, giftSystemRequester=None, gameRestrictionsRequester=None, resourceWellRequester=None):
+    def __init__(self, inventory, stats, dossiers, goodies, shop, recycleBin, vehicleRotation, ranked, battleRoyale, badges, epicMetaGame, tokens, festivityRequester, blueprints=None, sessionStatsRequester=None, anonymizerRequester=None, battlePassRequester=None, giftSystemRequester=None, gameRestrictionsRequester=None, resourceWellRequester=None, achievements20Requester=None):
         self.__inventory = inventory
         self.__stats = stats
         self.__dossiers = dossiers
@@ -411,6 +443,7 @@ class ItemsRequester(IItemsRequester):
         self.__giftSystem = giftSystemRequester
         self.__gameRestrictions = gameRestrictionsRequester
         self.__resourceWell = resourceWellRequester
+        self.__achievements20 = achievements20Requester
         self.__itemsCache = defaultdict(dict)
         self.__brokenSyncAlreadyLoggedTypes = set()
         self.__fittingItemRequesters = {self.__inventory,
@@ -500,28 +533,38 @@ class ItemsRequester(IItemsRequester):
     def resourceWell(self):
         return self.__resourceWell
 
+    @property
+    def achievements20(self):
+        return self.__achievements20
+
     @adisp_async
     @adisp_process
     def request(self, callback=None):
         from gui.Scaleform.Waiting import Waiting
+        g_playerEvents.onLoadingMilestoneReached(Milestones.INVENTORY)
         Waiting.show('download/inventory')
         yield self.__stats.request()
         yield self.__inventory.request()
         yield self.__vehicleRotation.request()
         Waiting.hide('download/inventory')
+        g_playerEvents.onLoadingMilestoneReached(Milestones.SHOP)
         Waiting.show('download/shop')
         yield self.__shop.request()
         Waiting.hide('download/shop')
+        g_playerEvents.onLoadingMilestoneReached(Milestones.DOSSIER)
         Waiting.show('download/dossier')
         yield self.__dossiers.request()
         yield self.__sessionStats.request()
         Waiting.hide('download/dossier')
+        g_playerEvents.onLoadingMilestoneReached(Milestones.DISCOUNTS)
         Waiting.show('download/discounts')
         yield self.__goodies.request()
         Waiting.hide('download/discounts')
+        g_playerEvents.onLoadingMilestoneReached(Milestones.RECYCLE_BIN)
         Waiting.show('download/recycleBin')
         yield self.__recycleBin.request()
         Waiting.hide('download/recycleBin')
+        g_playerEvents.onLoadingMilestoneReached(Milestones.PLAYER_DATA)
         Waiting.show('download/anonymizer')
         yield self.__anonymizer.request()
         Waiting.hide('download/anonymizer')
@@ -558,6 +601,9 @@ class ItemsRequester(IItemsRequester):
         Waiting.show('download/resourceWell')
         yield self.__resourceWell.request()
         Waiting.hide('download/resourceWell')
+        Waiting.show('download/achievements20')
+        yield self.__achievements20.request()
+        Waiting.hide('download/achievements20')
         self.__brokenSyncAlreadyLoggedTypes.clear()
         callback(self)
 
@@ -574,8 +620,11 @@ class ItemsRequester(IItemsRequester):
         ranked = yield dr.getRankedInfo()
         dogTag = yield dr.getDogTag()
         battleRoyaleStats = yield dr.getBattleRoyaleStats()
+        wtr = yield dr.getWTR()
+        layout = yield dr.getLayout()
+        layoutState = yield dr.getLayoutState()
         container = self.__itemsCache[GUI_ITEM_TYPE.ACCOUNT_DOSSIER]
-        container[databaseID] = self._AccountItem(userAccDossier, clanInfo, seasons, ranked, dogTag, battleRoyaleStats)
+        container[databaseID] = self._AccountItem(userAccDossier, clanInfo, seasons, ranked, dogTag, battleRoyaleStats, wtr, layout, layoutState)
         callback((userAccDossier, clanInfo, dr.isHidden))
 
     def unloadUserDossier(self, databaseID):
@@ -595,11 +644,7 @@ class ItemsRequester(IItemsRequester):
 
     def clear(self):
         while self.__itemsCache:
-            itemsType, cache = self.__itemsCache.popitem()
-            if itemsType == GUI_ITEM_TYPE.VEHICLE:
-                for item in cache.itervalues():
-                    item.stopPerksController()
-
+            _, cache = self.__itemsCache.popitem()
             cache.clear()
 
         self.__vehCustomStateCache.clear()
@@ -801,6 +846,7 @@ class ItemsRequester(IItemsRequester):
         copyVehicle.consumables.setInstalled(*vehicle.consumables.installed)
         copyVehicle.battleBoosters.setInstalled(*vehicle.battleBoosters.installed)
         copyVehicle.installPostProgression(vehicle.postProgression.getState(), ignoreDisabledProgression)
+        copyVehicle.initCrew()
         copyVehicle.crew = vehicle.crew
         return copyVehicle
 
@@ -873,6 +919,11 @@ class ItemsRequester(IItemsRequester):
         callback(result)
 
     def getTankmen(self, criteria=REQ_CRITERIA.TANKMAN.ACTIVE):
+        result = self.getInventoryTankmen(criteria)
+        result.update(self.getDismissedTankmen(criteria))
+        return result
+
+    def getInventoryTankmen(self, criteria=REQ_CRITERIA.TANKMAN.ACTIVE):
         result = ItemsCollection()
         activeTankmenInvData = self.__inventory.getItemsData(GUI_ITEM_TYPE.TANKMAN)
         for invID, tankmanInvData in activeTankmenInvData.iteritems():
@@ -880,7 +931,6 @@ class ItemsRequester(IItemsRequester):
             if criteria(item):
                 result[invID] = item
 
-        result.update(self.getDismissedTankmen(criteria))
         return result
 
     def getDismissedTankmen(self, criteria=REQ_CRITERIA.TANKMAN.DISMISSED):
@@ -908,6 +958,13 @@ class ItemsRequester(IItemsRequester):
                 result.append(tankman)
 
             return result
+
+    def tankmenInBarracksCount(self):
+        tmen = self.getInventoryTankmen()
+        return sum((1 for tmn in tmen.itervalues() if not tmn.isInTank))
+
+    def freeTankmenBerthsCount(self):
+        return self.stats.tankmenBerthsCount - self.tankmenInBarracksCount()
 
     def getVehicles(self, criteria=REQ_CRITERIA.EMPTY):
         return self.getItems(GUI_ITEM_TYPE.VEHICLE, criteria=criteria)
@@ -995,6 +1052,39 @@ class ItemsRequester(IItemsRequester):
         else:
             return dogTag
 
+    def getWTR(self, databaseID=None):
+        if databaseID is None:
+            return self.sessionStats.getAccountWtr()
+        container = self.__itemsCache[GUI_ITEM_TYPE.ACCOUNT_DOSSIER]
+        wtr = container.get(int(databaseID)).wtr
+        if wtr is None:
+            LOG_WARNING('Trying to get empty user wtr', databaseID)
+            return
+        else:
+            return wtr
+
+    def getLayout(self, databaseID=None):
+        if databaseID is None:
+            return self.achievements20.getLayout()
+        container = self.__itemsCache[GUI_ITEM_TYPE.ACCOUNT_DOSSIER]
+        layout = container.get(int(databaseID)).layout
+        if layout is None:
+            LOG_WARNING('Trying to get empty user layout', databaseID)
+            return
+        else:
+            return layout
+
+    def getLayoutState(self, databaseID=None):
+        if databaseID is None:
+            return self.achievements20.getLayoutState()
+        container = self.__itemsCache[GUI_ITEM_TYPE.ACCOUNT_DOSSIER]
+        layoutState = container.get(int(databaseID)).layoutState
+        if layoutState is None:
+            LOG_WARNING('Trying to get empty user layoutState', databaseID)
+            return
+        else:
+            return layoutState
+
     def getBattleRoyaleStats(self, arenaType, databaseID=None, vehicleIntCD=None):
         if databaseID is None:
             stats = self.battleRoyale.getStats(arenaType)
@@ -1047,7 +1137,6 @@ class ItemsRequester(IItemsRequester):
                 self.__vehCustomStateCache[uid] = item.getCustomState()
             elif uid in self.__vehCustomStateCache:
                 del self.__vehCustomStateCache[uid]
-            item.stopPerksController()
         del cache[uid]
 
     def __getAccountDossierDescr(self):

@@ -99,6 +99,8 @@ class AccountRequirements(ConditionsParser):
             return conditions.PremiumAccount(uniqueName, data)
         if name == 'premiumPlus':
             return conditions.PremiumPlusAccount(uniqueName, data)
+        if name == 'wotPlus':
+            return conditions.WotPlus(uniqueName, data)
         if name == 'inClan':
             return conditions.InClan(uniqueName, data)
         if name == 'igrType':
@@ -323,3 +325,15 @@ class BonusConditions(ConditionsParser):
         if self._progress is not None:
             progress = self._progress.get(groupByKey, {})
         return progress.get('bonusCount', 0) >= self._bonusLimit if self._bonusLimit is not None else False
+
+
+class MapsTrainingPostBattleConditions(PostBattleConditions):
+
+    def __init__(self, section, preBattleCond, questID):
+        super(MapsTrainingPostBattleConditions, self).__init__(section, preBattleCond)
+        self.questID = questID
+
+    def _handleCondition(self, name, data, uniqueName, group):
+        if name == 'win':
+            return conditions.StaticMapsTrainingWin(uniqueName, data, self.questID)
+        super(MapsTrainingPostBattleConditions, self)._handleCondition(name, data, uniqueName, group)

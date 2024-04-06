@@ -12,11 +12,11 @@ from gui.Scaleform.genConsts.FITTING_TYPES import FITTING_TYPES
 from gui.goodies.demount_kit import isDemountKitApplicableTo, getDemountKitForOptDevice
 from gui.impl import backport
 from gui.impl.gen import R
-from gui.shop import showBuyGoldForEquipment
 from gui.shared import event_dispatcher
 from gui.shared.formatters import text_styles, getRoleTextWithLabel
 from gui.shared.formatters.tankmen import formatDeletedTankmanStr
 from gui.shared.gui_items import GUI_ITEM_TYPE
+from gui.shared.gui_items.processors import plugins
 from gui.shared.gui_items.processors.vehicle import VehicleSeller, getCustomizationItemSellCountForVehicle
 from gui.shared.items_cache import CACHE_SYNC_REASON
 from gui.shared.money import Currency, MONEY_UNDEFINED
@@ -24,15 +24,21 @@ from gui.shared.tooltips import ACTION_TOOLTIPS_TYPE
 from gui.shared.tooltips.formatters import packActionTooltipData
 from gui.shared.tooltips.formatters import packItemActionTooltipData
 from gui.shared.utils import decorators
+from gui.shared.utils.functions import makeTooltip
 from gui.shared.utils.requesters import REQ_CRITERIA
+from gui.shop import showBuyGoldForEquipment
 from helpers import int2roman, dependency
+from items import ITEM_TYPES
 from items.components.c11n_constants import ItemTags
 from nation_change.nation_change_helpers import iterVehTypeCDsInNationGroup
-from skeletons.gui.game_control import IRestoreController
+from post_progression_common import TankSetupGroupsId
+from skeletons.gui.game_control import IRestoreController, IWotPlusController
 from skeletons.gui.goodies import IGoodiesCache
+from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.shared import IItemsCache
 if typing.TYPE_CHECKING:
     from typing import List, Set, Iterator, Optional, Tuple, Dict, Union, Any
+    from gui.game_control.wot_plus_controller import WotPlusController
     from gui.shared.gui_items.fitting_item import FittingItem
     from gui.shared.gui_items.Vehicle import Vehicle
     from gui.shared.gui_items.artefacts import OptionalDevice, BattleBooster
@@ -41,7 +47,9 @@ if typing.TYPE_CHECKING:
     from gui.shared.gui_items.gui_item import GUIItem
     from gui.shared.gui_items.gui_item_economics import ItemPrice
     from gui.shared.money import Money
+    from helpers.server_settings import ServerSettings
 _DK_CURRENCY = GOODIE_VARIETY.DEMOUNT_KIT_NAME
+_WP_CURRENCY = 'wotPlusVSD'
 _SETTINGS_KEY = 'vehicleSellDialog'
 _SETTINGS_OPEN_ENTRY = 'isOpened'
 _INVENTORY_SHELLS = 'inventoryShells'
@@ -51,6 +59,7 @@ class VehicleSellDialog(VehicleSellDialogMeta):
     __itemsCache = dependency.descriptor(IItemsCache)
     __restore = dependency.descriptor(IRestoreController)
     __goodiesCache = dependency.descriptor(IGoodiesCache)
+    __wotPlus = dependency.descriptor(IWotPlusController)
     __slots__ = ('__vehInvID', '__vehicle', '__nationGroupVehicles', '__controlNumber', '__enteredControlNumber', '__income', '__accountMoney', '__isCrewDismissal', '__vehicleSellPrice', '__items', '__otherVehicleShells', '__isDemountKitEnabled')
 
     def __init__(self, ctx=None):
@@ -105,15 +114,18 @@ class VehicleSellDialog(VehicleSellDialogMeta):
          FITTING_TYPES.CUSTOMIZATION: customizationItems,
          FITTING_TYPES.BOOSTER: boosters}
         itemsForDemountKit = []
+        itemsForFreeDemount = []
         for item in self.__items:
             guiItem = item.guiItem
             if item.toInventory:
                 if guiItem.itemTypeID == GUI_ITEM_TYPE.OPTIONALDEVICE and item.removeCurrency == _DK_CURRENCY:
                     itemsForDemountKit.append(guiItem)
+                if guiItem.itemTypeID == GUI_ITEM_TYPE.OPTIONALDEVICE and item.removeCurrency == _WP_CURRENCY:
+                    itemsForFreeDemount.append(guiItem)
             container = sellMap[item.itemType]
             container.append(guiItem)
 
-        self.__doSellVehicle(self.__vehicle, shells, eqs, optDevicesToSell, inventory, customizationItems, self.__isCrewDismissal, itemsForDemountKit, boosters)
+        self.__doSellVehicle(self.__vehicle, shells, eqs, optDevicesToSell, inventory, customizationItems, self.__isCrewDismissal, itemsForDemountKit, itemsForFreeDemount, boosters)
 
     def onWindowClose(self):
         self.destroy()
@@ -139,6 +151,11 @@ class VehicleSellDialog(VehicleSellDialogMeta):
                         self.__accountMoney[_DK_CURRENCY] = demountKit.inventoryCount
 
             self.__isDemountKitEnabled = True
+        if self.__wotPlus.isEnabled():
+            devicesSlotsNumber = self.__vehicle.descriptor.supplySlots.getAmountForType(ITEM_TYPES.optionalDevice)
+            if self.__vehicle.isSetupSwitchActive(TankSetupGroupsId.EQUIPMENT_AND_SHELLS):
+                devicesSlotsNumber *= 2
+            self.__accountMoney[_WP_CURRENCY] = devicesSlotsNumber
         optionalDevicesOnVehicle = []
         shellsOnVehicle = []
         equipmentsOnVehicle = []
@@ -258,15 +275,11 @@ class VehicleSellDialog(VehicleSellDialogMeta):
     def __prepareVehicleOptionalDevices(self, vehicle, currentBalance):
         onVehicleOptionalDevices = []
         for optDevice in vehicle.optDevices.setupLayouts.getUniqueItems():
-            data = _OptionalDeviceData(optDevice, vehicle)
+            data = _OptionalDeviceData(optDevice)
             removeCurrency = _findCurrency(currentBalance, data.itemRemovalPrice)
             if removeCurrency is not None:
                 currentBalance -= data.itemRemovalPrice.extract(removeCurrency)
             data.removeCurrency = removeCurrency
-            if optDevice.isModernized and data.removeCurrency != _DK_CURRENCY:
-                data.toInventory = False
-            elif data.isRemovableForMoney:
-                data.toInventory = data.removeCurrency is not None
             self.__addVSDItem(data)
             onVehicleOptionalDevices.append(data.toFlashVO())
 
@@ -330,16 +343,16 @@ class VehicleSellDialog(VehicleSellDialogMeta):
         return onVehicleShells
 
     def __subscribe(self):
-        g_clientUpdateManager.addCurrencyCallback(Currency.GOLD, self.__onSetGoldHandler)
-        g_clientUpdateManager.addCurrencyCallback(Currency.CRYSTAL, self.__onSetCrystalHandler)
-        g_clientUpdateManager.addCallback('goodies', self.__onSetGoodiesHandler)
+        g_clientUpdateManager.addCallbacks({'stats.gold': self.__onSetGoldHandler,
+         'stats.crystal': self.__onSetCrystalHandler,
+         'stats.equipCoin': self.__onSetEquipCoinHandler,
+         'stats.vehicleSellsLeft': self.__onSellLimitUpdate,
+         'goodies': self.__onSetGoodiesHandler})
         self.__itemsCache.onSyncCompleted += self.__shopResyncHandler
 
     def __unsubscribe(self):
         self.__itemsCache.onSyncCompleted -= self.__shopResyncHandler
-        g_clientUpdateManager.removeCurrencyCallback(Currency.GOLD, self.__onSetGoldHandler)
-        g_clientUpdateManager.removeCurrencyCallback(Currency.CRYSTAL, self.__onSetCrystalHandler)
-        g_clientUpdateManager.removeCallback('goodies', self.__onSetGoodiesHandler)
+        g_clientUpdateManager.removeObjectCallbacks(self)
 
     def __onSetGoldHandler(self, gold):
         self.__updateMoney(Currency.GOLD, gold)
@@ -347,6 +360,13 @@ class VehicleSellDialog(VehicleSellDialogMeta):
 
     def __onSetCrystalHandler(self, crystals):
         self.__updateMoney(Currency.CRYSTAL, crystals)
+        self.__updateSubmitButton()
+
+    def __onSetEquipCoinHandler(self, equipCoin):
+        self.__updateMoney(Currency.EQUIP_COIN, equipCoin)
+        self.__updateSubmitButton()
+
+    def __onSellLimitUpdate(self, *_):
         self.__updateSubmitButton()
 
     def __onSetGoodiesHandler(self, goodies):
@@ -365,8 +385,27 @@ class VehicleSellDialog(VehicleSellDialogMeta):
         expenses = -self.__income
         shortage = expenses.getShortage(self.__accountMoney)
         shortage[Currency.GOLD] = 0
-        shortage[Currency.EQUIP_COIN] = 0
-        self.as_enableButtonS(controlNumberValid and shortage.isEmpty())
+        shortage[_WP_CURRENCY] = 0
+        isInLimit = True
+        if not (self.__vehicle.isRented and self.__vehicle.rentalIsOver):
+            isInLimit = plugins.VehicleSellsLeftValidator(self.__vehicle).validate().success
+        tooltip = ''
+        acceptButtonTooltip = R.strings.tooltips.vehicleSellDialog.acceptButtonTooltip
+        formattedItems = []
+        if not shortage.isEmpty():
+            formattedItems.append(backport.text(acceptButtonTooltip.notEnoughCurrency.body()))
+        if not isInLimit:
+            formattedItems.append(backport.text(acceptButtonTooltip.vehicleSellLimit.body()))
+        warningMessage = '{}\n'.format(backport.text(R.strings.common.common.dot())).join(formattedItems) + backport.text(R.strings.common.common.dot())
+        if formattedItems:
+            header = backport.text(acceptButtonTooltip.notEnable.header())
+            tooltip = makeTooltip(header, warningMessage)
+        elif not controlNumberValid:
+            header = backport.text(acceptButtonTooltip.controlNumberValid.header())
+            body = backport.text(acceptButtonTooltip.controlNumberValid.body())
+            tooltip = makeTooltip(header, body)
+        self.as_enableButtonS(controlNumberValid and shortage.isEmpty() and isInLimit, tooltip)
+        self.as_setSellEnabledS(shortage.isEmpty() and isInLimit, str(warningMessage))
 
     def __getControlQuestion(self, usingGold=False):
         if usingGold:
@@ -443,8 +482,8 @@ class VehicleSellDialog(VehicleSellDialogMeta):
         return False
 
     @decorators.adisp_process('sellVehicle')
-    def __doSellVehicle(self, vehicle, shells, eqs, optDevicesToSell, inventory, customizationItems, isDismissCrew, itemsForDemountKit, boosters):
-        vehicleSeller = VehicleSeller(vehicle, shells, eqs, optDevicesToSell, inventory, customizationItems, boosters, isDismissCrew, itemsForDemountKit)
+    def __doSellVehicle(self, vehicle, shells, eqs, optDevicesToSell, inventory, customizationItems, isDismissCrew, itemsForDemountKit, itemsForFreeDemount, boosters):
+        vehicleSeller = VehicleSeller(vehicle, shells, eqs, optDevicesToSell, inventory, customizationItems, boosters, isDismissCrew, itemsForDemountKit, itemsForFreeDemount)
         currentMoneyGold = self.__itemsCache.items.stats.money.get(Currency.GOLD, 0)
         spendMoneyGold = vehicleSeller.spendMoney.get(Currency.GOLD, 0)
         if currentMoneyGold < spendMoneyGold:
@@ -471,18 +510,21 @@ def _getSlidingComponentOpened():
 
 
 def _getCurrencyIterator():
-    order = (_DK_CURRENCY,) + Currency.BY_WEIGHT
+    order = (_WP_CURRENCY, _DK_CURRENCY) + Currency.BY_WEIGHT
     for c in order:
         yield c
 
 
 def _findCurrency(have, price):
+    firstCurrency = None
     for c in _getCurrencyIterator():
         value = price[c]
-        if value and have[c] >= value:
-            return c
+        if value:
+            firstCurrency = firstCurrency or c
+            if have[c] >= value:
+                return c
 
-    return None
+    return firstCurrency
 
 
 class _VSDMoney(dict):
@@ -644,19 +686,32 @@ class _ModulesData(_VSDItemData):
 
 
 _DEMOUNT_KIT_ONE = _VSDMoney(**{_DK_CURRENCY: 1})
+_WOT_PLUS_ONE = _VSDMoney(**{_WP_CURRENCY: 1})
 
 class _OptionalDeviceData(_VSDItemData):
     __slots__ = ()
     __itemsCache = dependency.descriptor(IItemsCache)
+    __wotPlus = dependency.descriptor(IWotPlusController)
+    __lobbyContext = dependency.descriptor(ILobbyContext)
 
-    def __init__(self, optDevice, vehicle=None):
+    def __init__(self, optDevice):
         super(_OptionalDeviceData, self).__init__(optDevice, FITTING_TYPES.OPTIONAL_DEVICE)
         self._flashData['isRemovable'] = optDevice.isRemovable
         self._flashData['isModernized'] = optDevice.isModernized
         removalPrice = optDevice.getRemovalPrice(self.__itemsCache.items)
         if removalPrice.isActionPrice():
             self._flashData['removeActionPrice'] = packActionTooltipData(ACTION_TOOLTIPS_TYPE.ECONOMICS, 'paidRemovalCost', True, removalPrice.price, removalPrice.defPrice)
-        self._itemRemovalPrice = _VSDMoney(removalPrice.price)
-        if isDemountKitApplicableTo(optDevice):
-            self._itemRemovalPrice += _DEMOUNT_KIT_ONE
+        serverSettings = self.__lobbyContext.getServerSettings()
+        isFreeEquipmentDemountingEnabled = serverSettings.isFreeEquipmentDemountingEnabled()
+        if isFreeEquipmentDemountingEnabled and self.__wotPlus.isFreeToDemount(optDevice):
+            self._itemRemovalPrice = _WOT_PLUS_ONE
+        else:
+            self._itemRemovalPrice = _VSDMoney(removalPrice.price)
+            if isDemountKitApplicableTo(optDevice):
+                self._itemRemovalPrice += _DEMOUNT_KIT_ONE
         self._flashData['removePrice'] = self._itemRemovalPrice.toDict()
+        self._flashData['alertIconDataID'] = self.__getAlertIconTooltip(optDevice)
+
+    @classmethod
+    def __getAlertIconTooltip(cls, optDevice):
+        return '#tooltips:vehicleSellDialog/renderer/alertIconSell' if not optDevice.isModernized else '#tooltips:vehicleSellDialog/renderer/alertIconDeconstruct'

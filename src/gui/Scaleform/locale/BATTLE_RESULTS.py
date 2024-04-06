@@ -126,8 +126,10 @@ class BATTLE_RESULTS(object):
     COMMON_VEHICLESTATE_DEAD5 = '#battle_results:common/vehicleState/dead5'
     COMMON_VEHICLESTATE_DEAD6 = '#battle_results:common/vehicleState/dead6'
     COMMON_VEHICLESTATE_DEAD7 = '#battle_results:common/vehicleState/dead7'
+    COMMON_VEHICLESTATE_DEAD12 = '#battle_results:common/vehicleState/dead12'
     COMMON_VEHICLESTATE_DEAD13 = '#battle_results:common/vehicleState/dead13'
     COMMON_VEHICLESTATE_DEAD27 = '#battle_results:common/vehicleState/dead27'
+    COMMON_VEHICLESTATE_DEAD29 = '#battle_results:common/vehicleState/dead29'
     COMMON_VEHICLESTATE_PREMATURELEAVE = '#battle_results:common/vehicleState/prematureLeave'
     COMMON_DETAILS_NOPREMTITLE = '#battle_results:common/details/noPremTitle'
     COMMON_DETAILS_PREMTITLE = '#battle_results:common/details/premTitle'
@@ -150,11 +152,19 @@ class BATTLE_RESULTS(object):
     COMMON_PREMIUMBONUS_DESCRIPTION = '#battle_results:common/premiumBonus/description'
     COMMON_PREMIUMBONUS_RULE = '#battle_results:common/premiumBonus/rule'
     COMMON_PREMIUMBONUS_EXPIREDBATTLERESULT = '#battle_results:common/premiumBonus/expiredBattleResult'
+    COMMON_PREMIUMBONUS_UNAVAILABLE = '#battle_results:common/premiumBonus/unavailable'
     COMMON_PREMIUMBONUS_TANKSTATECHANGED = '#battle_results:common/premiumBonus/tankStateChanged'
     COMMON_PREMIUMBONUS_TANKMENSTATECHANGED = '#battle_results:common/premiumBonus/tankmenStateChanged'
     COMMON_PREMIUMBONUS_ISXPTOTMENENABLED = '#battle_results:common/premiumBonus/isXPToTmenEnabled'
     COMMON_PREMIUMBONUS_ISXPTOTMENDISABLED = '#battle_results:common/premiumBonus/isXPToTmenDisabled'
     COMMON_PREMIUMBONUS_BONUSLEFT = '#battle_results:common/premiumBonus/bonusLeft'
+    COMMON_PLUSBONUS_BONUSLEFTADDITIONALTEXT = '#battle_results:common/plusBonus/bonusLeftAdditionalText'
+    COMMON_PLUSBONUS_EARNINGSINFORMATION = '#battle_results:common/plusBonus/earningsInformation'
+    COMMON_PLUSBONUS_PREMIUMPLUSADD = '#battle_results:common/plusBonus/premiumPlusAdd'
+    COMMON_PLUSBONUS_WOTPLUS = '#battle_results:common/plusBonus/wotPlus'
+    COMMON_PLUSBONUS_WOTPREMIUM = '#battle_results:common/plusBonus/wotPremium'
+    COMMON_PLUSBONUS_YOUROCK = '#battle_results:common/plusBonus/youRock'
+    COMMON_WOTPLUSBONUS_BONUSLEFT = '#battle_results:common/wotPlusBonus/bonusLeft'
     COMMON_PREMIUMBONUS_APPLIEDBONUS = '#battle_results:common/premiumBonus/appliedBonus'
     COMMON_PREMIUMBONUS_APPLYBONUSBTN = '#battle_results:common/premiumBonus/applyBonusBtn'
     TEAM_STATS_OWNTEAM = '#battle_results:team/stats/ownTeam'
@@ -286,6 +296,7 @@ class BATTLE_RESULTS(object):
     DETAILS_CALCULATIONS_HEAVYTRUCKS = '#battle_results:details/calculations/heavyTrucks'
     DETAILS_CALCULATIONS_INTERMEDIATETOTAL = '#battle_results:details/calculations/intermediateTotal'
     DETAILS_CALCULATIONS_BASE = '#battle_results:details/calculations/base'
+    DETAILS_CALCULATIONS_WOTPLUS = '#battle_results:details/calculations/wotPlus'
     DETAILS_CALCULATIONS_XPRECORD = '#battle_results:details/calculations/xpRecord'
     DETAILS_CALCULATIONS_SQUADBONUS = '#battle_results:details/calculations/squadBonus'
     DETAILS_CALCULATIONS_NOPENALTY = '#battle_results:details/calculations/noPenalty'
@@ -356,6 +367,9 @@ class BATTLE_RESULTS(object):
     CUSTOMIZATIONPROGRESS_DESCR = '#battle_results:customizationProgress/descr'
     CUSTOMIZATIONPROGRESS_AWARD_RECEIVED = '#battle_results:customizationProgress/award/received'
     CUSTOMIZATIONPROGRESS_AWARD_NEWLEVEL = '#battle_results:customizationProgress/award/newLevel'
+    PRESTIGE_TITLE = '#battle_results:prestige/title'
+    PRESTIGE_COMMON_DESCRIPTION = '#battle_results:prestige/common/description'
+    PRESTIGE_MAX_DESCRIPTION = '#battle_results:prestige/max/description'
     DETAILS_TIME_LBL_ENUM = (DETAILS_TIME_LBL_OBJECTIVESREACHED,
      DETAILS_TIME_LBL_OBJECTIVESDESTROYED,
      DETAILS_TIME_LBL_BASESCAPTURED,
@@ -369,6 +383,7 @@ class BATTLE_RESULTS(object):
      DETAILS_CALCULATIONS_HEAVYTRUCKS,
      DETAILS_CALCULATIONS_INTERMEDIATETOTAL,
      DETAILS_CALCULATIONS_BASE,
+     DETAILS_CALCULATIONS_WOTPLUS,
      DETAILS_CALCULATIONS_XPRECORD,
      DETAILS_CALCULATIONS_SQUADBONUS,
      DETAILS_CALCULATIONS_NOPENALTY,
@@ -458,8 +473,10 @@ class BATTLE_RESULTS(object):
      COMMON_VEHICLESTATE_DEAD5,
      COMMON_VEHICLESTATE_DEAD6,
      COMMON_VEHICLESTATE_DEAD7,
+     COMMON_VEHICLESTATE_DEAD12,
      COMMON_VEHICLESTATE_DEAD13,
-     COMMON_VEHICLESTATE_DEAD27)
+     COMMON_VEHICLESTATE_DEAD27,
+     COMMON_VEHICLESTATE_DEAD29)
 
     @classmethod
     def getDetailsTimeLbl(cls, statName):

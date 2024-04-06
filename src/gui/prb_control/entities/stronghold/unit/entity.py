@@ -8,8 +8,12 @@ import account_helpers
 from client_request_lib.exceptions import ResponseCodes
 from constants import PREBATTLE_TYPE, QUEUE_TYPE
 from debug_utils import LOG_DEBUG, LOG_ERROR
+from gui.Scaleform.settings import TOOLTIP_TYPES
 from gui import SystemMessages
+from gui.Scaleform.daapi.view.lobby.clans.clan_helpers import getStrongholdEventBattleModeSettings, getStrongholdEventEnabled
+from gui.Scaleform.daapi.view.lobby.fortifications.ConfirmOrderDialogMeta import UnfreezeVehicleDialogMeta
 from gui.clans.clan_helpers import isStrongholdsEnabled, isLeaguesEnabled
+from gui.clans.stronghold_event_requester import FrozenVehiclesRequester, FrozenVehiclesConstants
 from gui.impl import backport
 from gui.impl.gen import R
 from gui.prb_control import prb_getters
@@ -17,7 +21,7 @@ from gui.prb_control import settings
 from gui.prb_control.entities.base.unit.entity import UnitEntity, UnitEntryPoint, UnitBrowserEntryPoint, UnitBrowserEntity
 from gui.prb_control.entities.stronghold.unit.actions_handler import StrongholdActionsHandler
 from gui.prb_control.entities.stronghold.unit.actions_validator import StrongholdActionsValidator
-from gui.prb_control.entities.stronghold.unit.permissions import StrongholdPermissions
+from gui.prb_control.entities.stronghold.unit.permissions import StrongholdPermissions, StrongholdBrowserPermissions
 from gui.prb_control.entities.stronghold.unit.requester import StrongholdUnitRequestProcessor
 from gui.prb_control.entities.base.external_battle_unit.base_external_battle_waiting_manager import BaseExternalUnitWaitingManager
 from gui.prb_control.events_dispatcher import g_eventDispatcher
@@ -29,21 +33,22 @@ from gui.prb_control.items.unit_items import DynamicRosterSettings
 from gui.prb_control.settings import PREBATTLE_ACTION_NAME, FUNCTIONAL_FLAG
 from gui.prb_control.settings import UNIT_RESTRICTION
 from gui.prb_control.storages import prequeue_storage_getter
-from gui.shared.ClanCache import _ClanCache
+from gui.clans.clan_cache import g_clanCache
 from gui.Scaleform.daapi.view.dialogs.rally_dialog_meta import StrongholdConfirmDialogMeta
 from gui.SystemMessages import SM_TYPE
 from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.shared.notifications import NotificationPriorityLevel
 from gui.shared.utils.requesters.abstract import Response
-from gui.wgcg.strongholds.contexts import StrongholdJoinBattleCtx, StrongholdUpdateCtx, StrongholdMatchmakingInfoCtx, StrongholdLeaveModeCtx, SlotVehicleFiltersUpdateCtx
+from gui.shared.utils.functions import makeTooltip
+from gui.wgcg.strongholds.contexts import StrongholdJoinBattleCtx, StrongholdUpdateCtx, StrongholdMatchmakingInfoCtx, StrongholdLeaveModeCtx, SlotVehicleFiltersUpdateCtx, StrongholdEventGetFrozenVehiclesCtx, StrongholdEventUnfreezeVehicleCtx
 from helpers import time_utils, dependency
 from UnitBase import UNIT_ERROR, UNIT_ROLE
-from gui.prb_control.entities.base import vehicleAmmoCheck
+from shared_utils import findFirst
 from skeletons.gui.game_control import IGameSessionController
 _CREATION_TIMEOUT = 30
 ERROR_MAX_RETRY_COUNT = 3
-SUCCESS_STATUSES = (200, 201, 403, 409)
+SUCCESS_STATUSES = (200, 201)
 DEFAULT_OK_WEB_REQUEST_ID = 0
 
 class StrongholdDynamicRosterSettings(DynamicRosterSettings):
@@ -153,6 +158,21 @@ class StrongholdBrowserEntity(UnitBrowserEntity):
     def canKeepMode(self):
         return False
 
+    def getPermissions(self, dbID=None, unitMgrID=None):
+        return StrongholdBrowserPermissions(self.hasLockedState())
+
+    def leave(self, ctx, callback=None):
+        processor = StrongholdUnitRequestProcessor()
+        processor.doRequest(StrongholdLeaveModeCtx(ctx.getID()), 'leave_mode')
+        super(StrongholdBrowserEntity, self).leave(ctx, callback)
+
+    def getSquadBtnTooltipData(self):
+        if self.getPermissions().canCreateSquad():
+            header = backport.text(R.strings.platoon.headerButton.tooltips.squad.header())
+            body = backport.text(R.strings.platoon.headerButton.tooltips.squad.body())
+            return (makeTooltip(header, body), TOOLTIP_TYPES.COMPLEX)
+        return ('', TOOLTIP_TYPES.COMPLEX)
+
     def _loadUnit(self):
         g_eventDispatcher.loadStrongholds()
 
@@ -161,11 +181,6 @@ class StrongholdBrowserEntity(UnitBrowserEntity):
 
     def _showWindow(self):
         g_eventDispatcher.showStrongholdsWindow()
-
-    def leave(self, ctx, callback=None):
-        processor = StrongholdUnitRequestProcessor()
-        processor.doRequest(StrongholdLeaveModeCtx(ctx.getID()), 'leave_mode')
-        super(StrongholdBrowserEntity, self).leave(ctx, callback)
 
 
 class StrongholdEntity(UnitEntity):
@@ -180,7 +195,6 @@ class StrongholdEntity(UnitEntity):
     def __init__(self):
         self.__strongholdSettings = StrongholdSettings()
         super(StrongholdEntity, self).__init__(FUNCTIONAL_FLAG.STRONGHOLD, PREBATTLE_TYPE.STRONGHOLD)
-        self.__g_clanCache = _ClanCache()
         self.__revisionId = 0
         self.__battleModeData = {}
         self.__waitingManager = BaseExternalUnitWaitingManager()
@@ -193,6 +207,7 @@ class StrongholdEntity(UnitEntity):
         self.__strongholdUpdateEventsMapping = {}
         self.__playersMatchingStartedAt = None
         self.__slotVehicleFilters = []
+        self.__eventFrozenVehiclesRequester = None
         self.storage = prequeue_storage_getter(QUEUE_TYPE.STRONGHOLD_UNITS)()
         return
 
@@ -205,6 +220,7 @@ class StrongholdEntity(UnitEntity):
         if rev > 1:
             self.requestUpdateStronghold()
             self.requestSlotVehicleFilters()
+        self.__checkStrongholdEvent()
         unitMgr = prb_getters.getClientUnitMgr()
         if unitMgr:
             unitMgr.onUnitResponseReceived += self.onUnitResponseReceived
@@ -228,6 +244,9 @@ class StrongholdEntity(UnitEntity):
     def fini(self, ctx=None, woEvents=False):
         self.__gameSession.onNotifyTimeTillKick -= self.__onParentControlNotify
         self.__gameSession.onParentControlNotify -= self.__onParentControlNotify
+        if self.__eventFrozenVehiclesRequester is not None:
+            self.__eventFrozenVehiclesRequester.stop()
+            self.__eventFrozenVehiclesRequester = None
         self.__cancelMatchmakingTimer()
         unitMgr = prb_getters.getClientUnitMgr()
         if unitMgr:
@@ -390,6 +409,13 @@ class StrongholdEntity(UnitEntity):
         self.__isInSlot = playerInfo.isInSlot
         super(StrongholdEntity, self).unit_onUnitMembersListChanged()
 
+    def getSquadBtnTooltipData(self):
+        if self.getPermissions().canCreateSquad():
+            header = backport.text(R.strings.platoon.headerButton.tooltips.squad.header())
+            body = backport.text(R.strings.platoon.headerButton.tooltips.squad.body())
+            return (makeTooltip(header, body), TOOLTIP_TYPES.COMPLEX)
+        return ('', TOOLTIP_TYPES.COMPLEX)
+
     def request(self, ctx, callback=None):
         self.__waitingManager.processRequest(ctx)
 
@@ -419,7 +445,6 @@ class StrongholdEntity(UnitEntity):
             ctx.startProcessing(callback)
             self._requestsProcessor.doRequest(ctx, 'leave', callback=callbackWrapper)
 
-    @vehicleAmmoCheck
     def doBattleQueue(self, ctx, callback=None):
         if ctx.isRequestToStart():
             self.setCoolDown(settings.REQUEST_TYPE.SET_PLAYER_STATE, ctx.getCooldown())
@@ -653,6 +678,71 @@ class StrongholdEntity(UnitEntity):
         pInfo = self.getPlayerInfo()
         return isLeaguesEnabled() and self.isInQueue() and pInfo.isInSlot
 
+    def getEventFrozenVehicles(self, spaID=None):
+        if self.__eventFrozenVehiclesRequester is not None:
+            if spaID is None:
+                spaID = account_helpers.getAccountDatabaseID()
+            return self.__eventFrozenVehiclesRequester.getFrozenVehicles(spaID)
+        else:
+            return
+
+    def hasEventFrozenVehicles(self):
+        if not self.__isStrongholdEventEnabled():
+            return False
+        else:
+            fullData = self.getUnitFullData()
+            for slotInfo in fullData.slotsIterator:
+                player = slotInfo.player
+                vehicle = slotInfo.vehicle
+                if player is not None and vehicle:
+                    frozenVehicles = self.getEventFrozenVehicles(player.dbID)
+                    isFrozen = frozenVehicles is not None and (frozenVehicles == FrozenVehiclesConstants.ALL_VEHICLES_FROZEN or vehicle.vehTypeCompDescr in frozenVehicles)
+                    if isFrozen:
+                        return True
+
+            return False
+
+    def onUnfreezeVehicleInSlot(self, slotIdx, parent=None):
+        if not self.__isStrongholdEventEnabled():
+            return False
+        else:
+            fullData = self.getUnitFullData()
+            slotInfo = findFirst(lambda s: s.index == slotIdx, fullData.slotsIterator)
+            if slotInfo is None or slotInfo.player is None or slotInfo.vehicle is None:
+                return
+            vehicleCD = slotInfo.vehicle.vehTypeCompDescr
+            vehicle = self.itemsCache.items.getItemByCD(vehicleCD)
+            price = self.__eventFrozenVehiclesRequester.getUnfreezePrice(vehicleCD)
+            self.showDialog(UnfreezeVehicleDialogMeta(slotInfo.player.name, vehicle.shortUserName if vehicle is not None else '', price, self.__eventFrozenVehiclesRequester.getSparePartsBalance()), lambda result: self.__onUnfreezeVehicleDialogCallback(result, slotInfo.player.dbID, vehicleCD, price), parent=parent)
+            return
+
+    def __onUnfreezeVehicleDialogCallback(self, result, playerSpaID, vehicleCD, price):
+        if not result:
+            return
+        ctx = StrongholdEventUnfreezeVehicleCtx(playerSpaID, vehicleCD, price)
+        self._requestsProcessor.doRequest(ctx, 'unfreezeVehicle', callback=partial(self.__unfreezeVehicleRequestCallback, playerSpaID=playerSpaID))
+
+    def __unfreezeVehicleRequestCallback(self, response, playerSpaID):
+        rawData = response.getData()
+        if response.isSuccess():
+            vehicleCD = rawData.get('vehicle_cd')
+            vehicle = self.itemsCache.items.getItemByCD(vehicleCD)
+            SystemMessages.pushMessage(backport.text(R.strings.system_messages.unit.warnings.wgshEvent.vehicleUnfrozen(), vehicleName=vehicle.shortUserName if vehicle is not None else ''), type=SM_TYPE.Warning, priority=NotificationPriorityLevel.MEDIUM)
+            self.__eventFrozenVehiclesRequester.removeFromFrozenVehicle(playerSpaID, vehicleCD)
+            self.__frozenVehiclesUpdated([playerSpaID])
+            return
+        else:
+            if response.getExtraCode() not in SUCCESS_STATUSES:
+                self.__getEventFrozenVehicles()
+            if isinstance(rawData, dict):
+                resMsg = R.strings.system_messages.unit.error.wgshEvent.dyn(rawData.get('title', ''))
+            else:
+                resMsg = R.strings.system_messages.unit.error.wgshEvent.common
+            if not resMsg.exists():
+                resMsg = R.strings.system_messages.unit.error.wgshEvent.common
+            SystemMessages.pushMessage(backport.text(resMsg()), type=SM_TYPE.ErrorSimple, priority=NotificationPriorityLevel.MEDIUM)
+            return
+
     def _onPlayersMatchingDataUpdated(self, response):
         if not self.__processResponseMessage(response):
             return
@@ -706,7 +796,7 @@ class StrongholdEntity(UnitEntity):
 
     def _buildPermissions(self, roles, flags, isCurrentPlayer=False, isPlayerReady=False, hasLockedState=False):
         playerInfo = self.getPlayerInfo()
-        myClanRole = self.__g_clanCache.clanRole
+        myClanRole = g_clanCache.clanRole
         strongholdManageReservesRoles = None
         strongholdStealLeadershipRoles = None
         if self.isStrongholdSettingsValid():
@@ -774,6 +864,43 @@ class StrongholdEntity(UnitEntity):
         _, unit = self.getUnit(safe=True)
         return StrongholdDynamicRosterSettings(unit, self.__strongholdSettings)
 
+    def __getEventFrozenVehicles(self):
+        ctx = StrongholdEventGetFrozenVehiclesCtx()
+        self._requestsProcessor.doRequest(ctx, 'getFrozenVehicles', callback=self.__frozenVehiclesReceived)
+
+    def __frozenVehiclesReceived(self, response):
+        if not self.__processResponseMessage(response):
+            BigWorld.callback(0.1, self.__getEventFrozenVehicles)
+            return
+        rawData = response.getData()
+        if response.getCode() != ResponseCodes.NO_ERRORS:
+            return
+        self.__eventFrozenVehiclesRequester.setInitialDataAndStart(rawData)
+
+    def __frozenVehiclesUpdated(self, updatedSpaIDs):
+        self._invokeListeners('onEventFrozenVehiclesChanged', updatedSpaIDs)
+
+    def __isStrongholdEventEnabled(self):
+        if not getStrongholdEventEnabled():
+            return False
+        battleMode, lvl = getStrongholdEventBattleModeSettings()
+        header = self.__strongholdSettings.getHeader()
+        if header.getType() != battleMode:
+            return False
+        return False if not header.getMinLevel() <= lvl <= header.getMaxLevel() else True
+
+    def __checkStrongholdEvent(self):
+        if not self.__isStrongholdEventEnabled():
+            return False
+        else:
+            if self.__eventFrozenVehiclesRequester is not None:
+                self.__eventFrozenVehiclesRequester.stop()
+            else:
+                self.__eventFrozenVehiclesRequester = FrozenVehiclesRequester()
+            self.__eventFrozenVehiclesRequester.onUpdated += self.__frozenVehiclesUpdated
+            self.__getEventFrozenVehicles()
+            return True
+
     def __onStrongholdUpdate(self, response):
         if not self.__processResponseMessage(response):
             BigWorld.callback(0.0, self.requestUpdateStronghold)
@@ -826,8 +953,11 @@ class StrongholdEntity(UnitEntity):
                         self.__slotVehicleFilters = {}
                         if key == 'STRONGHOLDS_MODE_CHANGED':
                             self.resetPlayerReadiness()
+                            self.__checkStrongholdEvent()
                         break
 
+            else:
+                self.__checkStrongholdEvent()
             for field, _ in battleModeFields:
                 self.__battleModeData[field] = gettersMapping[field]()
 

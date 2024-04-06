@@ -17,7 +17,7 @@ from skeletons.gui.game_control import IBattlePassController
 
 class RewardsSelectionView(SelectableRewardBase):
     __slots__ = ('__chapterID', '__level', '__onRewardsReceivedCallback', '__onCloseCallback')
-    __battlePassController = dependency.descriptor(IBattlePassController)
+    __battlePass = dependency.descriptor(IBattlePassController)
     _helper = BattlePassSelectableRewardManager
 
     def __init__(self, chapterID=0, level=0, onRewardsReceivedCallback=None, onCloseCallback=None):
@@ -26,6 +26,9 @@ class RewardsSelectionView(SelectableRewardBase):
         self.__onRewardsReceivedCallback = onRewardsReceivedCallback
         self.__onCloseCallback = onCloseCallback
         super(RewardsSelectionView, self).__init__(R.views.lobby.battle_pass.RewardsSelectionView(), self._helper.getAvailableSelectableBonuses(partial(_isValidReward, self.__chapterID, self.__level)), RewardsSelectionViewModel)
+
+    def _getReceivedRewards(self, rewardName):
+        pass
 
     @property
     def viewModel(self):
@@ -36,6 +39,8 @@ class RewardsSelectionView(SelectableRewardBase):
         with self.viewModel.transaction() as tx:
             tx.setChapterID(self.__chapterID)
             tx.setLevel(self.__level)
+            tx.setIsExtra(self.__battlePass.isExtraChapter(self.__chapterID))
+            tx.setIsHoliday(self.__battlePass.isHoliday())
 
     def _initialize(self, *args, **kwargs):
         super(RewardsSelectionView, self)._initialize(*args, **kwargs)

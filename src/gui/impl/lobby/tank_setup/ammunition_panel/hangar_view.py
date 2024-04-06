@@ -3,9 +3,8 @@
 import logging
 from CurrentVehicle import g_currentVehicle
 from account_helpers.settings_core.ServerSettingsManager import UI_STORAGE_KEYS
-from account_helpers.settings_core.settings_constants import OnceOnlyHints
-from wg_async import wg_async
 from frameworks.wulf import ViewStatus
+from gui.impl.gen.view_models.views.lobby.tank_setup.tank_setup_constants import TankSetupConstants
 from gui.impl.lobby.tank_setup.ammunition_panel.base_view import BaseAmmunitionPanelView
 from gui.impl.lobby.tank_setup.intro_ammunition_setup_view import showIntro
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
@@ -13,14 +12,11 @@ from gui.shared.events import AmmunitionPanelViewEvent
 from gui.shared.gui_items.Vehicle import Vehicle
 from helpers import dependency
 from skeletons.account_helpers.settings_core import ISettingsCore
-from skeletons.gui.game_control import IUISpamController
+from wg_async import wg_async
 _logger = logging.getLogger(__name__)
-_AMMUNITION_PANEL_HINTS = {OnceOnlyHints.AMMUNITION_PANEL_HINT: UI_STORAGE_KEYS.OPTIONAL_DEVICE_SETUP_INTRO_SHOWN,
- OnceOnlyHints.AMUNNITION_PANEL_EPIC_BATTLE_ABILITIES_HINT: UI_STORAGE_KEYS.EPIC_BATTLE_ABILITIES_INTRO_SHOWN}
 
 class HangarAmmunitionPanelView(BaseAmmunitionPanelView):
     _settingsCore = dependency.descriptor(ISettingsCore)
-    _uiSpamController = dependency.descriptor(IUISpamController)
 
     def update(self, fullUpdate=True):
         with self.viewModel.transaction():
@@ -42,18 +38,12 @@ class HangarAmmunitionPanelView(BaseAmmunitionPanelView):
         self.viewModel.ammunitionPanel.onChangeSetupIndex -= self._onChangeSetupIndex
         self.viewModel.onEscKeyDown -= self.__onEscKeyDown
 
-    def _onLoading(self, *args, **kwargs):
-        super(HangarAmmunitionPanelView, self)._onLoading(*args, **kwargs)
-        serverSettings = self._settingsCore.serverSettings
-        for hintName, uiStorage in _AMMUNITION_PANEL_HINTS.iteritems():
-            showHint = not serverSettings.getOnceOnlyHintsSetting(hintName, default=False)
-            if showHint and not self._uiSpamController.shouldBeHidden(hintName):
-                serverSettings.setOnceOnlyHintsSettings({hintName: True})
-                serverSettings.saveInUIStorage({uiStorage: True})
-
     @wg_async
     def _onPanelSectionSelected(self, args):
         selectedSection = args['selectedSection']
+        if selectedSection == TankSetupConstants.SHELLS and self.vehItem and self.vehItem.gun.isDamageMutable():
+            if not self._settingsCore.serverSettings.getUIStorage2().get(UI_STORAGE_KEYS.MUTABLE_DAMAGE_SHELL_MARK_IS_SHOWN):
+                self._settingsCore.serverSettings.saveInUIStorage2({UI_STORAGE_KEYS.MUTABLE_DAMAGE_SHELL_MARK_IS_SHOWN: True})
         yield showIntro(selectedSection, self.getParentWindow())
         if self.viewStatus != ViewStatus.LOADED:
             return
@@ -70,3 +60,8 @@ class HangarAmmunitionPanelView(BaseAmmunitionPanelView):
 
     def __onEscKeyDown(self):
         g_eventBus.handleEvent(AmmunitionPanelViewEvent(AmmunitionPanelViewEvent.CLOSE_VIEW), EVENT_BUS_SCOPE.LOBBY)
+
+    def _updateView(self):
+        isFullUpdate = not self._wasVehicleOnLoading and self.vehItem is not None
+        self.update(fullUpdate=isFullUpdate)
+        return

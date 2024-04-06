@@ -5,22 +5,23 @@ import typing
 import Event
 from frameworks.wulf import WindowLayer
 from gui import GUI_SETTINGS
+from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
 from gui.impl import backport
 from gui.impl.gen import R
 from gui.impl.gen.view_models.views.lobby.mode_selector.mode_selector_card_types import ModeSelectorCardTypes
 from gui.impl.gen.view_models.views.lobby.mode_selector.mode_selector_normal_card_model import ModeSelectorNormalCardModel
 from gui.impl.gen.view_models.views.lobby.mode_selector.mode_selector_reward_model import ModeSelectorRewardModel
-from gui.impl.lobby.mode_selector.items.items_constants import CustomModeName, COLUMN_SETTINGS, DEFAULT_PRIORITY, DEFAULT_COLUMN, ModeSelectorRewardID
-from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
+from gui.impl.lobby.mode_selector.items.items_constants import COLUMN_SETTINGS, DEFAULT_PRIORITY, DEFAULT_COLUMN, ModeSelectorRewardID, DEFAULT_MODE_SETTING
+from gui.limited_ui.lui_rules_storage import LuiRules
 from gui.shared.event_dispatcher import showBrowserOverlayView
 from gui.shared.formatters import time_formatters
 from helpers import dependency, i18n, time_utils
-from skeletons.gui.game_control import IBootcampController, IUISpamController
+from skeletons.gui.game_control import ILimitedUIController
 from soft_exception import SoftException
 if typing.TYPE_CHECKING:
     from typing import Callable, Optional, Type, Union
     from gui.impl.gen.view_models.views.lobby.mode_selector.mode_selector_card_model import ModeSelectorCardModel
-    from gui.Scaleform.daapi.view.lobby.header.battle_selector_items import _SelectorItem
+    from gui.Scaleform.daapi.view.lobby.header.battle_selector_items import SelectorItem
     from gui.impl.gen_utils import DynAccessor
 _rMode = R.strings.mode_selector.mode
 _INFO_PAGE_KEY_TEMPLATE = 'infoPage%s'
@@ -42,8 +43,7 @@ class ModeSelectorItem(object):
     __slots__ = ('_viewModel', '_initialized', '_priority', '_preferredColumn')
     _VIEW_MODEL = None
     _CARD_VISUAL_TYPE = ModeSelectorCardTypes.DEFAULT
-    _bootcamp = dependency.descriptor(IBootcampController)
-    _uiSpamController = dependency.descriptor(IUISpamController)
+    __limitedUIController = dependency.descriptor(ILimitedUIController)
 
     def __init__(self):
         super(ModeSelectorItem, self).__init__()
@@ -83,7 +83,7 @@ class ModeSelectorItem(object):
 
     @property
     def disabledTooltipText(self):
-        return backport.text(R.strings.tooltips.mode_selector.unavailable.bootcamp()) if self._bootcamp.isInBootcamp() else self._getDisabledTooltipText()
+        return self._getDisabledTooltipText()
 
     def getFactory(self):
 
@@ -128,12 +128,11 @@ class ModeSelectorItem(object):
         return GUI_SETTINGS.lookup(getInfoPageKey(self.modeName)) is not None
 
     def _isNewLabelVisible(self):
-        isInBootcamp = self._bootcamp.isInBootcamp()
-        isNewbie = self._uiSpamController.shouldBeHidden('ModeSelectorWidgetsBtnHint')
-        return self._getIsNew() and not isInBootcamp and not isNewbie
+        isNewbie = not self.__limitedUIController.isRuleCompleted(LuiRules.MODE_SELECTOR_WIDGET_BTN_HINT)
+        return self._getIsNew() and not isNewbie
 
     def _isDisabled(self):
-        return self._getIsDisabled() or self._bootcamp.isInBootcamp()
+        return self._getIsDisabled()
 
     def _onDisposing(self):
         pass
@@ -164,7 +163,7 @@ class ModeSelectorNormalCardItem(ModeSelectorItem):
 
     @property
     def modeName(self):
-        return CustomModeName.DEFAULT
+        return DEFAULT_MODE_SETTING
 
     @property
     def calendarTooltipText(self):
@@ -184,13 +183,16 @@ class ModeSelectorNormalCardItem(ModeSelectorItem):
     def _isNeedToHideCard(self):
         return False
 
+    def _getModeStringsRoot(self):
+        return _rMode.dyn(self.modeName)
+
     def _onInitializing(self):
         super(ModeSelectorNormalCardItem, self)._onInitializing()
         modeName = self.modeName
         if R.images.gui.maps.icons.mode_selector.mode.dyn(modeName).isValid():
             self.viewModel.setResourcesFolderName(modeName)
         self._preferredColumn, self._priority = self._getPositionByModeName()
-        modeStrings = _rMode.dyn(modeName)
+        modeStrings = self._getModeStringsRoot()
         if modeStrings.isValid():
             condition = modeStrings.dyn('condition')
             self.viewModel.setConditions(backport.text(condition()) if condition.exists() else '')

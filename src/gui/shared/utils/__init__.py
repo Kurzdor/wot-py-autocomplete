@@ -25,9 +25,13 @@ RELOAD_TIME_PROP_NAME = 'reloadTime'
 RELOAD_MAGAZINE_TIME_PROP_NAME = 'reloadMagazineTime'
 SHELL_RELOADING_TIME_PROP_NAME = 'shellReloadingTime'
 DISPERSION_RADIUS_PROP_NAME = 'dispersionRadius'
+SHOT_DISPERSION_ANGLE = 'shotDispersionAngle'
+DISPERSION_RADIUS = 'dispertionRadius'
 AIMING_TIME_PROP_NAME = 'aimingTime'
 PIERCING_POWER_PROP_NAME = 'piercingPower'
 DAMAGE_PROP_NAME = 'damage'
+MAX_MUTABLE_DAMAGE_PROP_NAME = 'maxMutableDamage'
+MIN_MUTABLE_DAMAGE_PROP_NAME = 'minMutableDamage'
 SHELLS_PROP_NAME = 'shells'
 STUN_DURATION_PROP_NAME = 'stunDuration'
 AUTO_RELOAD_PROP_NAME = 'autoReloadTime'
@@ -37,6 +41,10 @@ UNICHARGED_VEHICLES_PROP_NAME = 'uniChargedVehicles'
 VEHICLES_PROP_NAME = 'vehicles'
 CLIP_VEHICLES_CD_PROP_NAME = 'clipVehiclesCD'
 MAX_STEERING_LOCK_ANGLE = 'maxSteeringLockAngle'
+BURST_FIRE_RATE = 'burstFireRate'
+BURST_TIME_INTERVAL = 'burstTimeInterval'
+BURST_COUNT = 'burstCount'
+BURST_SIZE = 'burstSize'
 WHEELED_SWITCH_ON_TIME = 'wheeledSwitchOnTime'
 WHEELED_SWITCH_OFF_TIME = 'wheeledSwitchOffTime'
 WHEELED_SWITCH_TIME = 'wheeledSwitchTime'
@@ -53,6 +61,8 @@ ROCKET_ACCELERATION_SPEED_LIMITS = 'rocketAccelerationSpeedLimits'
 ROCKET_ACCELERATION_REUSE_AND_DURATION = 'rocketAccelerationReuseAndDuration'
 DUAL_GUN_CHARGE_TIME = 'chargeTime'
 DUAL_GUN_RATE_TIME = 'rateTime'
+DUAL_ACCURACY_AFTER_SHOT_DISPERSION_ANGLE = 'dualAccuracyAfterShotDispersionAngle'
+DUAL_ACCURACY_COOLING_DELAY = 'dualAccuracyCoolingDelay'
 GUN_RELOADING_TYPE = 'gunReloadingType'
 CHASSIS_REPAIR_TIME = 'chassisRepairTime'
 CHASSIS_REPAIR_TIME_YOH = 'chassisRepairTimeYoh'
@@ -299,3 +309,10 @@ _ROMAN_FORBIDDEN_LANGUAGES = {'ko', 'no'}
 
 def isRomanNumberForbidden():
     return bool(_ROMAN_FORBIDDEN_LANGUAGES.intersection((backport.text(R.strings.settings.LANGUAGE_CODE()),)))
+
+
+def showAFKWarningInWindowsBar():
+    try:
+        BigWorld.WGWindowsNotifier.onAFKWarning()
+    except AttributeError:
+        LOG_CURRENT_EXCEPTION()

@@ -11,7 +11,7 @@ import Triggers
 from arena_bonus_type_caps import ARENA_BONUS_TYPE_CAPS
 from battle_royale.gui.constants import BattleRoyaleEquipments
 from cgf_script.bonus_caps_rules import bonusCapsManager
-from cgf_script.component_meta_class import CGFComponent, ComponentProperty, CGFMetaTypes
+from cgf_script.component_meta_class import ComponentProperty, CGFMetaTypes, registerComponent
 from cgf_script.managers_registrator import onAddedQuery, onRemovedQuery
 from constants import IS_CLIENT
 from items import vehicles
@@ -42,7 +42,7 @@ class ResourceLoaded(object):
 
 if typing.TYPE_CHECKING:
     from BattleRoyaleAbilities import HealthRestoreAbilityMappingEntry
-    from items.artefacts import AdaptationHealthRestore
+    from battle_royale_artefacts import AdaptationHealthRestore
     from vehicle_systems.CompoundAppearance import CompoundAppearance
     from typing import Optional, List
 _logger = logging.getLogger(__name__)
@@ -55,21 +55,31 @@ def findEffectRoots(gameObject):
     return result
 
 
+def findEquipComp(gameObject):
+    h = CGF.HierarchyManager(gameObject.spaceID)
+    rootGameObject = h.getTopMostParent(gameObject)
+    return bool(rootGameObject.findComponentByType(VehicleAdaptationHealthRestoreComponent))
+
+
 def getChildren(gameObject):
     return CGF.HierarchyManager(gameObject.spaceID).getChildren(gameObject) or []
 
 
-class AdaptationHealthRestoreAbilityPart(CGFComponent):
+@registerComponent
+class AdaptationHealthRestoreAbilityPart(object):
+    domain = CGF.DomainOption.DomainClient
     startAnimation = ComponentProperty(type=CGFMetaTypes.STRING, value='')
     cycleAnimation = ComponentProperty(type=CGFMetaTypes.STRING, value='')
     endAnimation = ComponentProperty(type=CGFMetaTypes.STRING, value='')
 
 
-class AdaptationHealthRestoreEffectArea(CGFComponent):
+@registerComponent
+class AdaptationHealthRestoreEffectArea(object):
+    domain = CGF.DomainOption.DomainClient
     teamMateRestoringRadius = ComponentProperty(type=CGFMetaTypes.FLOAT, value=1.0, editorName='Teammate restoring radius')
 
 
-@bonusCapsManager(ARENA_BONUS_TYPE_CAPS.BATTLEROYALE)
+@bonusCapsManager(ARENA_BONUS_TYPE_CAPS.BATTLEROYALE, CGF.DomainOption.DomainClient)
 class AdaptationHealthRestoreEffectManager(CGF.ComponentManager):
 
     @onAddedQuery(VehicleAdaptationHealthRestoreComponent, CGF.GameObject)
@@ -111,6 +121,8 @@ class AdaptationHealthRestoreEffectManager(CGF.ComponentManager):
 
     @onAddedQuery(ResourceLoaded, CGF.GameObject)
     def onResourcesLoadedAdded(self, resource, effectRoot):
+        if not findEquipComp(effectRoot):
+            return
         for partComponent, partGO in self.iterParts(effectRoot):
             if resource.elapsedTime < _START_ANIMATION_THRESHOLD:
                 self.spawnStartAnimation(partComponent, partGO)

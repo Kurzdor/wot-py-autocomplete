@@ -11,6 +11,7 @@ from AvatarInputHandler.control_modes import IControlMode
 from AvatarInputHandler.rotating_cursor_camera import RotatingCoursorCamera
 from aih_constants import CTRL_MODE_NAME
 from constants import ARENA_PERIOD, VEHICLE_SELECTION_BLOCK_DELAY
+from gui.battle_control import avatar_getter
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
 from gui.shared.events import GameEvent
 from helpers import dependency
@@ -35,6 +36,10 @@ class _CameraManager(object):
         self.__cameraMover = _CameraMover(self.__camera)
         self.__pendingVehicles = set()
         return
+
+    @property
+    def camera(self):
+        return self.__camera
 
     def start(self):
         self.__locateCameraOnAllVehicles()
@@ -64,10 +69,10 @@ class _CameraManager(object):
 
     def __locateCameraOnAllVehicles(self):
         arenaDP = self.__sessionProvider.getArenaDP()
-        yawSum = 0
         numVehs = 0
         vehiclesBBPoints = []
         targetPos = Math.Vector3()
+        rotationVector = Math.Vector3()
 
         def _makeAdditionalPoints(basePoint, extraPoint):
             yield (extraPoint[0], basePoint[1], basePoint[2])
@@ -90,7 +95,7 @@ class _CameraManager(object):
                 vehiclesBBPoints.extend([vehMatrix.applyPoint(hullBB[0]), vehMatrix.applyPoint(hullBB[1])])
                 vehiclesBBPoints.extend(_makeAdditionalPoints(vehMatrix.applyPoint(hullBB[0]), vehMatrix.applyPoint(hullBB[1])))
                 vehiclesBBPoints.extend(_makeAdditionalPoints(vehMatrix.applyPoint(hullBB[1]), vehMatrix.applyPoint(hullBB[0])))
-                yawSum += vehMatrix.yaw + 2 * math.pi if vehMatrix.yaw < 0 else vehMatrix.yaw
+                rotationVector += Math.createRotationMatrix((vehMatrix.yaw, 0, 0)).applyVector((0, 0, 1))
                 numVehs += 1
 
         if self.__pendingVehicles:
@@ -99,11 +104,8 @@ class _CameraManager(object):
         if numVehs == 0:
             return
         else:
-            averageYaw = yawSum / numVehs
-            if averageYaw > math.pi:
-                averageYaw -= 2 * math.pi
             targetPosition = targetPos.scale(1.0 / numVehs)
-            yawMatrix = math_utils.createRTMatrix((averageYaw, self.__CAMERA_PITCH, 0), targetPosition)
+            yawMatrix = math_utils.createRTMatrix((rotationVector.yaw, self.__CAMERA_PITCH, 0), targetPosition)
             yawMatrix.invert()
             rotatedPoints = [ yawMatrix.applyPoint(p) for p in vehiclesBBPoints ]
             maxX = max((p.x for p in rotatedPoints))
@@ -117,7 +119,7 @@ class _CameraManager(object):
             ratio = cameras.getScreenAspectRatio()
             halfFOVTan = math.tan(hFov / 2)
             distanceToTarget = max(width / (2 * halfFOVTan * ratio), height / (2 * halfFOVTan)) + maxY
-            initialRotations = math_utils.createRotationMatrix((averageYaw, -self.__CAMERA_PITCH, 0))
+            initialRotations = math_utils.createRotationMatrix((rotationVector.yaw, -self.__CAMERA_PITCH, 0))
             self.__initialCamSetup = (targetPosition, initialRotations, distanceToTarget)
             self.__setCamera()
             return
@@ -199,6 +201,10 @@ class VehiclesSelectionControlMode(IControlMode):
         self.__callbackDelayer = CallbackDelayer()
         return
 
+    @property
+    def camera(self):
+        return self.__camManager.camera
+
     def destroy(self):
         if self.__camManager is not None:
             self.__camManager.stop()
@@ -232,7 +238,7 @@ class VehiclesSelectionControlMode(IControlMode):
         return True
 
     def onRecreateDevice(self):
-        self.__camManager.reset()
+        pass
 
     def moveCameraToDefault(self):
         lockIsSoon = 0 < self.__lockStartTime < BigWorld.serverTime() + self.__camManager.CAMERA_TRANSITION_DURATION
@@ -242,6 +248,8 @@ class VehiclesSelectionControlMode(IControlMode):
     def __onLockedState(self):
         self.__lockedState = True
         g_eventBus.handleEvent(GameEvent(GameEvent.PREBATTLE_INPUT_STATE_LOCKED), scope=EVENT_BUS_SCOPE.BATTLE)
+        if avatar_getter.isObserver():
+            return
         self.__aih.ctrls[CTRL_MODE_NAME.ARCADE].camera.enable(camTransitionParams={'cameraTransitionDuration': self.__camManager.CAMERA_TRANSITION_DURATION})
 
     def __onArenaPeriodChanged(self, period, periodEndTime, *_):

@@ -542,6 +542,61 @@ class FakeDataAccessor(base.BaseDataAccessor):
     def get_wgsh_unit_info(self, periphery_id, unit_id, rev, fields=None):
         return self._request_data('wgsh_unit_info', unit_id)
 
+    @fake_method(example={'permissions': {'manage_reserves': ['commander',
+                                         'combat_officer',
+                                         'executive_officer',
+                                         'personnel_officer']},
+     'time_to_ready': 900,
+     'max_level': 10,
+     'battle_series_duration': 3600,
+     'enemy_clan': None,
+     'industrial_resource_multiplier': 1,
+     'max_players_count': 15,
+     'type': 'FORT_BATTLE',
+     'max_legionaries_count': 0,
+     'direction': 'A',
+     'min_players_count': 1,
+     'matchmaker_next_tick': 1475578800,
+     'battle_series_status': [{'battle_reward': 0,
+                               'gameplay_id': 0,
+                               'geometry_id': 6,
+                               'first_resp_clan_id': None,
+                               'second_resp_clan_id': None,
+                               'attacker': None,
+                               'clan_owner_id': 14000012972L,
+                               'current_battle': False,
+                               'map_id': 6}, {'battle_reward': 0,
+                               'gameplay_id': 0,
+                               'geometry_id': 14,
+                               'first_resp_clan_id': None,
+                               'second_resp_clan_id': None,
+                               'attacker': None,
+                               'clan_owner_id': 14000012972L,
+                               'current_battle': False,
+                               'map_id': 14}, {'battle_reward': 0,
+                               'gameplay_id': 0,
+                               'geometry_id': 20,
+                               'first_resp_clan_id': None,
+                               'second_resp_clan_id': None,
+                               'attacker': None,
+                               'clan_owner_id': 14000012972L,
+                               'current_battle': False,
+                               'map_id': 20}],
+     'battle_duration': 600,
+     'public': False,
+     'min_level': 1})
+    def get_wgsh_common_unit_info(self, periphery_id, unit_id, rev, fields=None):
+        return self._request_data('wgsh_common_unit_info', unit_id)
+
+    @fake_method(example={'available_reserves': {'ARTILLERY_STRIKE': [],
+                            'HIGH_CAPACITY_TRANSPORT': [],
+                            'REQUISITION': [],
+                            'AIRSTRIKE': []},
+     'requisition_bonus_percent': None,
+     'selected_reserves': [None, None, None]})
+    def get_wgsh_account_unit_info(self, periphery_id, unit_id, rev, fields=None):
+        return self._request_data('wgsh_account_unit_info', unit_id)
+
     @fake_method(example={})
     def set_vehicle(self, periphery_id, unit_id, vehicle_cd, fields=None):
         return self._request_data('set_vehicle', unit_id)
@@ -653,7 +708,7 @@ class FakeDataAccessor(base.BaseDataAccessor):
               'promoscreen_url': '/promoscreens/<slug>/'},
      'unread': 3,
      'sent_at': 1423813849})
-    def get_teaser(self, fields=None):
+    def get_teaser(self, fields=None, **kwargs):
         return self._request_data('teaser', None)
 
     @fake_method(example=None)
@@ -699,3 +754,13 @@ class FakeDataAccessor(base.BaseDataAccessor):
                           'consumed': []}}})
     def get_inventory_entitlements(self, entitlement_codes):
         return self._request_data('inventory_entitlements', None)
+
+    @fake_method(example={'data': {'balance': [{'code': 'fake_code',
+                           'amount': 0,
+                           'expires_at': '1970-01-01T00:00:00Z',
+                           'tags': []}],
+              'balance_version': 0,
+              'on_hold': {'granted': [],
+                          'consumed': []}}})
+    def get_inventory_entitlements_v5(self, entitlementsFilter):
+        return self._request_data('get_inventory_entitlements_v5', None)

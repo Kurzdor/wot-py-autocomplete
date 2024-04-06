@@ -7,7 +7,7 @@ class ATLAS_CONSTANTS(object):
     COMMON_BATTLE_LOBBY = 'commonBattleLobby'
     COMPONENTS = 'components'
     DAMAGE_INDICATOR = 'damageIndicator'
-    DIGITS = 'digits'
+    DEATH_CAM = 'deathCam'
     MAPS_BLACKLIST = 'mapsBlacklist'
     QUESTS_PROGRESS = 'questsProgress'
     STORE = 'store'

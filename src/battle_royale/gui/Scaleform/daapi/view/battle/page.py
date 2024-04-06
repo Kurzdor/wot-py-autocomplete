@@ -1,7 +1,11 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: battle_royale/scripts/client/battle_royale/gui/Scaleform/daapi/view/battle/page.py
 import BigWorld
+from BattleReplay import g_replayEvents
+from battle_royale.gui.Scaleform.daapi.view.battle.respawn_message_panel import RespawnMessagePanel
+from gui.battle_control.event_dispatcher import toggleCrosshairVisibility
 from shared_utils import CONST_CONTAINER
+import PlayerEvents
 from constants import ARENA_PERIOD
 from aih_constants import CTRL_MODE_NAME
 from arena_bonus_type_caps import ARENA_BONUS_TYPE, ARENA_BONUS_TYPE_CAPS
@@ -37,6 +41,7 @@ class _DynamicAliases(CONST_CONTAINER):
     VEH_UPGRADE_EFFECT_PLAYER = 'vehicleUpgradeEffectPlayer'
     SPAWNED_BOT_MSG_PUBLISHER = 'SpawnedBotMsgPublisher'
     MINEFIELD_MSG_PUBLISHER = 'MinefieldMsgPublisher'
+    RESPAWN_PANEL = 'RespawnPanel'
 
 
 class _BattleRoyaleComponentsConfig(ComponentsConfig):
@@ -50,8 +55,10 @@ class _BattleRoyaleComponentsConfig(ComponentsConfig):
            BATTLE_VIEW_ALIASES.RADAR_BUTTON,
            _DynamicAliases.ARENA_PERIOD_SOUND_PLAYER,
            _DynamicAliases.SELECT_RESPAWN_SOUND_PLAYER,
-           BATTLE_VIEW_ALIASES.CORRODING_SHOT_INDICATOR)),
-         (BATTLE_CTRL_ID.TEAM_BASES, (BATTLE_VIEW_ALIASES.TEAM_BASES_PANEL, DynamicAliases.DRONE_MUSIC_PLAYER, BATTLE_VIEW_ALIASES.PLAYERS_PANEL)),
+           BATTLE_VIEW_ALIASES.CORRODING_SHOT_INDICATOR,
+           BATTLE_VIEW_ALIASES.BR_TIMERS_PANEL)),
+         (BATTLE_CTRL_ID.PERKS, (BATTLE_VIEW_ALIASES.PERKS_PANEL,)),
+         (BATTLE_CTRL_ID.BATTLE_HINTS, (BATTLE_VIEW_ALIASES.BATTLE_HINT,)),
          (BATTLE_CTRL_ID.DEBUG, (BATTLE_VIEW_ALIASES.DEBUG_PANEL,)),
          (BATTLE_CTRL_ID.BATTLE_FIELD_CTRL, (BATTLE_VIEW_ALIASES.BATTLE_TEAM_PANEL, DynamicAliases.DRONE_MUSIC_PLAYER)),
          (BATTLE_CTRL_ID.PROGRESSION_CTRL, (BATTLE_VIEW_ALIASES.BATTLE_LEVEL_PANEL,
@@ -65,9 +72,14 @@ class _BattleRoyaleComponentsConfig(ComponentsConfig):
            _DynamicAliases.MINEFIELD_MSG_PUBLISHER)),
          (BATTLE_CTRL_ID.ARENA_LOAD_PROGRESS, (DynamicAliases.DRONE_MUSIC_PLAYER,)),
          (BATTLE_CTRL_ID.GAME_MESSAGES_PANEL, (BATTLE_VIEW_ALIASES.GAME_MESSAGES_PANEL,)),
+         (BATTLE_CTRL_ID.CALLOUT, (BATTLE_VIEW_ALIASES.CALLOUT_PANEL,)),
          (BATTLE_CTRL_ID.MAPS, (BATTLE_VIEW_ALIASES.MINIMAP,)),
          (BATTLE_CTRL_ID.RADAR_CTRL, (BATTLE_VIEW_ALIASES.RADAR_BUTTON, _DynamicAliases.RADAR_SOUND_PLAYER)),
-         (BATTLE_CTRL_ID.SPAWN_CTRL, (BATTLE_VIEW_ALIASES.BR_SELECT_RESPAWN, _DynamicAliases.SELECT_RESPAWN_SOUND_PLAYER)),
+         (BATTLE_CTRL_ID.SPAWN_CTRL, (BATTLE_VIEW_ALIASES.BR_SELECT_RESPAWN,
+           BATTLE_VIEW_ALIASES.BR_RESPAWN_MESSAGE_PANEL,
+           _DynamicAliases.SELECT_RESPAWN_SOUND_PLAYER,
+           BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL,
+           BATTLE_VIEW_ALIASES.BATTLE_TEAM_PANEL)),
          (BATTLE_CTRL_ID.VEHICLES_COUNT_CTRL, (BATTLE_VIEW_ALIASES.FRAG_PANEL,
            BATTLE_VIEW_ALIASES.FULL_STATS,
            _DynamicAliases.ENEMIES_AMOUNT_SOUND_PLAYER,
@@ -88,7 +100,8 @@ class _BattleRoyaleComponentsConfig(ComponentsConfig):
          (_DynamicAliases.VEH_UPGRADE_EFFECT_PLAYER, BRUpgradeEffectPlayer),
          (_DynamicAliases.EQUIPMENT_SOUND_PLAYER, EquipmentSoundPlayer),
          (_DynamicAliases.SPAWNED_BOT_MSG_PUBLISHER, SpawnedBotMsgPlayerMsgs),
-         (_DynamicAliases.MINEFIELD_MSG_PUBLISHER, MinefieldPlayerMessenger)))
+         (_DynamicAliases.MINEFIELD_MSG_PUBLISHER, MinefieldPlayerMessenger),
+         (_DynamicAliases.RESPAWN_PANEL, RespawnMessagePanel)))
 
 
 _BATTLE_ROYALE_CFG = _BattleRoyaleComponentsConfig()
@@ -100,8 +113,10 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
         if components is None:
             components = _BATTLE_ROYALE_CFG
         self.__selectSpawnToggling = set()
+        self.__winScreenToggling = set()
         self.__brSoundControl = None
         self.__isFullStatsShown = False
+        self.__isWinnerScreenShown = False
         self.__panelsIsVisible = False
         self.__es = EventsSubscriber()
         self.__isAllowToogleGuiVisible = False
@@ -118,7 +133,7 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
             self.__selectSpawnToggling.update(set(self.as_getComponentsVisibilityS()) - set(visibleComponents))
         self.__canShowHUD = False
         self._setComponentsVisibility(visible=visibleComponents, hidden=self.__selectSpawnToggling)
-        self.app.enterGuiControlMode(BATTLE_VIEW_ALIASES.BR_SELECT_RESPAWN)
+        self.app.enterGuiControlMode(BATTLE_VIEW_ALIASES.BR_SELECT_RESPAWN, stopVehicle=True)
 
     def closeSpawnPoints(self):
         self.__isAllowToogleGuiVisible = True
@@ -133,21 +148,38 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
     def isFullStatsShown(self):
         return self.__isFullStatsShown
 
-    def _canShowPostmortemTips(self):
-        if avatar_getter.isObserverSeesAll():
+    def _onPostMortemSwitched(self, noRespawnPossible, respawnAvailable):
+        self._updatePostmortemTips()
+        if not self.sessionProvider.getCtx().isPlayerObserver():
+            self._isInPostmortem = True
+            self._switchToPostmortem()
+
+    @property
+    def isPostmortemTipsVisible(self):
+        bonusType = BigWorld.player().arenaBonusType
+        isTournament = bonusType in (ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SOLO, ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SQUAD)
+        vehicleCountCtrl = self.sessionProvider.dynamic.vehicleCount
+        arenaDP = self.sessionProvider.getArenaDP()
+        if vehicleCountCtrl and vehicleCountCtrl.getTeamCount() <= 1 and arenaDP.getVehicleInfo().isAlive():
             return False
-        else:
-            arenaDP = self.sessionProvider.getArenaDP()
-            enemiesTeamCount = len({vInfo.team for vInfo, _ in arenaDP.getActiveVehiclesGenerator() if vInfo.isAlive()})
-            bonusType = BigWorld.player().arenaBonusType
-            isTournament = bonusType in (ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SOLO, ARENA_BONUS_TYPE.BATTLE_ROYALE_TRN_SQUAD)
-            if enemiesTeamCount <= 1 or isTournament:
-                postmortemPanel = self.getComponent(BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL)
-                if postmortemPanel is not None:
-                    postmortemPanel.as_setSpectatorPanelVisibleS(False)
-                    super(BattleRoyalePage, self).as_setPostmortemTipsVisibleS(True)
-                    return False
-            return not self.__isFullStatsShown and super(BattleRoyalePage, self)._canShowPostmortemTips() and BigWorld.player().isFollowWinner()
+        if not (self._canShowPostmortemTips() and not self.__isFullStatsShown and not self.__isWinnerScreenShown and (BigWorld.player().isFollowWinner() or isTournament)):
+            return False
+        componentSystem = self.sessionProvider.arenaVisitor.getComponentSystem()
+        if componentSystem and componentSystem.battleRoyaleComponent:
+            observedVehicleID = BigWorld.player().getObservedVehicleID()
+            observedVehicleTeam = self.sessionProvider.getArenaDP().getVehicleInfo(observedVehicleID).team
+            defeatedTeams = set(componentSystem.battleRoyaleComponent.defeatedTeams)
+            return observedVehicleTeam in defeatedTeams or self.__isDeadAfterRespawnTimeFinished
+        return False
+
+    def _canShowPostmortemTips(self):
+        return True
+
+    def _updatePostmortemTips(self):
+        self.as_onPostmortemActiveS(self.isPostmortemTipsVisible)
+
+    def _onDefeatedTeamsUpdated(self, *_):
+        self._updatePostmortemTips()
 
     def _toggleFullStats(self, isShown, permanent=None, tabAlias=None):
         manager = self.app.containerManager
@@ -162,9 +194,27 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
                 progressionWindow = self.__getProgressionWindowCtrl()
                 if progressionWindow:
                     progressionWindow.closeWindow()
-            if self.__selectSpawnToggling:
+            if self.__selectSpawnToggling or self.__isWinnerScreenShown:
                 return
             super(BattleRoyalePage, self)._toggleFullStats(isShown, permanent, tabAlias)
+            self._updatePostmortemTips()
+            return
+
+    def _toggleRadialMenu(self, isShown, allowAction=True):
+        radialMenuLinkage = BATTLE_VIEW_ALIASES.RADIAL_MENU
+        radialMenu = self.getComponent(radialMenuLinkage)
+        if radialMenu is None:
+            return
+        else:
+            componentsVisibility = self.as_getComponentsVisibilityS()
+            if BATTLE_VIEW_ALIASES.BR_SELECT_RESPAWN in componentsVisibility or self._fullStatsAlias and self._fullStatsAlias in componentsVisibility or self.__isWinnerScreenShown:
+                return
+            if isShown:
+                radialMenu.show()
+                self.app.enterGuiControlMode(radialMenuLinkage, cursorVisible=False, enableAiming=False)
+            else:
+                self.app.leaveGuiControlMode(radialMenuLinkage)
+                radialMenu.hide(allowAction)
             return
 
     def _populate(self):
@@ -172,42 +222,39 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
         progressionWindowCtrl = self.__getProgressionWindowCtrl()
         if progressionWindowCtrl:
             self.__es.subscribeToEvent(progressionWindowCtrl.onTriggered, self.__onConfWindowTriggered)
-        spawnCtrl = self.sessionProvider.dynamic.spawn
-        if spawnCtrl:
-            spawnCtrl.addRuntimeView(self)
         self.sessionProvider.getCtx().setPlayerFullNameFormatter(BattleRoyalePlayerFullNameFormatter())
-        if avatar_getter.isObserverSeesAll():
-            self.__es.subscribeToEvent(avatar_getter.getInputHandler().onCameraChanged, self.__onCameraChanged)
+        if self.sessionProvider.isReplayPlaying:
+            self.__es.subscribeToEvent(g_replayEvents.onTimeWarpStart, self.__onTimeWarpStart)
         self.__brSoundControl = BRBattleSoundController()
         self.__brSoundControl.init()
-        deathScreenCtrl = self.sessionProvider.dynamic.deathScreen
-        if deathScreenCtrl:
-            deathScreenCtrl.onShowDeathScreen += self.__onShowDeathScreen
 
-    def reload(self):
-        super(BattleRoyalePage, self).reload()
-        spawnCtrl = self.sessionProvider.dynamic.spawn
-        if spawnCtrl and self not in spawnCtrl.viewComponents:
-            spawnCtrl.addRuntimeView(self)
+    def _onWinScreenReload(self):
+        alias = BATTLE_VIEW_ALIASES.BATTLE_ROYALE_WINNER_CONGRATS
+        if self.__isWinnerScreenShown:
+            self.__isWinnerScreenShown = False
+            self._setComponentsVisibility(visible=self.__winScreenToggling, hidden=[alias])
+            self.__winScreenToggling.clear()
+            toggleCrosshairVisibility()
 
     def _startBattleSession(self):
         super(BattleRoyalePage, self)._startBattleSession()
         vehStateCtrl = self.sessionProvider.shared.vehicleState
         if vehStateCtrl is not None:
-            vehStateCtrl.onVehicleStateUpdated += self.__onVehicleStateUpdated
-        ammoCtrl = self.sessionProvider.shared.ammo
-        if ammoCtrl is not None:
-            ammoCtrl.onGunSettingsSet += self.__onGunSettingsSet
-        return
-
-    def _stopBattleSession(self):
-        super(BattleRoyalePage, self)._stopBattleSession()
-        vehStateCtrl = self.sessionProvider.shared.vehicleState
-        if vehStateCtrl is not None:
-            vehStateCtrl.onVehicleStateUpdated -= self.__onVehicleStateUpdated
-        ammoCtrl = self.sessionProvider.shared.ammo
-        if ammoCtrl is not None:
-            ammoCtrl.onGunSettingsSet -= self.__onGunSettingsSet
+            self._battleSessionES.subscribeToEvent(vehStateCtrl.onVehicleStateUpdated, self.__onVehicleStateUpdated)
+            self._battleSessionES.subscribeToEvent(vehStateCtrl.onVehicleControlling, self.__onVehicleControlling)
+        componentSystem = self.sessionProvider.arenaVisitor.getComponentSystem()
+        if componentSystem and componentSystem.battleRoyaleComponent:
+            self._battleSessionES.subscribeToEvent(componentSystem.battleRoyaleComponent.onBattleRoyaleDefeatedTeamsUpdate, self._onDefeatedTeamsUpdated)
+        deathScreenCtrl = self.sessionProvider.dynamic.deathScreen
+        if deathScreenCtrl:
+            self._battleSessionES.subscribeToEvent(deathScreenCtrl.onShowDeathScreen, self.__onShowDeathScreen)
+            self._battleSessionES.subscribeToEvent(deathScreenCtrl.onWinnerScreen, self.__onWinnerScreen)
+        spawnCtrl = self.sessionProvider.dynamic.spawn
+        if spawnCtrl and self not in spawnCtrl.viewComponents:
+            spawnCtrl.addRuntimeView(self)
+            self._battleSessionES.addCallbackOnUnsubscribe(lambda : spawnCtrl.removeRuntimeView(self))
+        if avatar_getter.isObserverSeesAll():
+            self._battleSessionES.subscribeToEvent(avatar_getter.getInputHandler().onCameraChanged, self.__onCameraChanged)
         return
 
     def _onRegisterFlashComponent(self, viewPy, alias):
@@ -227,8 +274,12 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
         super(BattleRoyalePage, self)._onBattleLoadingFinish()
         if not self.__canShowHUD and not BigWorld.player().observerSeesAll():
             self._setComponentsVisibility(visible={BATTLE_VIEW_ALIASES.BR_SELECT_RESPAWN})
+        if BigWorld.player().isObserver() and arenaPeriod != ARENA_PERIOD.BATTLE:
+            self._setComponentsVisibility(hidden={BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL})
 
     def _setComponentsVisibility(self, visible=None, hidden=None):
+        if self.__isWinnerScreenShown:
+            return
         if not self.__canShowHUD and visible:
             hasNoHUD = {BATTLE_VIEW_ALIASES.BR_SELECT_RESPAWN, BATTLE_VIEW_ALIASES.BATTLE_LOADING} & set(visible)
             if not hasNoHUD:
@@ -246,12 +297,6 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
         super(BattleRoyalePage, self)._toggleGuiVisible()
 
     def _dispose(self):
-        deathScreenCtrl = self.sessionProvider.dynamic.deathScreen
-        if deathScreenCtrl:
-            deathScreenCtrl.onShowDeathScreen -= self.__onShowDeathScreen
-        spawnCtrl = self.sessionProvider.dynamic.spawn
-        if spawnCtrl:
-            spawnCtrl.removeRuntimeView(self)
         if self.__brSoundControl is not None:
             self.__brSoundControl.destroy()
             self.__brSoundControl = None
@@ -261,9 +306,20 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
         return
 
     def _switchToPostmortem(self):
+        self.__hideRadialMenu()
+        if self._hasCalloutPanel() and self.as_isComponentVisibleS(BATTLE_VIEW_ALIASES.CALLOUT_PANEL):
+            self._processCallout(needShow=False)
         BigWorld.player().setIsObserver()
 
+    def _getComponentsVideoModeSwitching(self, ctrlMode):
+        components = super(BattleRoyalePage, self)._getComponentsVideoModeSwitching(ctrlMode)
+        if not self.__panelsIsVisible:
+            components.discard(BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL)
+        return components
+
     def __onCameraChanged(self, ctrlMode, _=None):
+        if self.__isFullStatsShown:
+            return
         teamPanelAliases = (CTRL_MODE_NAME.POSTMORTEM, CTRL_MODE_NAME.VIDEO)
         if ctrlMode in teamPanelAliases:
             args = {'hidden': {BATTLE_VIEW_ALIASES.BATTLE_TEAM_PANEL},
@@ -271,7 +327,12 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
         else:
             args = {'hidden': {BATTLE_VIEW_ALIASES.PLAYERS_PANEL},
              'visible': {BATTLE_VIEW_ALIASES.BATTLE_TEAM_PANEL}}
-        args['hidden' if ctrlMode == CTRL_MODE_NAME.VIDEO else 'visible'].add(BATTLE_VIEW_ALIASES.BATTLE_LEVEL_PANEL)
+        hideInVideoModeAliases = {BATTLE_VIEW_ALIASES.BATTLE_LEVEL_PANEL,
+         BATTLE_VIEW_ALIASES.BR_RESPAWN_MESSAGE_PANEL,
+         BATTLE_VIEW_ALIASES.VEHICLE_MESSAGES,
+         BATTLE_VIEW_ALIASES.RADAR_BUTTON}
+        args['hidden' if ctrlMode == CTRL_MODE_NAME.VIDEO else 'visible'].update(hideInVideoModeAliases)
+        args['hidden' if ctrlMode == CTRL_MODE_NAME.VIDEO or not self.isPostmortemTipsVisible else 'visible'].add(BATTLE_VIEW_ALIASES.POSTMORTEM_PANEL)
         self._setComponentsVisibility(**args)
 
     def __onConfWindowTriggered(self, isOpened):
@@ -287,36 +348,81 @@ class BattleRoyalePage(BattleRoyalePageMeta, ISpawnListener):
         return progression.getWindowCtrl() if progression else None
 
     def __onVehicleStateUpdated(self, state, value):
+        damageScreenVisible = None
         if state == VEHICLE_VIEW_STATE.DEATHZONE_TIMER and value.level is None:
             vehicle = self.sessionProvider.shared.vehicleState.getControllingVehicle()
             isAlive = vehicle is not None and vehicle.isAlive()
-            self.as_updateDamageScreenS(value.isCausingDamage and isAlive)
+            damageScreenVisible = value.isCausingDamage and isAlive
         elif state in (VEHICLE_VIEW_STATE.SWITCHING, VEHICLE_VIEW_STATE.DESTROYED, VEHICLE_VIEW_STATE.CREW_DEACTIVATED):
-            self.as_updateDamageScreenS(False)
+            damageScreenVisible = False
+        isObserver = BigWorld.player().isObserver()
+        notInBattle = self.sessionProvider.shared.arenaPeriod.getPeriod() != ARENA_PERIOD.BATTLE
         vehicle = BigWorld.player().getVehicleAttached()
-        if vehicle is None or not vehicle.isAlive() and BigWorld.player().isObserver():
+        if vehicle is None or (not vehicle.isAlive() or notInBattle) and isObserver:
+            damageScreenVisible = False
             if self.__panelsIsVisible:
-                self._setComponentsVisibility(hidden=self.__PANELS_FOR_SHOW_HIDE)
+                if self.__isFullStatsShown:
+                    self._fsToggling.difference_update(self.__PANELS_FOR_SHOW_HIDE)
+                else:
+                    self._setComponentsVisibility(hidden=self.__PANELS_FOR_SHOW_HIDE)
                 self.__panelsIsVisible = False
         elif not self.__panelsIsVisible:
-            self._setComponentsVisibility(visible=self.__PANELS_FOR_SHOW_HIDE)
+            if not self.__isFullStatsShown:
+                self._setComponentsVisibility(visible=self.__PANELS_FOR_SHOW_HIDE)
+            else:
+                self._fsToggling.update(self.__PANELS_FOR_SHOW_HIDE)
             self.__panelsIsVisible = True
         if vehicle and not vehicle.isAlive():
-            if avatar_getter.isBecomeObserverAfterDeath():
+            if avatar_getter.isBecomeObserverAfterDeath() and BigWorld.player().isObserverBothTeams:
                 self._setComponentsVisibility(visible=[BATTLE_VIEW_ALIASES.PLAYERS_PANEL, BATTLE_VIEW_ALIASES.CONSUMABLES_PANEL])
                 BigWorld.player().setIsObserver()
+        if damageScreenVisible is not None:
+            self.as_updateDamageScreenS(damageScreenVisible)
         return
 
-    def __onGunSettingsSet(self, _):
+    def __onVehicleControlling(self, vehicle):
         progressionWindowCtrl = self.__getProgressionWindowCtrl()
         if progressionWindowCtrl and progressionWindowCtrl.isWindowOpened():
-            isDualGunVehicle = self.sessionProvider.getArenaDP().getVehicleInfo().vehicleType.isDualGunVehicle
-            dualGunAlias = BATTLE_VIEW_ALIASES.DUAL_GUN_PANEL
-            if not isDualGunVehicle:
+            vTypeDesc = vehicle.typeDescriptor
+            isDualGubEnabled = False
+            if vehicle.isAlive() and vTypeDesc.isDualgunVehicle and vehicle.isPlayerVehicle:
+                isDualGubEnabled = True
+            if not isDualGubEnabled:
+                dualGunAlias = BATTLE_VIEW_ALIASES.DUAL_GUN_PANEL
                 if dualGunAlias in self._fsToggling:
                     self._fsToggling.remove(dualGunAlias)
 
     def __onShowDeathScreen(self):
+        self.__hideRadialMenu()
         if self.as_isComponentVisibleS(self._fullStatsAlias):
             self._setComponentsVisibility(visible={self._fullStatsAlias}, hidden=[BATTLE_VIEW_ALIASES.BR_PLAYER_STATS_IN_BATTLE])
             self._fsToggling.add(BATTLE_VIEW_ALIASES.BR_PLAYER_STATS_IN_BATTLE)
+
+    def __onWinnerScreen(self, *_):
+        self.__hideRadialMenu()
+        if not BigWorld.player().userSeesWorld():
+            self.__es.subscribeToEvent(PlayerEvents.g_playerEvents.crosshairPanelInitialized, self.__onWinnerScreen)
+            return
+        hideSet = set(self.as_getComponentsVisibilityS())
+        hideSet.difference_update([BATTLE_VIEW_ALIASES.BATTLE_ROYALE_WINNER_CONGRATS])
+        if not self.__winScreenToggling:
+            self.__winScreenToggling.update(hideSet)
+        self._setComponentsVisibility(visible={BATTLE_VIEW_ALIASES.BATTLE_ROYALE_WINNER_CONGRATS}, hidden=hideSet)
+        self.__isWinnerScreenShown = True
+        toggleCrosshairVisibility()
+        avatar_getter.setComponentsVisibility(False)
+
+    def __onTimeWarpStart(self):
+        self._onWinScreenReload()
+
+    def __hideRadialMenu(self):
+        ctrl = self.sessionProvider.shared.calloutCtrl
+        if ctrl is not None and ctrl.isRadialMenuOpened():
+            self._toggleRadialMenu(False)
+        return
+
+    @property
+    def __isDeadAfterRespawnTimeFinished(self):
+        arenaDP = self.sessionProvider.getArenaDP()
+        arenaInfo = BigWorld.player().arena.arenaInfo
+        return arenaInfo.abilityNotifierComponent.isRespawnTimeFinished and not arenaDP.getVehicleInfo().isAlive() if arenaInfo else False

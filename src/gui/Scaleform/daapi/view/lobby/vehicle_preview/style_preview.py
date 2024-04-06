@@ -1,8 +1,10 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/Scaleform/daapi/view/lobby/vehicle_preview/style_preview.py
 import logging
+import typing
 from CurrentVehicle import g_currentPreviewVehicle
 from gui.ClientUpdateManager import g_clientUpdateManager
+from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
 from gui.Scaleform.daapi.view.lobby.LobbySelectableView import LobbySelectableView
 from gui.Scaleform.daapi.view.lobby.vehicle_preview.sound_constants import STYLE_PREVIEW_SOUND_SPACE
 from gui.Scaleform.daapi.view.meta.VehicleBasePreviewMeta import VehicleBasePreviewMeta
@@ -17,8 +19,8 @@ from gui.shared.gui_items.customization.c11n_items import getGroupFullNameResour
 from helpers import dependency
 from preview_selectable_logic import PreviewSelectableLogic
 from skeletons.gui.game_control import IHeroTankController
-from skeletons.gui.shared import IItemsCache
 from skeletons.gui.shared.utils import IHangarSpace
+from uilogging.shop.loggers import ShopVehicleStylePreviewMetricsLogger, ShopVehicleStylePreviewFlowLogger
 _SHOW_CLOSE_BTN = False
 _SHOW_BACK_BTN = True
 _logger = logging.getLogger(__name__)
@@ -26,7 +28,6 @@ _logger = logging.getLogger(__name__)
 class VehicleStylePreview(LobbySelectableView, VehicleBasePreviewMeta):
     __background_alpha__ = 0.0
     __metaclass__ = event_bus_handlers.EventBusListener
-    __itemsCache = dependency.descriptor(IItemsCache)
     __hangarSpace = dependency.descriptor(IHangarSpace)
     __heroTanksControl = dependency.descriptor(IHeroTankController)
     _COMMON_SOUND_SPACE = STYLE_PREVIEW_SOUND_SPACE
@@ -35,6 +36,7 @@ class VehicleStylePreview(LobbySelectableView, VehicleBasePreviewMeta):
         super(VehicleStylePreview, self).__init__(ctx)
         self.__ctx = ctx
         self._style = ctx['style']
+        self.__backPreviewAlias = ctx.get('backPreviewAlias')
         self.__outfit = ctx.get('outfit')
         self.__vehicleCD = ctx['itemCD']
         self.__styleDescr = (ctx.get('styleDescr') or self._style.getDescription()) % {'insertion_open': '',
@@ -44,12 +46,16 @@ class VehicleStylePreview(LobbySelectableView, VehicleBasePreviewMeta):
         self.__topPanelData = ctx.get('topPanelData') or {}
         self.__selectedVehicleEntityId = None
         g_currentPreviewVehicle.selectHeroTank(ctx.get('isHeroTank', False))
+        self.__uiMetricsLogger = ShopVehicleStylePreviewMetricsLogger(self._style.intCD)
+        self.__uiFlowLogger = ShopVehicleStylePreviewFlowLogger()
         return
 
     def closeView(self):
         event_dispatcher.showHangar()
 
     def onBackClick(self):
+        if self.__backPreviewAlias and self.__backPreviewAlias == VIEW_ALIAS.LOBBY_STORE:
+            self.__uiMetricsLogger.onViewClosed()
         self.__backCallback()
 
     def setTopPanel(self):
@@ -70,10 +76,10 @@ class VehicleStylePreview(LobbySelectableView, VehicleBasePreviewMeta):
          'backBtnDescrLabel': self.__backBtnDescrLabel,
          'showCloseBtn': _SHOW_CLOSE_BTN,
          'showBackButton': _SHOW_BACK_BTN})
-        self.as_setAdditionalInfoS({'objectSubtitle': text_styles.main(backport.text(getGroupFullNameResourceID(self._style.groupID))),
-         'objectTitle': self._style.userName,
-         'descriptionTitle': backport.text(R.strings.tooltips.vehiclePreview.historicalReference.title()),
-         'descriptionText': self.__styleDescr})
+        self.as_setAdditionalInfoS(self._getAdditionalInfoVO())
+        if self.__backPreviewAlias and self.__backPreviewAlias == VIEW_ALIAS.LOBBY_STORE:
+            self.__uiFlowLogger.logOpenPreview()
+            self.__uiMetricsLogger.onViewOpen()
         return
 
     def _dispose(self):
@@ -82,8 +88,6 @@ class VehicleStylePreview(LobbySelectableView, VehicleBasePreviewMeta):
         g_clientUpdateManager.removeObjectCallbacks(self)
         self.__hangarSpace.onSpaceCreate -= self.__onHangarCreateOrRefresh
         self.__heroTanksControl.setInteractive(True)
-        g_currentPreviewVehicle.selectNoVehicle()
-        g_currentPreviewVehicle.resetAppearance()
         g_eventBus.handleEvent(events.LobbySimpleEvent(events.LobbySimpleEvent.VEHICLE_PREVIEW_HIDDEN), scope=EVENT_BUS_SCOPE.LOBBY)
         super(VehicleStylePreview, self)._dispose()
         return
@@ -95,6 +99,12 @@ class VehicleStylePreview(LobbySelectableView, VehicleBasePreviewMeta):
 
     def _createSelectableLogic(self):
         return PreviewSelectableLogic()
+
+    def _getAdditionalInfoVO(self):
+        return {'objectSubtitle': text_styles.main(backport.text(getGroupFullNameResourceID(self._style.groupID))),
+         'objectTitle': self._style.userName,
+         'descriptionTitle': backport.text(R.strings.tooltips.vehiclePreview.historicalReference.title()),
+         'descriptionText': self.__styleDescr}
 
     def __onVehicleLoading(self, ctxEvent):
         isVehicleLoadingStarted = ctxEvent.ctx['started']

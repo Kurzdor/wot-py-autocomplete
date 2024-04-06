@@ -1,7 +1,6 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/impl/lobby/account_completion/curtain/curtain_view.py
 import typing
-from bootcamp.Bootcamp import g_bootcamp
 from frameworks.wulf import ViewSettings
 from gui.hangar_cameras.hangar_camera_common import CameraRelatedEvents
 from gui.impl.gen import R
@@ -12,11 +11,9 @@ from gui.impl.pub.dialog_window import DialogFlags
 from gui.impl.pub.lobby_window import LobbyWindow
 from gui.prb_control.entities.listener import IGlobalListener
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE, events
-from gui.shared.utils.requesters import REQ_CRITERIA
 from helpers import dependency
-from skeletons.gui.game_control import IOverlayController, IBootcampController
+from skeletons.gui.game_control import IOverlayController
 from skeletons.gui.impl import IGuiLoader
-from skeletons.gui.shared import IItemsCache
 if typing.TYPE_CHECKING:
     from typing import Optional, Type, Dict
 _DYN_ACCESSOR = R.views.lobby.account_completion.CurtainView
@@ -58,7 +55,7 @@ class CurtainView(ViewImpl, IGlobalListener):
         self.stopGlobalListening()
         self._subViews.clear()
         if self._activeSubView:
-            self._deactivateSubView(self._activeSubView)
+            self._activeSubView.onWaitingChanged -= self._waitingChangedHandler
             self._activeSubView = None
         self._overlay.setOverlayState(False)
         super(CurtainView, self)._finalize()
@@ -99,29 +96,29 @@ class CurtainView(ViewImpl, IGlobalListener):
     def _activateSubView(self, subView, *args, **kwargs):
         if self._activeSubView == subView:
             return
-        if self._activeSubView:
-            self._deactivateSubView(self._activeSubView)
-        if not subView:
+        else:
+            if self._activeSubView:
+                self._deactivateSubView(self._activeSubView)
+            self._activeSubView = None
+            if not subView:
+                return
+            subView.activate(*args, **kwargs)
+            subView.onWaitingChanged += self._waitingChangedHandler
+            self._waitingChangedHandler(subView.isWaitingVisible, subView.waitingMsgResID)
+            if self.viewModel.getState() in (CurtainStateEnum.HIDING, CurtainStateEnum.HIDDEN):
+                subView.reveal()
+            self._activeSubView = subView
+            self.viewModel.setCurrentSubViewID(subView.layoutID)
+            currentState = self.viewModel.getState()
+            if currentState == CurtainStateEnum.CLOSED:
+                self.viewModel.setState(CurtainStateEnum.OPENING)
+            if currentState == CurtainStateEnum.HIDDEN:
+                self.viewModel.setState(CurtainStateEnum.REVEALING)
             return
-        subView.activate(*args, **kwargs)
-        subView.onWaitingChanged += self._waitingChangedHandler
-        self._waitingChangedHandler(subView.isWaitingVisible, subView.waitingMsgResID)
-        if self.viewModel.getState() in (CurtainStateEnum.HIDING, CurtainStateEnum.HIDDEN):
-            subView.reveal()
-        self._activeSubView = subView
-        self.viewModel.setCurrentSubViewID(subView.layoutID)
-        currentState = self.viewModel.getState()
-        if currentState == CurtainStateEnum.CLOSED:
-            self.viewModel.setState(CurtainStateEnum.OPENING)
-        if currentState == CurtainStateEnum.HIDDEN:
-            self.viewModel.setState(CurtainStateEnum.REVEALING)
 
     def _deactivateSubView(self, subView):
         subView.deactivate()
-        if self._activeSubView == subView:
-            subView.onWaitingChanged -= self._waitingChangedHandler
-            self._activeSubView = None
-        return
+        subView.onWaitingChanged -= self._waitingChangedHandler
 
     def _stateTransitionCompleteHandler(self):
         currentState = self.viewModel.getState()
@@ -153,24 +150,12 @@ class CurtainView(ViewImpl, IGlobalListener):
             return
 
 
-class BootcampCurtainView(CurtainView):
-    _itemsCache = dependency.descriptor(IItemsCache)
-
-    def _onLoaded(self, *args, **kwargs):
-        super(BootcampCurtainView, self)._onLoaded(*args, **kwargs)
-        invVehs = self._itemsCache.items.getVehicles(REQ_CRITERIA.INVENTORY)
-        if not invVehs:
-            g_bootcamp.previewNation(g_bootcamp.nation)
-
-
 class CurtainWindow(LobbyWindow):
     __slots__ = ()
     guiLoader = dependency.descriptor(IGuiLoader)
-    bootcampController = dependency.descriptor(IBootcampController)
 
     def __init__(self):
-        view = BootcampCurtainView() if self.bootcampController.isInBootcampAccount() else CurtainView()
-        super(CurtainWindow, self).__init__(wndFlags=DialogFlags.TOP_FULLSCREEN_WINDOW, content=view)
+        super(CurtainWindow, self).__init__(wndFlags=DialogFlags.TOP_FULLSCREEN_WINDOW, content=CurtainView())
 
     @property
     def content(self):
@@ -182,7 +167,7 @@ class CurtainWindow(LobbyWindow):
     def close(self):
         self.content.close()
 
-    def hide(self):
+    def hide(self, destroy=False):
         self.content.hide()
 
     def reveal(self):

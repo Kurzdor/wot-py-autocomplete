@@ -28,6 +28,7 @@ from gui.impl.gen.view_models.views.lobby.platoon.slot_model import SlotModel, E
 from gui.impl.gen.view_models.views.lobby.platoon.comp7_member_count_dropdown import Comp7DropdownItem
 from gui.impl.gui_decorators import args2params
 from gui.impl.lobby.comp7 import comp7_shared
+from gui.impl.lobby.comp7.comp7_model_helpers import getSeasonNameEnum
 from gui.impl.lobby.platoon.platoon_helpers import formatSearchEstimatedTime
 from gui.impl.lobby.platoon.tooltip.platoon_alert_tooltip import AlertTooltip
 from gui.impl.lobby.platoon.tooltip.platoon_wtr_tooltip import WTRTooltip
@@ -37,6 +38,7 @@ from gui.impl.lobby.platoon.view.subview.platoon_tiers_filter_subview import Set
 from gui.impl.lobby.platoon.view.subview.platoon_tiers_limit_subview import TiersLimitSubview
 from gui.impl.lobby.common.vehicle_model_helpers import fillVehicleModel
 from gui.impl.lobby.premacc.squad_bonus_tooltip_content import SquadBonusTooltipContent, Comp7SquadBonusTooltipContent
+from gui.prestige.prestige_helpers import hasVehiclePrestige, fillPrestigeEmblemModel
 from gui.impl.pub import ViewImpl
 from gui.prb_control import prb_getters, prbEntityProperty
 from gui.prb_control.settings import CTRL_ENTITY_TYPE, REQUEST_TYPE, SELECTOR_BATTLE_TYPES
@@ -59,7 +61,7 @@ from gui.impl.pub.tooltip_window import SimpleTooltipContent
 from messenger.ext import channel_num_gen
 from adisp import adisp_process
 if typing.TYPE_CHECKING:
-    from helpers.server_settings import Comp7PrestigeRanksConfig
+    from helpers.server_settings import Comp7RanksConfig
     from comp7_ranks_common import Comp7Division
 _logger = logging.getLogger(__name__)
 _strButtons = R.strings.platoon.buttons
@@ -102,7 +104,6 @@ class SquadMembersView(ViewImpl, CallbackDelayer):
     _itemsCache = dependency.descriptor(IItemsCache)
     _layoutID = R.views.lobby.platoon.MembersWindow()
     _prebattleType = PrebattleTypes.SQUAD
-    _SHOW_VEHICLE_TIER = True
     _bonusTooltipTexts = R.strings.tooltips.squadBonus.complex
 
     def __init__(self, prbType):
@@ -350,6 +351,13 @@ class SquadMembersView(ViewImpl, CallbackDelayer):
         tags = playerData.get('tags', [])
         slotModel.player.voice.setIsMutedByUser(USER_TAG.MUTED in tags)
         slotModel.player.setIsIgnored(USER_TAG.IGNORED in tags)
+        prestigeLevel = slotData.get('prestigeLevel', 0)
+        vehicleData = slotData.get('selectedVehicle')
+        vehicleCD = vehicleData.get('intCD', 0) if vehicleData else 0
+        isPrestigeAvailable = hasVehiclePrestige(vehicleCD) and prestigeLevel != 0
+        slotModel.player.setIsPrestigeAvailable(isPrestigeAvailable)
+        if isPrestigeAvailable:
+            fillPrestigeEmblemModel(slotModel.player.prestigeEmblem, prestigeLevel, vehicleCD)
         return
 
     def _setVehicleData(self, slotData, slotModel):
@@ -388,16 +396,19 @@ class SquadMembersView(ViewImpl, CallbackDelayer):
             model.setWindowTooltipBody(body)
             layoutStyle = self.__getLayoutStyle()
             fileName = '{battleType}_{layout}_list'.format(battleType=self._prebattleType.value, layout=layoutStyle.value)
-            fileNameRes = R.images.gui.maps.icons.platoon.members_window.backgrounds.dyn(fileName)
-            if fileNameRes.exists():
-                model.header.setBackgroundImage(backport.image(fileNameRes()))
-            else:
-                _logger.warning('R.images.gui.maps.icons.platoon.members_window.backgrounds %s not found', fileName)
+            self._setHeaderBg(fileName, model)
             model.setIsHorizontal(layoutStyle in (_LayoutStyle.HORIZONTAL, _LayoutStyle.HORIZONTAL_SHORT))
             model.setIsShort(layoutStyle == _LayoutStyle.HORIZONTAL_SHORT)
             model.setPrebattleType(self._prebattleType)
             self._initWindowModeSpecificData(model)
         self._setBonusInformation(self._getBonusState())
+
+    def _setHeaderBg(self, fileName, model):
+        fileNameRes = R.images.gui.maps.icons.platoon.members_window.backgrounds.dyn(fileName)
+        if fileNameRes.exists():
+            model.header.setBackgroundImage(backport.image(fileNameRes()))
+        else:
+            _logger.warning('R.images.gui.maps.icons.platoon.members_window.backgrounds %s not found', fileName)
 
     def _initWindowModeSpecificData(self, model):
         pass
@@ -535,19 +546,28 @@ class SquadMembersView(ViewImpl, CallbackDelayer):
         if not self._platoonCtrl.isInPlatoon():
             return
         isInQueue = self._platoonCtrl.isInQueue()
-        actionButtonStateVO = self.__getActionButtonStateVO()
-        simpleState = actionButtonStateVO.getSimpleState()
-        onlyReadinessText = actionButtonStateVO.isReadinessTooltip()
+        isEnabled, onlyReadinessText, simpleState, toolTipData = self._getActionButtonStateInfo()
         with self.viewModel.transaction() as model:
             if not self._platoonCtrl.isInCoolDown(REQUEST_TYPE.SET_PLAYER_STATE):
-                model.btnSwitchReady.setIsEnabled(actionButtonStateVO['isEnabled'] and not isInQueue)
+                model.btnSwitchReady.setIsEnabled(isEnabled and not isInQueue)
             if self._platoonCtrl.getPlayerInfo().isReady:
                 model.btnSwitchReady.setCaption(backport.text(_strButtons.notReady.caption()))
             else:
                 model.btnSwitchReady.setCaption(backport.text(_strButtons.ready.caption()))
-            model.btnSwitchReady.setDescription(i18n.makeString(actionButtonStateVO['toolTipData'] + '/body'))
+            model.btnSwitchReady.setDescription(toolTipData)
             model.setFooterMessage(simpleState)
-            model.setIsFooterMessageGrey(actionButtonStateVO['isEnabled'] or onlyReadinessText or isInQueue)
+            model.setIsFooterMessageGrey(isEnabled or onlyReadinessText or isInQueue)
+
+    def _getActionButtonStateInfo(self):
+        actionButtonStateVO = self.__getActionButtonStateVO()
+        isEnabled = actionButtonStateVO['isEnabled']
+        onlyReadinessText = actionButtonStateVO.isReadinessTooltip()
+        simpleState = actionButtonStateVO.getSimpleState()
+        toolTipData = i18n.makeString(actionButtonStateVO['toolTipData'] + '/body')
+        return (isEnabled,
+         onlyReadinessText,
+         simpleState,
+         toolTipData)
 
     def _onFindPlayers(self):
         platoonCtrl = self._platoonCtrl
@@ -564,7 +584,7 @@ class SquadMembersView(ViewImpl, CallbackDelayer):
         self.__updateVoiceChatToggleState()
 
     def _onLeavePlatoon(self):
-        self._platoonCtrl.leavePlatoon()
+        self._platoonCtrl.leavePlatoon(parent=self)
 
     def __onServerSettingsChange(self, diff):
         if 'unit_assembler_config' in diff:
@@ -708,7 +728,6 @@ class EpicMembersView(SquadMembersView):
 
 class BattleRoyalMembersView(SquadMembersView):
     _prebattleType = PrebattleTypes.BATTLEROYAL
-    _SHOW_VEHICLE_TIER = False
 
     def _addSubviews(self):
         self._addSubviewToLayout(ChatSubview())
@@ -724,6 +743,17 @@ class BattleRoyalMembersView(SquadMembersView):
 
     def _getWTRStatus(self):
         return False
+
+    @staticmethod
+    def __sortCurrentUser(slot):
+        accID = BigWorld.player().id
+        player = slot['player'] or {}
+        return accID != player.get('accID')
+
+    def _getPlatoonSlotsData(self):
+        slots = super(BattleRoyalMembersView, self)._getPlatoonSlotsData()
+        slots.sort(key=self.__sortCurrentUser)
+        return slots
 
 
 class MapboxMembersView(SquadMembersView):
@@ -787,9 +817,8 @@ class Comp7MembersView(SquadMembersView):
     def _getWindowInfoTooltipHeaderAndBody(self):
         squadRatingSettings = self._comp7Controller.getModeSettings().squadRatingRestriction
         rating = squadRatingSettings.get(2)
-        rating7 = squadRatingSettings.get(7)
         tooltipHeader = backport.text(R.strings.platoon.members.header.tooltip.comp7.header())
-        tooltipBody = backport.text(R.strings.platoon.members.header.tooltip.comp7.body(), rating=rating, rating7=rating7)
+        tooltipBody = backport.text(R.strings.platoon.members.header.tooltip.comp7.body(), rating=rating)
         return (tooltipHeader, tooltipBody)
 
     def _createSimpleBonusTooltip(self):
@@ -799,6 +828,7 @@ class Comp7MembersView(SquadMembersView):
 
     def _initWindowModeSpecificData(self, model):
         options = self._comp7Controller.getModeSettings().squadSizes
+        model.setSeasonName(getSeasonNameEnum())
         model.header.memberCountDropdown.setMultiple(False)
         items = model.header.memberCountDropdown.getItems()
         for option in options:
@@ -815,11 +845,6 @@ class Comp7MembersView(SquadMembersView):
         slots = super(Comp7MembersView, self)._getPlatoonSlotsData()
         slots.sort(key=self.__playerTimeJoin)
         return slots
-
-    def __playerTimeJoin(self, slot):
-        player = slot['player'] or {}
-        roleIndex = -slot['role'] if not player.get('isOffline') else 0
-        return (not player, roleIndex, player.get('timeJoin', 0))
 
     def _hasFreeSlot(self):
         return len(self.__unitMgr.unit.getPlayers()) < self.__unitMgr.unit.getSquadSize() if self.__unitMgr is not None and self.__unitMgr.unit is not None else False
@@ -875,9 +900,15 @@ class Comp7MembersView(SquadMembersView):
 
     @classmethod
     def __getDivision(cls, rank, rating):
-        ranksConfig = cls._lobbyContext.getServerSettings().comp7PrestigeRanksConfig
+        ranksConfig = cls._lobbyContext.getServerSettings().comp7RanksConfig
         division = findFirst(lambda d: rating in d.range, ranksConfig.divisionsByRank.get(rank, ()))
         return division
+
+    @staticmethod
+    def __playerTimeJoin(slot):
+        player = slot['player'] or {}
+        roleIndex = -slot['role'] if not player.get('isOffline') else 0
+        return (not player, roleIndex, player.get('timeJoin', 0))
 
 
 class MembersWindow(PreloadableWindow):

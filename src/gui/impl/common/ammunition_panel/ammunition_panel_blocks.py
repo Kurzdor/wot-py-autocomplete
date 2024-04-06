@@ -17,8 +17,8 @@ from gui.impl.lobby.tank_setup.tank_setup_helper import getCategoriesMask, NONE_
 from helpers import dependency
 from helpers.epic_game import searchRankForSlot
 from items.components.supply_slot_categories import SlotCategories
-from skeletons.gui.game_control import IEpicBattleMetaGameController
 from skeletons.gui.battle_session import IBattleSessionProvider
+from skeletons.gui.game_control import IEpicBattleMetaGameController
 if typing.TYPE_CHECKING:
     from gui.shared.gui_items import Vehicle
 EMPTY_NAME = 'empty'
@@ -165,7 +165,6 @@ class OptDeviceBlock(BaseBlock):
         slotModel.specializations.setIsDynamic(isDynamic)
         if slotItem is not None:
             itemCategories = slotItem.descriptor.categories
-            slotModel.setLevel(slotItem.level)
         else:
             itemCategories = set()
         slotModel.setActiveSpecsMask(getCategoriesMask(itemCategories & optDeviceItem.categories))
@@ -192,6 +191,8 @@ class OptDeviceBlock(BaseBlock):
         return
 
     def _updateOverlayAspects(self, slotModel, slotItem):
+        if slotItem is not None:
+            slotModel.setLevel(slotItem.level)
         if slotItem.isDeluxe:
             slotModel.setOverlayType(ItemHighlightTypes.EQUIPMENT_PLUS)
         elif slotItem.isModernized:
@@ -202,6 +203,7 @@ class OptDeviceBlock(BaseBlock):
             slotModel.setOverlayType(ItemHighlightTypes.TROPHY_UPGRADED)
         else:
             slotModel.setOverlayType(ItemHighlightTypes.EMPTY)
+        return
 
     def _getSlot(self, idx):
         return self._vehicle.optDevices.getSlot(idx)
@@ -340,6 +342,9 @@ class BattleAbilitiesBlock(BaseBlock):
         super(BattleAbilitiesBlock, self)._updateSlotWithItem(model, idx, slotItem)
         model.setImageSource(R.images.gui.maps.icons.epicBattles.skills.c_48x48.dyn(slotItem.descriptor.iconName)())
         categoryName = self._getSlotCategoryName(idx)
+        model.setIsInstalled(slotItem in self._getInstalled())
+        if self.__epicMetaGameCtrl.isRandomBattleReserves():
+            return
         if categoryName:
             model.setCategoryImgSource(R.images.gui.maps.icons.tanksetup.panel.dyn(categoryName)())
         model.setIsInstalled(slotItem in self._getInstalled())

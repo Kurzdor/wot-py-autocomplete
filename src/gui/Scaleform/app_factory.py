@@ -3,6 +3,7 @@
 import logging
 import weakref
 import BattleReplay
+import BigWorld
 from constants import ARENA_GUI_TYPE
 from frameworks.wulf import WindowFlags
 from gui import GUI_SETTINGS
@@ -22,7 +23,6 @@ from gui.shared import g_eventBus, events, EVENT_BUS_SCOPE
 from helpers import dependency
 from shared_utils import AlwaysValidObject
 from skeletons.gui.app_loader import IAppFactory
-from skeletons.gui.game_control import IBootcampController
 from skeletons.gui.impl import IGuiLoader
 _logger = logging.getLogger(__name__)
 _logger.addHandler(logging.NullHandler())
@@ -56,7 +56,6 @@ class EmptyAppFactory(AlwaysValidObject, IAppFactory):
 
 class AS3_AppFactory(IAppFactory):
     __slots__ = ('__apps', '__packages', '__importer', '__waiting', '__ctrlModeFlags', '__weakref__', '__gui')
-    bootcampCtrl = dependency.descriptor(IBootcampController)
     __gui = dependency.descriptor(IGuiLoader)
 
     def __init__(self):
@@ -148,7 +147,7 @@ class AS3_AppFactory(IAppFactory):
         _logger.info('Creating app: %s', _SPACE.SF_BATTLE)
         battle = self.__apps[_SPACE.SF_BATTLE]
         if not battle:
-            battle = BattleEntry(_SPACE.SF_BATTLE, self.__ctrlModeFlags[_SPACE.SF_BATTLE])
+            battle = BattleEntry(_SPACE.SF_BATTLE, self.__ctrlModeFlags[_SPACE.SF_BATTLE], arenaGuiType)
             self.__apps[_SPACE.SF_BATTLE] = battle
             packages = collectScaleformBattlePackages(arenaGuiType)
             if not packages:
@@ -239,11 +238,6 @@ class AS3_AppFactory(IAppFactory):
             self.__importer = None
         return
 
-    def goToIntroVideo(self, appNS):
-        if appNS != _SPACE.SF_LOBBY:
-            return
-        g_eventBus.handleEvent(events.LoadViewEvent(SFViewLoadParams(VIEW_ALIAS.INTRO_VIDEO)), EVENT_BUS_SCOPE.LOBBY)
-
     def goToLogin(self, appNS):
         if appNS != _SPACE.SF_LOBBY:
             return
@@ -258,8 +252,6 @@ class AS3_AppFactory(IAppFactory):
          'guiControlsLobbyDynamic2.swf',
          'popovers.swf',
          'iconLibrary.swf']
-        if self.bootcampCtrl.isInBootcamp():
-            libs.extend(['BCGuiControlsLobbyBattle.swf', 'BCGuiControlsLobby.swf'])
         app.as_loadLibrariesS(libs)
         mainWindow = self.getMainWindow()
         g_eventBus.handleEvent(events.LoadViewEvent(SFViewLoadParams(VIEW_ALIAS.LOBBY, parent=mainWindow)), EVENT_BUS_SCOPE.LOBBY)
@@ -288,6 +280,7 @@ class AS3_AppFactory(IAppFactory):
             return
         battle = self.__apps[_SPACE.SF_BATTLE]
         if battle:
+            BigWorld.player().logBattleLoadingFinished()
             self._toggleBattleLoading(False)
 
     def handleKey(self, appNS, isDown, key, mods):
@@ -304,7 +297,7 @@ class AS3_AppFactory(IAppFactory):
     def getMainWindow(cls):
         windows = cls.__gui.windowsManager.findWindows(lambda w: w.typeFlag == WindowFlags.MAIN_WINDOW)
         if not windows:
-            _logger.error('The mian window does not exist')
+            _logger.error('The main window does not exist')
             return None
         else:
             return windows[0]

@@ -3,14 +3,13 @@
 import typing
 from CurrentVehicle import g_currentVehicle
 from constants import SEASON_NAME_BY_TYPE
-from gui.impl.gen import R
+from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from dossiers2.ui.achievements import MARK_ON_GUN_RECORD
 from gui import GUI_NATIONS_ORDER_INDEX, makeHtmlString
 from gui.Scaleform import getButtonsAssetPath
 from gui.Scaleform.genConsts.TOOLTIPS_CONSTANTS import TOOLTIPS_CONSTANTS
 from gui.Scaleform.framework.entities.DAAPIDataProvider import SortableDAAPIDataProvider
 from gui.Scaleform.locale.MENU import MENU
-from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from gui.impl import backport
 from gui.shared.formatters import icons, text_styles
 from gui.shared.formatters.time_formatters import RentLeftFormatter
@@ -19,7 +18,7 @@ from gui.shared.gui_items.dossier.achievements import isMarkOfMasteryAchieved
 from gui.shared.utils.requesters import REQ_CRITERIA
 from helpers.i18n import makeString as ms
 from helpers import dependency
-from skeletons.gui.game_control import IBattleRoyaleController, IBootcampController
+from skeletons.gui.game_control import IBattleRoyaleController
 if typing.TYPE_CHECKING:
     from skeletons.gui.shared import IItemsCache
 
@@ -63,15 +62,15 @@ def getStatusStrings(vState, vStateLvl=Vehicle.VEHICLE_STATE_LEVEL.INFO, substit
         return (text_styles.middleTitle(substitute), status) if substitute else (status, status)
 
 
-@dependency.replace_none_kwargs(bootcampCtrl=IBootcampController)
-def getVehicleDataVO(vehicle, bootcampCtrl=None):
+def getVehicleDataVO(vehicle):
+    return _getVehicleDataVO(vehicle)
+
+
+def _getVehicleDataVO(vehicle):
     rentInfoText = ''
-    if not vehicle.isWotPlusRent and not vehicle.isTelecomRent:
+    if not vehicle.isTelecomRent:
         rentInfoText = RentLeftFormatter(vehicle.rentInfo, vehicle.isPremiumIGR).getRentLeftStr()
     vState, vStateLvl = vehicle.getState()
-    if vState == Vehicle.VEHICLE_STATE.AMMO_NOT_FULL and bootcampCtrl.isInBootcamp():
-        vState = Vehicle.VEHICLE_STATE.UNDAMAGED
-        vStateLvl = Vehicle.VEHICLE_STATE_LEVEL.INFO
     if vehicle.isRotationApplied():
         if vState in (Vehicle.VEHICLE_STATE.AMMO_NOT_FULL, Vehicle.VEHICLE_STATE.LOCKED):
             vState = Vehicle.VEHICLE_STATE.ROTATION_GROUP_UNLOCKED
@@ -92,17 +91,13 @@ def getVehicleDataVO(vehicle, bootcampCtrl=None):
         bonusImage = getButtonsAssetPath('bonus_x{}'.format(vehicle.dailyXPFactor))
     else:
         bonusImage = ''
-    if bootcampCtrl.isInBootcamp():
-        userName = backport.text(R.strings.bootcamp.award.options.tankTitle()).format(title=vehicle.shortUserName)
-    else:
-        userName = vehicle.shortUserName if vehicle.isPremiumIGR else vehicle.userName
-    label = userName
+    label = vehicle.shortUserName if vehicle.isPremiumIGR else vehicle.userName
     labelStyle = text_styles.premiumVehicleName if vehicle.isPremium else text_styles.vehicleName
     tankType = '{}_elite'.format(vehicle.type) if vehicle.isElite else vehicle.type
     current, maximum = vehicle.getCrystalsEarnedInfo()
     isCrystalsLimitReached = current == maximum
-    isWotPlusSlot = (vehicle.isWotPlusRent or vehicle.isTelecomRent) and not vehicle.rentExpiryState
-    extraImage = RES_ICONS.MAPS_ICONS_LIBRARY_RENT_ICO_BIG if isWotPlusSlot else ''
+    showIcon = vehicle.isTelecomRent and not vehicle.rentExpiryState
+    extraImage = RES_ICONS.MAPS_ICONS_LIBRARY_RENT_ICO_BIG if showIcon else ''
     return {'id': vehicle.invID,
      'intCD': vehicle.intCD,
      'infoText': largeStatus,
@@ -135,7 +130,7 @@ def getVehicleDataVO(vehicle, bootcampCtrl=None):
      'isCrystalsLimitReached': isCrystalsLimitReached,
      'isUseRightBtn': True,
      'tooltip': TOOLTIPS_CONSTANTS.CAROUSEL_VEHICLE,
-     'isWotPlusSlot': isWotPlusSlot,
+     'isWotPlusSlot': vehicle.isWotPlus,
      'extraImage': extraImage}
 
 
@@ -159,7 +154,10 @@ class CarouselDataProvider(SortableDAAPIDataProvider):
         return
 
     def hasRentedVehicles(self):
-        return bool(self._getFilteredVehicles(REQ_CRITERIA.VEHICLE.RENT | ~REQ_CRITERIA.VEHICLE.CLAN_WARS))
+        criteria = REQ_CRITERIA.VEHICLE.RENT
+        criteria |= ~REQ_CRITERIA.VEHICLE.CLAN_WARS
+        criteria |= ~REQ_CRITERIA.VEHICLE.WOT_PLUS_VEHICLE
+        return bool(self._getFilteredVehicles(criteria))
 
     def hasEventVehicles(self):
         return bool(self._getFilteredVehicles(REQ_CRITERIA.VEHICLE.EVENT))
@@ -285,10 +283,15 @@ class CarouselDataProvider(SortableDAAPIDataProvider):
             self.__sortedIndices = sortedIndices(self._vehicles, self._vehicleComparisonKey, reverse)
         return self.__sortedIndices
 
+    def _populate(self):
+        super(CarouselDataProvider, self)._populate()
+        g_currentVehicle.onChanged += self.__updateCurrentVehicle
+
     def _dispose(self):
         self._filter = None
         self._itemsCache = None
         self._randomStats = None
+        g_currentVehicle.onChanged -= self.__updateCurrentVehicle
         super(CarouselDataProvider, self)._dispose()
         return
 
@@ -323,7 +326,7 @@ class CarouselDataProvider(SortableDAAPIDataProvider):
         self._addCriteria()
 
     def _addCriteria(self):
-        self._addVehicleItemsByCriteria(self._baseCriteria | REQ_CRITERIA.VEHICLE.ACTIVE_IN_NATION_GROUP | (~REQ_CRITERIA.VEHICLE.WOTPLUS_RENT | ~REQ_CRITERIA.VEHICLE.TELECOM_RENT))
+        self._addVehicleItemsByCriteria(self._baseCriteria | REQ_CRITERIA.VEHICLE.ACTIVE_IN_NATION_GROUP | ~REQ_CRITERIA.VEHICLE.TELECOM_RENT)
 
     def _buildVehicle(self, vehicle):
         vo = getVehicleDataVO(vehicle)
@@ -403,3 +406,7 @@ class CarouselDataProvider(SortableDAAPIDataProvider):
 
     def __resetSortedIndices(self):
         self.__sortedIndices = []
+
+    def __updateCurrentVehicle(self):
+        self._currentVehicleInvID = g_currentVehicle.invID
+        self.applyFilter()

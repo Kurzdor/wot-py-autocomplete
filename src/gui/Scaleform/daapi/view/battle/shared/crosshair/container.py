@@ -4,6 +4,7 @@ import logging
 import BattleReplay
 import GUI
 import WWISE
+from PlayerEvents import g_playerEvents
 from debug_utils import LOG_WARNING, LOG_DEBUG, LOG_ERROR
 from gui import DEPTH_OF_Aim
 from gui.Scaleform.daapi.view.battle.shared.crosshair import gm_factory, plugins, settings
@@ -16,6 +17,7 @@ from gui.Scaleform.genConsts.AUTOLOADERBOOSTVIEWSOUNDS import AUTOLOADERBOOSTVIE
 from gui.Scaleform.locale.INGAME_GUI import INGAME_GUI
 from gui.Scaleform.daapi.view.battle.shared.hint_panel.plugins import RoleHelpPlugin
 from gui.battle_control.battle_constants import CROSSHAIR_VIEW_ID
+from gui.impl import backport
 from gui.shared.events import GameEvent
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
 from gui.shared.utils.plugins import PluginsCollection
@@ -47,12 +49,13 @@ class CrosshairPanelContainer(ExternalFlashComponent, CrosshairPanelContainerMet
     def __init__(self):
         super(CrosshairPanelContainer, self).__init__(ExternalFlashSettings(BATTLE_VIEW_ALIASES.CROSSHAIR_PANEL, settings.CROSSHAIR_CONTAINER_SWF, settings.CROSSHAIR_ROOT_PATH, settings.CROSSHAIR_INIT_CALLBACK))
         self.__plugins = PluginsCollection(self)
-        self.__plugins.addPlugins(plugins.createPlugins())
+        self.__plugins.addPlugins(self._getPlugins())
         self.__gunMarkers = None
         self.__viewID = CROSSHAIR_VIEW_ID.UNDEFINED
         self.__zoomFactor = 0.0
         self.__scale = 1.0
         self.__distance = 0
+        self.__damage = 0
         self.__hasAmmo = True
         self.__callbackDelayer = None
         self.__isFaded = False
@@ -110,6 +113,15 @@ class CrosshairPanelContainer(ExternalFlashComponent, CrosshairPanelContainerMet
     def clearDistance(self, immediate=True):
         self.__distance = 0
         self.as_clearDistanceS(immediate)
+
+    def setMutableDamage(self, damage):
+        if damage != self.__damage:
+            self.__damage = damage
+            self.as_setAverageDamageS(str(backport.getIntegralFormat(damage)))
+
+    def clearMutableDamage(self, immediate=True):
+        self.__damage = 0
+        self.as_clearAverageDamageS(immediate)
 
     def setHasAmmo(self, hasAmmo):
         if self.__hasAmmo != hasAmmo:
@@ -175,6 +187,7 @@ class CrosshairPanelContainer(ExternalFlashComponent, CrosshairPanelContainerMet
         self.__callbackDelayer = CallbackDelayer()
         if RoleHelpPlugin.isAvailableToShow():
             self.__toggleFade(True)
+        g_playerEvents.crosshairPanelInitialized()
 
     def _dispose(self):
         self.stopPlugins()
@@ -183,6 +196,9 @@ class CrosshairPanelContainer(ExternalFlashComponent, CrosshairPanelContainerMet
             self.__callbackDelayer.destroy()
         g_eventBus.removeListener(GameEvent.ROLE_HINT_TOGGLE, self.__handleRoleHintToggled, scope=EVENT_BUS_SCOPE.BATTLE)
         super(CrosshairPanelContainer, self)._dispose()
+
+    def _getPlugins(self):
+        return plugins.createPlugins()
 
     def __handleRoleHintToggled(self, event):
         self.__toggleFade(event.ctx.get('isShown', False))

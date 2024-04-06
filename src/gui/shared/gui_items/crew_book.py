@@ -39,6 +39,10 @@ class CrewBook(FittingItem):
         return
 
     @property
+    def isForPurchase(self):
+        return self.__lobbyContext.getServerSettings().isCrewBooksPurchaseEnabled()
+
+    @property
     def isForSale(self):
         return self.__lobbyContext.getServerSettings().isCrewBooksSaleEnabled()
 
@@ -91,8 +95,9 @@ class CrewBook(FittingItem):
         return iconName
 
     def getShopIcon(self, size='large'):
-        sizeID = R.images.gui.maps.icons.crewBooks.books.dyn(size)
-        if not sizeID.exists():
+        if size in R.images.gui.maps.icons.crewBooks.books.keys():
+            sizeID = R.images.gui.maps.icons.crewBooks.books.dyn(size)
+        else:
             sizeID = R.images.gui.maps.icons.crewBooks.books.dyn('s' + size)
         resID = sizeID.dyn(replaceHyphenToUnderscore(self.getBonusIconName()))()
         return backport.image(resID) if resID != -1 else ''

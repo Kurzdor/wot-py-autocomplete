@@ -204,96 +204,6 @@ class I18nConfirmDialogMeta(I18nDialogMeta):
         super(I18nConfirmDialogMeta, self).__init__(key, buttons, titleCtx, messageCtx, meta, scope)
 
 
-class DemoAccountBootcampFailureMeta(I18nInfoDialogMeta):
-
-    def getEventType(self):
-        return events.ShowDialogEvent.SHOW_BUTTON_DLG
-
-
-class BCConfirmDialogMeta(IDialogMeta):
-
-    def __init__(self, meta=None):
-        self.__meta = meta
-
-    def getEventType(self):
-        return events.ShowDialogEvent.SHOW_SIMPLE_DLG
-
-    def getViewScopeType(self):
-        return ScopeTemplates.DEFAULT_SCOPE
-
-    def getLabelExecute(self):
-        return self.__meta.get('labelExecute', '')
-
-    def getIcon(self):
-        return self.__meta.get('icon', '')
-
-    def getCostValue(self):
-        return self.__meta.get('costValue', 0)
-
-    def getLabel(self):
-        return self.__meta.get('label', '')
-
-    def getIsBuy(self):
-        return self.__meta.get('isBuy', False)
-
-    def getIsTraining(self):
-        return self.__meta.get('isTraining', False)
-
-    def getMessage(self):
-        return self.__meta.get('message', '')
-
-
-class TankmanOperationDialogMeta(I18nConfirmDialogMeta):
-
-    def __init__(self, key, tankman=None, focusedID=None, showPeriodEndWarning=False):
-        super(TankmanOperationDialogMeta, self).__init__(key, None, None, None, focusedID)
-        self.__tankman = tankman
-        self.__showPeriodEndWarning = showPeriodEndWarning
-        return
-
-    def getEventType(self):
-        return events.ShowDialogEvent.SHOW_RESTORE_TANKMAN_DIALOG if self.__tankman.isDismissed else events.ShowDialogEvent.SHOW_DISMISS_TANKMAN_DIALOG
-
-    def getTankman(self):
-        return self.__tankman
-
-    @property
-    def showPeriodEndWarning(self):
-        return self.__showPeriodEndWarning
-
-
-class CrewSkinsRemovalDialogMeta(I18nConfirmDialogMeta):
-
-    def getEventType(self):
-        return events.ShowDialogEvent.SHOW_CREW_SKINS_COMPENSATION_DIALOG
-
-    def getItems(self):
-        return self._messageCtx.get('items')
-
-    def getMessagePrice(self):
-        return self._messageCtx.get('price', None)
-
-
-class CrewSkinsRemovalCompensationDialogMeta(CrewSkinsRemovalDialogMeta):
-    ROLE_MISMATCH_SUFFIX = 1
-    OUT_OF_STORAGE_SUFFIX = 2
-
-    def __init__(self, key, reasonSuffix, titleCtx=None, messageCtx=None, meta=None, focusedID=None, scope=ScopeTemplates.VIEW_SCOPE):
-        super(CrewSkinsRemovalCompensationDialogMeta, self).__init__(key, titleCtx, messageCtx, meta, focusedID, scope)
-        self._reasonSuffix = reasonSuffix
-
-    def getMessage(self):
-        result = None
-        if self._meta is not None:
-            result = self._meta.getMessage()
-        if not result:
-            result = self._makeString('{0:>s}/message{1:d}'.format(self._key, self._reasonSuffix), self._messageCtx)
-        return result
-
-    def getCompensationMessage(self):
-        return self._makeString(I18N_PRICE_KEY.format(self._key), self._messageCtx)
-
-
 class IconDialogMeta(I18nConfirmDialogMeta):
 
     def getEventType(self):
@@ -408,25 +318,6 @@ class TimerConfirmDialogMeta(I18nConfirmDialogMeta):
     def __init__(self, key, titleCtx=None, messageCtx=None, meta=None, focusedID=None, timer=0):
         super(TimerConfirmDialogMeta, self).__init__(key, titleCtx, messageCtx, meta, focusedID)
         self._timer = timer
-
-
-class I18PunishmentDialogMeta(I18nInfoDialogMeta):
-
-    def __init__(self, key, titleCtx=None, messageCtx=None, meta=None, scope=ScopeTemplates.VIEW_SCOPE):
-        super(I18PunishmentDialogMeta, self).__init__(key, titleCtx, messageCtx, meta, scope)
-        self.__penaltyType = messageCtx.get('penaltyType')
-
-    def getMessage(self):
-        msg = self._makeString('%s/message/%s' % (self._key, self.__penaltyType), self._messageCtx)
-        if self.__penaltyType == 'penalty':
-            msg = msg + makeHtmlString('html_templates:lobby/battle_results', 'penalty_extra_msg')
-        return msg
-
-    def getMsgTitle(self):
-        return self._makeString('%s/msgTitle/%s' % (self._key, self.__penaltyType), {})
-
-    def getEventType(self):
-        return events.ShowDialogEvent.SHOW_PUNISHMENT_DIALOG
 
 
 class CheckBoxDialogMeta(I18nConfirmDialogMeta):

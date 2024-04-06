@@ -3,64 +3,73 @@
 import BigWorld
 import CGF
 import GUI
+import Event
 from GenericComponents import VSEComponent
 from cgf_script.managers_registrator import tickGroup, onAddedQuery, onRemovedQuery
-from cgf_script.component_meta_class import CGFComponent
-from constants import IS_CLIENT
+from cgf_script.component_meta_class import registerComponent
+from constants import IS_CLIENT, CollisionFlags
 from vehicle_systems.tankStructure import ColliderTypes
 from helpers import dependency
 from skeletons.gui.shared.utils import IHangarSpace
 if IS_CLIENT:
     from AvatarInputHandler import cameras
 
-class IsHovered(CGFComponent):
-    pass
+@registerComponent
+class SelectionComponent(object):
+    editorTitle = 'Selection'
+    category = 'Common'
+    domain = CGF.DomainOption.DomainClient | CGF.DomainOption.DomainEditor
+
+    def __init__(self):
+        super(SelectionComponent, self).__init__()
+        self.onClickAction = Event.Event()
+
+
+@registerComponent
+class IsHoveredComponent(object):
+    domain = CGF.DomainOption.DomainClient
 
 
 class HoverManager(CGF.ComponentManager):
     _hangarSpace = dependency.descriptor(IHangarSpace)
 
-    def __init__(self):
-        super(HoverManager, self).__init__()
-        self.__enabled = True
-
-    def enable(self):
-        self.__enabled = True
-
-    def disable(self):
-        self.__enabled = False
-
-    @onAddedQuery(VSEComponent, IsHovered)
+    @onAddedQuery(VSEComponent, IsHoveredComponent)
     def onIsHoveredAdded(self, vseComponent, *args):
         vseComponent.context.onGameObjectHoverIn()
 
-    @onRemovedQuery(VSEComponent, IsHovered)
+    @onRemovedQuery(VSEComponent, IsHoveredComponent)
     def onIsHoveredRemoved(self, vseComponent, *args):
         vseComponent.context.onGameObjectHoverOut()
 
+    @onRemovedQuery(CGF.GameObject, SelectionComponent)
+    def onIsSelectableRemoved(self, gameObject, *args):
+        if gameObject.findComponentByType(IsHoveredComponent):
+            gameObject.removeComponentByType(IsHoveredComponent)
+
     @tickGroup(groupName='Simulation')
     def tick(self):
-        if not self.__enabled or not GUI.mcursor().inWindow or not GUI.mcursor().inFocus or not self._hangarSpace.isCursorOver3DScene:
+        gameObjectID = None
+        if GUI.mcursor().inWindow and GUI.mcursor().inFocus and self._hangarSpace.isSelectionEnabled and self._hangarSpace.isCursorOver3DScene:
+            gameObjectID = self.__getGameObjectUnderCursor()
+        hoveredGameObject = CGF.Query(self.spaceID, (CGF.GameObject, IsHoveredComponent))
+        for gameObject, _ in hoveredGameObject:
+            if gameObject.id != gameObjectID:
+                gameObject.removeComponentByType(IsHoveredComponent)
+            return
+
+        if gameObjectID == 0:
             return
         else:
-            cursorPosition = GUI.mcursor().position
-            ray, wpoint = cameras.getWorldRayAndPoint(cursorPosition.x, cursorPosition.y)
-            collidedId = None
-            res = BigWorld.wg_collideDynamicStatic(self.spaceID, wpoint, wpoint + ray * 1000, 0, 0, -1, ColliderTypes.HANGAR_FLAG)
-            if res is not None:
-                collidedId = res[2]
-            gameObjects = CGF.Query(self.spaceID, CGF.GameObject)
-            for gameObject in gameObjects:
-                if gameObject.id == collidedId:
-                    self._updateHoverComponent(gameObject, True)
-                self._updateHoverComponent(gameObject, False)
+            hoverableGameObjects = CGF.Query(self.spaceID, (CGF.GameObject, SelectionComponent))
+            for gameObject, _ in hoverableGameObjects:
+                if gameObject.id == gameObjectID:
+                    gameObject.createComponent(IsHoveredComponent)
 
             return
 
-    def _updateHoverComponent(self, go, isHovered):
-        if isHovered:
-            if go.findComponentByType(IsHovered) is None:
-                go.createComponent(IsHovered)
-        else:
-            go.removeComponentByType(IsHovered)
-        return
+    def __getGameObjectUnderCursor(self):
+        cursorPosition = GUI.mcursor().position
+        ray, wpoint = cameras.getWorldRayAndPoint(cursorPosition.x, cursorPosition.y)
+        skipFlags = CollisionFlags.TRIANGLE_PROJECTILENOCOLLIDE | CollisionFlags.TRIANGLE_NOCOLLIDE
+        res = BigWorld.wg_collideDynamicStatic(self.spaceID, wpoint, wpoint + ray * 1500, skipFlags, -1, -1, ColliderTypes.HANGAR_FLAG)
+        return res[5] if res is not None else None

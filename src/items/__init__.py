@@ -5,11 +5,9 @@ import nations
 from items import _xml
 from constants import IS_CLIENT, ITEM_DEFS_PATH
 from soft_exception import SoftException
+from extension_utils import ResMgr
 if IS_CLIENT:
-    import ResMgr
     from helpers import i18n
-else:
-    from realm_utils import ResMgr
 _g_itemTypes = None
 UNDEFINED_ITEM_CD = 0
 ITEM_TYPE_NAMES = ('_reserved', 'vehicle', 'vehicleChassis', 'vehicleTurret', 'vehicleGun', 'vehicleEngine', 'vehicleFuelTank', 'vehicleRadio', 'tankman', 'optionalDevice', 'shell', 'equipment', 'customizationItem', 'crewSkin', 'crewBook')
@@ -157,7 +155,7 @@ class ItemsPrices(object):
         return ItemsPrices(result)
 
 
-def init(preloadEverything, pricesToCollect=None):
+def init(preloadEverything, pricesToCollect=None, step=None):
     global _g_itemTypes
     _g_itemTypes = _readItemTypes()
     if pricesToCollect is not None:
@@ -180,7 +178,7 @@ def init(preloadEverything, pricesToCollect=None):
     from items import stun
     stun.init()
     from items import vehicles
-    vehicles.init(preloadEverything, pricesToCollect)
+    vehicles.init(preloadEverything, pricesToCollect, step)
     from items import avatars
     avatars.init()
     from items import tankmen
@@ -210,6 +208,8 @@ def getTypeOfCompactDescr(compactDescr):
         itemTypeID = ord(compactDescr[0]) & 15
         if itemTypeID == 0:
             itemTypeID = ord(compactDescr[1])
+        elif itemTypeID in SIMPLE_ITEM_TYPE_INDICES:
+            itemTypeID = itemTypeID - 2
     if itemTypeID >= len(ITEM_TYPE_NAMES):
         raise SoftException("value is not a 'compact descriptor'")
     return itemTypeID

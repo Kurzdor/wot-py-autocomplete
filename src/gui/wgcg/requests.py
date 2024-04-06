@@ -12,6 +12,7 @@ from gui.shared.utils.requesters.abstract import Response, ClientRequestsByIDPro
 from gui.wgcg.advent_calendar.handlers import AdventCalendarRequestHandlers
 from gui.wgcg.base.handlers import BaseRequestHandlers
 from gui.wgcg.clan.handlers import ClanRequestHandlers
+from gui.wgcg.clan_supply.handlers import ClanSupplyRequestHandlers
 from gui.wgcg.elen.handlers import ElenRequestHandlers
 from gui.wgcg.agate.handlers import AgateRequestHandlers
 from gui.wgcg.utils.handlers import UtilsRequestHandlers
@@ -24,6 +25,7 @@ from gui.wgcg.external_battle_handlers import BaseExternalBattleUnitRequestHandl
 from gui.wgcg.craftmachine.handlers import CraftmachineRequestHandlers
 from gui.wgcg.gift_system.handlers import GiftSystemRequestHandlers
 from gui.wgcg.uilogging.handlers import UILoggingRequestHandlers
+from gui.wgcg.wot_shop.handlers import WotShopRequestHandlers
 
 class WgcgRequestResponse(Response):
 
@@ -35,6 +37,9 @@ class WgcgRequestResponse(Response):
 
     def clone(self, data=None):
         return WgcgRequestResponse(self.code, self.txtStr, data or self.data)
+
+    def mergeData(self, data):
+        self.data.update(data)
 
 
 class WgcgRequester(ClientRequestsByIDProcessor):
@@ -108,6 +113,8 @@ class WgcgRequestsController(RequestsController):
         self.__handlers.update(GiftSystemRequestHandlers(requester).get())
         self.__handlers.update(UILoggingRequestHandlers(requester).get())
         self.__handlers.update(AgateRequestHandlers(requester).get())
+        self.__handlers.update(WotShopRequestHandlers(requester).get())
+        self.__handlers.update(ClanSupplyRequestHandlers(requester).get())
 
     def fini(self):
         super(WgcgRequestsController, self).fini()

@@ -10,7 +10,6 @@ import Math
 import Vehicle
 from AvatarInputHandler import aih_global_binding
 from AvatarInputHandler.cameras import getWorldRayAndPoint
-from account_helpers.settings_core.settings_constants import BattleCommStorageKeys
 from aih_constants import CTRL_MODE_NAME
 from arena_component_system.sector_base_arena_component import ID_TO_BASENAME
 from chat_commands_consts import MarkerType, DefaultMarkerSubType, ReplyState, BATTLE_CHAT_COMMAND_NAMES, INVALID_MARKER_SUBTYPE, _COMMAND_NAME_TRANSFORM_MARKER_TYPE, ONE_SHOT_COMMANDS_TO_REPLIES, COMMAND_RESPONDING_MAPPING
@@ -24,8 +23,8 @@ from helpers import isPlayerAvatar
 from messenger import MessengerEntry
 from messenger.m_constants import PROTO_TYPE
 from messenger.proto import proto_getter
-from messenger.proto.bw_chat2.battle_chat_cmd import EPIC_GLOBAL_CMD_NAMES, LOCATION_CMD_NAMES, TARGETED_VEHICLE_CMD_NAMES
-from skeletons.account_helpers.settings_core import ISettingsCore
+from messenger.proto.bw_chat2.battle_chat_cmd import EPIC_GLOBAL_CMD_NAMES, LOCATION_CMD_NAMES, TARGET_CMD_NAMES
+from skeletons.account_helpers.settings_core import IBattleCommunicationsSettings
 from skeletons.gui.battle_session import IBattleSessionProvider
 _logger = logging.getLogger(__name__)
 CONTEXTCOMMAND = 'CONTEXTCOMMAND'
@@ -43,6 +42,8 @@ TARGET_TYPE_TRANSLATION_MAPPING = {CONTEXTCOMMAND: {MarkerType.VEHICLE_MARKER_TY
                                                    DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.ATTACK_ENEMY},
                   MarkerType.BASE_MARKER_TYPE: {DefaultMarkerSubType.ALLY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.DEFEND_BASE,
                                                 DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.ATTACK_BASE},
+                  MarkerType.TARGET_POINT_MARKER_TYPE: {DefaultMarkerSubType.ALLY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.MOVE_TO_TARGET_POINT,
+                                                        DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.MOVE_TO_TARGET_POINT},
                   MarkerType.HEADQUARTER_MARKER_TYPE: {DefaultMarkerSubType.ALLY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.DEFEND_OBJECTIVE,
                                                        DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.ATTACK_OBJECTIVE},
                   MarkerType.LOCATION_MARKER_TYPE: {INVALID_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.ATTENTION_TO_POSITION}},
@@ -50,6 +51,8 @@ TARGET_TYPE_TRANSLATION_MAPPING = {CONTEXTCOMMAND: {MarkerType.VEHICLE_MARKER_TY
                                                     DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.ATTACKING_ENEMY},
                    MarkerType.BASE_MARKER_TYPE: {DefaultMarkerSubType.ALLY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.DEFENDING_BASE,
                                                  DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.ATTACKING_BASE},
+                   MarkerType.TARGET_POINT_MARKER_TYPE: {DefaultMarkerSubType.ALLY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.MOVING_TO_TARGET_POINT,
+                                                         DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.MOVING_TO_TARGET_POINT},
                    MarkerType.HEADQUARTER_MARKER_TYPE: {DefaultMarkerSubType.ALLY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.DEFENDING_OBJECTIVE,
                                                         DefaultMarkerSubType.ENEMY_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.ATTACKING_OBJECTIVE},
                    MarkerType.LOCATION_MARKER_TYPE: {INVALID_MARKER_SUBTYPE: BATTLE_CHAT_COMMAND_NAMES.GOING_THERE}},
@@ -76,7 +79,8 @@ PROHIBITED_IF_DEAD = [BATTLE_CHAT_COMMAND_NAMES.GOING_THERE,
  BATTLE_CHAT_COMMAND_NAMES.SUPPORTING_ALLY,
  BATTLE_CHAT_COMMAND_NAMES.VEHICLE_SPOTPOINT,
  BATTLE_CHAT_COMMAND_NAMES.SHOOTING_POINT,
- BATTLE_CHAT_COMMAND_NAMES.NAVIGATION_POINT]
+ BATTLE_CHAT_COMMAND_NAMES.NAVIGATION_POINT,
+ BATTLE_CHAT_COMMAND_NAMES.FLAG_POINT]
 PROHIBITED_IF_SPECTATOR = [BATTLE_CHAT_COMMAND_NAMES.GOING_THERE,
  BATTLE_CHAT_COMMAND_NAMES.SOS,
  BATTLE_CHAT_COMMAND_NAMES.HELPME,
@@ -90,7 +94,8 @@ PROHIBITED_IF_SPECTATOR = [BATTLE_CHAT_COMMAND_NAMES.GOING_THERE,
  BATTLE_CHAT_COMMAND_NAMES.VEHICLE_SPOTPOINT,
  BATTLE_CHAT_COMMAND_NAMES.SHOOTING_POINT,
  BATTLE_CHAT_COMMAND_NAMES.NAVIGATION_POINT,
- BATTLE_CHAT_COMMAND_NAMES.ATTENTION_TO_POSITION]
+ BATTLE_CHAT_COMMAND_NAMES.ATTENTION_TO_POSITION,
+ BATTLE_CHAT_COMMAND_NAMES.FLAG_POINT]
 
 def getAimedAtPositionWithinBorders(aimOffsetX, aimOffsetY):
     ray, _ = getWorldRayAndPoint(aimOffsetX, aimOffsetY)
@@ -110,7 +115,7 @@ def getAimedAtPositionWithinBorders(aimOffsetX, aimOffsetY):
 class ChatCommandsController(IBattleController):
     __slots__ = ('__isEnabled', '__arenaDP', '__feedback', '__ammo', '__markersManager')
     sessionProvider = dependency.descriptor(IBattleSessionProvider)
-    settingsCore = dependency.descriptor(ISettingsCore)
+    battleCommunications = dependency.descriptor(IBattleCommunicationsSettings)
     _aimOffset = aih_global_binding.bindRW(aih_global_binding.BINDING_ID.AIM_OFFSET)
 
     def __init__(self, setup, feedback, ammo):
@@ -130,7 +135,7 @@ class ChatCommandsController(IBattleController):
         return BATTLE_CTRL_ID.CHAT_COMMANDS
 
     def startControl(self):
-        self.settingsCore.onSettingsChanged += self.__onSettingsChanged
+        self.battleCommunications.onChanged += self.__onBattleCommunicationChanged
         g_eventBus.addListener(events.MarkersManagerEvent.MARKERS_CREATED, self.__onMarkersManagerMarkersCreated, EVENT_BUS_SCOPE.BATTLE)
 
     def stopControl(self):
@@ -138,7 +143,7 @@ class ChatCommandsController(IBattleController):
         self.__feedback = None
         self.__ammo = None
         self.__markersManager = None
-        self.settingsCore.onSettingsChanged -= self.__onSettingsChanged
+        self.battleCommunications.onChanged -= self.__onBattleCommunicationChanged
         g_eventBus.removeListener(events.MarkersManagerEvent.MARKERS_CREATED, self.__onMarkersManagerMarkersCreated, EVENT_BUS_SCOPE.BATTLE)
         return
 
@@ -148,8 +153,11 @@ class ChatCommandsController(IBattleController):
             return
         else:
             targetID, targetMarkerType, markerSubType = self.__getAimedAtVehicleOrObject()
-            if targetMarkerType == MarkerType.INVALID_MARKER_TYPE:
-                targetID, targetMarkerType, markerSubType = self.__markersManager.getCurrentlyAimedAtMarkerIDAndType()
+            if targetMarkerType == MarkerType.INVALID_MARKER_TYPE and self.__markersManager:
+                tID, tMarkerType, tMarkerSubType = self.__markersManager.getCurrentlyAimedAtMarkerIDAndType()
+                needCorrectCheck = tMarkerType == MarkerType.VEHICLE_MARKER_TYPE
+                if not needCorrectCheck or self.__isTargetCorrect(BigWorld.player(), BigWorld.entities.get(tID)):
+                    targetID, targetMarkerType, markerSubType = tID, tMarkerType, tMarkerSubType
             if targetMarkerType == MarkerType.INVALID_MARKER_TYPE and getAimedAtPositionWithinBorders(self._aimOffset[0], self._aimOffset[1]) is not None:
                 targetMarkerType = MarkerType.LOCATION_MARKER_TYPE
                 markerSubType = INVALID_MARKER_SUBTYPE
@@ -253,7 +261,7 @@ class ChatCommandsController(IBattleController):
             self.sendCommandToBase(targetID, action)
         elif action in LOCATION_CMD_NAMES:
             self.sendAdvancedPositionPing(action, isInRadialMenu)
-        elif action in TARGETED_VEHICLE_CMD_NAMES:
+        elif action in TARGET_CMD_NAMES:
             self.sendTargetedCommand(action, targetID, isInRadialMenu)
         elif action in EPIC_GLOBAL_CMD_NAMES:
             self.sendEpicGlobalCommand(action)
@@ -321,11 +329,17 @@ class ChatCommandsController(IBattleController):
             _logger.error('Command not found: %s', cmdName)
 
     def sendTargetedCommand(self, cmdName, targetID, isInRadialMenu=False):
-        if self.__isProhibitedToSendIfDeadOrObserver(cmdName) or self.__isEnabled is False or not self.__arenaDP.getVehicleInfo(targetID).isAlive():
+        if self.__isProhibitedToSendIfDeadOrObserver(cmdName) or self.__isEnabled is False:
             return
-        if self.__isSPG() and cmdName == BATTLE_CHAT_COMMAND_NAMES.ATTACKING_ENEMY or self.__isSPGAndInStrategicOrArtyMode() and cmdName == BATTLE_CHAT_COMMAND_NAMES.ATTACK_ENEMY and isInRadialMenu is False:
-            time = self.__getReloadTime() if self.__ammo.getShellsQuantityLeft() > 0 else -1
-            command = self.proto.battleCmd.createSPGAimTargetCommand(targetID, time)
+        if self.__arenaDP.isVehiclePresented(targetID):
+            if not self.__arenaDP.getVehicleInfo(targetID).isAlive():
+                return
+            if self.__isSPG() and cmdName == BATTLE_CHAT_COMMAND_NAMES.ATTACKING_ENEMY or self.__isSPGAndInStrategicOrArtyMode() and cmdName == BATTLE_CHAT_COMMAND_NAMES.ATTACK_ENEMY and isInRadialMenu is False:
+                shellsLeft = self.__ammo.getAllShellsQuantityLeft()
+                time = self.__getReloadTime() if shellsLeft > 0 else -1
+                command = self.proto.battleCmd.createSPGAimTargetCommand(targetID, time)
+            else:
+                command = self.proto.battleCmd.createByNameTarget(cmdName, targetID)
         else:
             command = self.proto.battleCmd.createByNameTarget(cmdName, targetID)
         if command:
@@ -362,8 +376,8 @@ class ChatCommandsController(IBattleController):
         if controller:
             controller.sendCommand(command)
 
-    def __onSettingsChanged(self, diff):
-        enableBattleCommunication = diff.get(BattleCommStorageKeys.ENABLE_BATTLE_COMMUNICATION)
+    def __onBattleCommunicationChanged(self):
+        enableBattleCommunication = self.battleCommunications.isEnabled
         if enableBattleCommunication is None:
             return
         else:
@@ -405,5 +419,6 @@ class ChatCommandsController(IBattleController):
         return False
 
     def __onMarkersManagerMarkersCreated(self, event):
+        g_eventBus.removeListener(events.MarkersManagerEvent.MARKERS_CREATED, self.__onMarkersManagerMarkersCreated, EVENT_BUS_SCOPE.BATTLE)
         self.__markersManager = event.getMarkersManager()
-        self.__isEnabled = bool(self.settingsCore.getSetting(BattleCommStorageKeys.ENABLE_BATTLE_COMMUNICATION))
+        self.__isEnabled = bool(self.battleCommunications.isEnabled)

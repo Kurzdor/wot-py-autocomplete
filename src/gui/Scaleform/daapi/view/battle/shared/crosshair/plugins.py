@@ -3,14 +3,15 @@
 import logging
 import math
 from collections import defaultdict, namedtuple
-from enum import IntEnum
-import BattleReplay
 import BigWorld
+from account_helpers.settings_core.settings_constants import GRAPHICS, AIM, GAME, SPGAim
+from enum import IntEnum
+from helpers.time_utils import MS_IN_SECOND
+import BattleReplay
 from AvatarInputHandler import gun_marker_ctrl, aih_global_binding
 from AvatarInputHandler.spg_marker_helpers.spg_marker_helpers import SPGShotResultEnum
 from PlayerEvents import g_playerEvents
 from ReplayEvents import g_replayEvents
-from account_helpers.settings_core.settings_constants import GRAPHICS, AIM, GAME, SPGAim
 from aih_constants import CHARGE_MARKER_STATE, CTRL_MODE_NAME
 from constants import VEHICLE_SIEGE_STATE as _SIEGE_STATE, DUALGUN_CHARGER_STATUS, SERVER_TICK_LENGTH
 from debug_utils import LOG_WARNING
@@ -36,10 +37,10 @@ from gui.shared.events import GameEvent
 from gui.shared.utils.TimeInterval import TimeInterval
 from gui.shared.utils.plugins import IPlugin
 from helpers import dependency
+from helpers_common import computeDamageAtDist
 from skeletons.account_helpers.settings_core import ISettingsCore
 from skeletons.gui.battle_session import IBattleSessionProvider
 from soft_exception import SoftException
-from helpers.time_utils import MS_IN_SECOND
 _logger = logging.getLogger(__name__)
 _SETTINGS_KEY_TO_VIEW_ID = {AIM.ARCADE: CROSSHAIR_VIEW_ID.ARCADE,
  AIM.SNIPER: CROSSHAIR_VIEW_ID.SNIPER}
@@ -70,7 +71,9 @@ def createPlugins():
      'siegeMode': SiegeModePlugin,
      'dualgun': DualGunPlugin,
      'artyCamDist': ArtyCameraDistancePlugin,
-     'spgShotResultIndicator': SPGShotResultIndicatorPlugin}
+     'spgShotResultIndicator': SPGShotResultIndicatorPlugin,
+     'dualAccuracyMechanics': DualAccuracyGunPlugin,
+     'mutableDamage': MutableDamagePlugin}
     return resultPlugins
 
 
@@ -141,14 +144,13 @@ class _AmmoSettings(object):
         return self._burst
 
     def getState(self, quantity, quantityInClip):
-        return (quantity < 3, 'normal')
+        pass
 
 
 class _CassetteSettings(_AmmoSettings):
 
     def getState(self, quantity, quantityInClip):
-        isLow, state = super(_CassetteSettings, self).getState(quantity, quantityInClip)
-        isLow |= quantity <= self.getClipCapacity()
+        state = super(_CassetteSettings, self).getState(quantity, quantityInClip)
         if self._burst > 1:
             total = math.ceil(self.getClipCapacity() / float(self._burst))
             current = math.ceil(quantityInClip / float(self._burst))
@@ -157,7 +159,7 @@ class _CassetteSettings(_AmmoSettings):
             current = quantityInClip
         if current <= 0.5 * total:
             state = 'critical' if current == 1 else 'warning'
-        return (isLow, state)
+        return state
 
 
 class CrosshairPlugin(IPlugin):
@@ -166,8 +168,7 @@ class CrosshairPlugin(IPlugin):
     settingsCore = dependency.descriptor(ISettingsCore)
 
     def _isHideAmmo(self):
-        arenaGuiTypeVisitor = self.sessionProvider.arenaVisitor.gui
-        return arenaGuiTypeVisitor.isBootcampBattle() or arenaGuiTypeVisitor.isMapsTraining()
+        return self.sessionProvider.arenaVisitor.gui.isMapsTraining()
 
 
 class CorePlugin(CrosshairPlugin):
@@ -494,12 +495,16 @@ class AmmoPlugin(CrosshairPlugin):
         self.__setupGuiSettings(ctrl.getGunSettings())
         quantity, quantityInClip = ctrl.getCurrentShells()
         if (quantity, quantityInClip) != (SHELL_QUANTITY_UNKNOWN,) * 2:
-            isLow, state = self.__guiSettings.getState(quantity, quantityInClip)
-            self._parentObj.as_setAmmoStockS(quantity, quantityInClip, isLow, state, False)
+            state = self.__guiSettings.getState(quantity, quantityInClip)
+            self._parentObj.as_setAmmoStockS(quantity, quantityInClip, state, False)
         reloadingState = ctrl.getGunReloadingState()
         self.__setReloadingState(reloadingState)
         if self.__guiSettings.hasAutoReload:
-            self.__reloadAnimator.setClipAutoLoading(reloadingState.getActualValue(), reloadingState.getBaseValue(), isStun=False)
+            autoReloadingState = ctrl.getAutoReloadingState()
+            baseValue = autoReloadingState.getBaseValue()
+            if quantityInClip == SHELL_QUANTITY_UNKNOWN:
+                baseValue = ctrl.getShellChangeTime()
+            self.__reloadAnimator.setClipAutoLoading(autoReloadingState.getActualValue(), round(baseValue, 1), isStun=False, isTimerOn=True)
         if self._isHideAmmo():
             self._parentObj.as_setNetVisibleS(CROSSHAIR_CONSTANTS.VISIBLE_NET)
         self._parentObj.as_setShellChangeTimeS(ctrl.canQuickShellChange(), ctrl.getQuickShellChangeTime())
@@ -550,12 +555,11 @@ class AmmoPlugin(CrosshairPlugin):
         return
 
     def __onGunAutoReloadTimeSet(self, state, stunned):
-        if not self.__autoReloadCallbackID:
-            timeLeft = min(state.getTimeLeft(), state.getActualValue())
-            baseValue = round(state.getBaseValue(), 1)
-            if self.__shellsInClip == 0:
-                baseValue = self.__reCalcFirstShellAutoReload(baseValue)
-            self.__reloadAnimator.setClipAutoLoading(timeLeft, baseValue, isStun=stunned, isTimerOn=True, isRedText=self.__shellsInClip == 0)
+        timeLeft = round(min(state.getTimeLeft(), state.getActualValue()), 1)
+        baseValue = round(state.getBaseValue(), 1)
+        if self.__shellsInClip == 0:
+            baseValue = self.__reCalcFirstShellAutoReload(baseValue)
+        self.__reloadAnimator.setClipAutoLoading(timeLeft, baseValue, isStun=stunned, isTimerOn=True, isRedText=self.__shellsInClip == 0)
         self.__autoReloadSnapshot = state
 
     def __onGunAutoReloadBoostUpd(self, state, stateDuration, stateTotalTime, extraData):
@@ -596,8 +600,8 @@ class AmmoPlugin(CrosshairPlugin):
         if not result & SHELL_SET_RESULT.CURRENT:
             return
         self.__shellsInClip = quantityInClip
-        isLow, state = self.__guiSettings.getState(quantity, quantityInClip)
-        self._parentObj.as_setAmmoStockS(quantity, quantityInClip, isLow, state, result & SHELL_SET_RESULT.CASSETTE_RELOAD > 0)
+        state = self.__guiSettings.getState(quantity, quantityInClip)
+        self._parentObj.as_setAmmoStockS(quantity, quantityInClip, state, result & SHELL_SET_RESULT.CASSETTE_RELOAD > 0)
         if quantity + quantityInClip == 0:
             self.__reloadAnimator.setClipAutoLoading(0, 0, isRedText=True)
 
@@ -605,12 +609,12 @@ class AmmoPlugin(CrosshairPlugin):
         ctrl = self.sessionProvider.shared.ammo
         if ctrl is not None:
             quantity, quantityInClip = ctrl.getCurrentShells()
-            isLow, state = self.__guiSettings.getState(quantity, quantityInClip)
-            self._parentObj.as_setAmmoStockS(quantity, quantityInClip, isLow, state, False)
+            state = self.__guiSettings.getState(quantity, quantityInClip)
+            self._parentObj.as_setAmmoStockS(quantity, quantityInClip, state, False)
         return
 
     def __onCurrentShellReset(self):
-        self._parentObj.as_setAmmoStockS(0, 0, False, 'normal', False)
+        self._parentObj.as_setAmmoStockS(0, 0, 'normal', False)
 
     def __onQuickShellChangerUpdated(self, isActive, time):
         self._parentObj.as_setShellChangeTimeS(isActive, time)
@@ -694,6 +698,8 @@ class VehicleStatePlugin(CrosshairPlugin):
         elif state == VEHICLE_VIEW_STATE.SWITCHING:
             self.__maxHealth = 0
             self.__healthPercent = 0
+            if value == 0:
+                self._parentObj.setHasAmmo(hasAmmo=True)
         elif state == VEHICLE_VIEW_STATE.GUN_RELOAD_BOOST:
             self.__onGunReloadBoost()
 
@@ -1098,9 +1104,9 @@ class SpeedometerWheeledTech(CrosshairPlugin):
             vStateCtrl.onVehicleControlling += self.__onVehicleControlling
             crosshairCtrl.onCrosshairViewChanged += self.__onCrosshairViewChanged
             vehicle = vStateCtrl.getControllingVehicle()
-            if vehicle is not None and vehicle.isWheeledTech:
+            if vehicle is not None and vehicle.hasSpeedometer:
                 self.__onVehicleControlling(vehicle)
-        specCtrl = self.sessionProvider.dynamic.spectator
+        specCtrl = self.sessionProvider.shared.spectator
         if specCtrl is not None:
             specCtrl.onSpectatorViewModeChanged += self.__onSpectatorModeChanged
         add = g_eventBus.addListener
@@ -1117,7 +1123,7 @@ class SpeedometerWheeledTech(CrosshairPlugin):
             vStateCtrl.onVehicleStateUpdated -= self.__onVehicleStateUpdated
             vStateCtrl.onVehicleControlling -= self.__onVehicleControlling
             crosshairCtrl.onCrosshairViewChanged -= self.__onCrosshairViewChanged
-        specCtrl = self.sessionProvider.dynamic.spectator
+        specCtrl = self.sessionProvider.shared.spectator
         if specCtrl is not None:
             specCtrl.onSpectatorViewModeChanged -= self.__onSpectatorModeChanged
         remove = g_eventBus.removeListener
@@ -1128,7 +1134,7 @@ class SpeedometerWheeledTech(CrosshairPlugin):
     def __onVehicleControlling(self, vehicle):
         vStateCtrl = self.sessionProvider.shared.vehicleState
         vTypeDesc = vehicle.typeDescriptor
-        if vTypeDesc.isWheeledVehicle and vehicle.health > 0:
+        if vTypeDesc.hasSpeedometer and vehicle.isAlive() and (vehicle.isPlayerVehicle or avatar_getter.getIsObserverFPV()):
             if vStateCtrl.isInPostmortem:
                 self.__resetSpeedometer()
             self.__updateBurnoutWarning(vStateCtrl)
@@ -1170,7 +1176,7 @@ class SpeedometerWheeledTech(CrosshairPlugin):
         if vehicle is None:
             return
         else:
-            if vehicle.typeDescriptor.isWheeledVehicle and viewID == CROSSHAIR_VIEW_ID.ARCADE:
+            if vehicle.hasSpeedometer and viewID == CROSSHAIR_VIEW_ID.ARCADE:
                 self.__onVehicleControlling(vehicle)
                 self.__updateCurStateSpeedMode(vStateCtrl)
             return
@@ -1276,7 +1282,7 @@ class SpeedometerWheeledTech(CrosshairPlugin):
                     vStateCtrl = self.sessionProvider.shared.vehicleState
                     if vStateCtrl is not None:
                         vehicle = vStateCtrl.getControllingVehicle()
-                        if vehicle is not None and vehicle.isWheeledTech:
+                        if vehicle is not None and vehicle.hasSpeedometer:
                             self.__onVehicleControlling(vehicle)
             else:
                 self.parentObj.as_removeSpeedometerS()
@@ -1555,3 +1561,141 @@ class SPGShotResultIndicatorPlugin(CrosshairPlugin):
 
     def __flyTimeIsActive(self, shotResult, shellState):
         return shotResult == SPGShotResultEnum.HIT and shellState not in (SPGShotIndicatorState.ACTIVE_EMPTY_SHELL, SPGShotIndicatorState.EMPTY_SHELL)
+
+
+class DualAccuracyGunPlugin(CrosshairPlugin):
+
+    def __init__(self, parentObj):
+        super(DualAccuracyGunPlugin, self).__init__(parentObj)
+        self.__dualAccGunCtrl = None
+        return
+
+    def start(self):
+        vStateCtrl = self.sessionProvider.shared.vehicleState
+        if vStateCtrl is not None:
+            vStateCtrl.onVehicleControlling += self.__onVehicleControlling
+            vehicle = vStateCtrl.getControllingVehicle()
+            self.__onVehicleControlling(vehicle)
+        return
+
+    def stop(self):
+        vStateCtrl = self.sessionProvider.shared.vehicleState
+        if vStateCtrl is not None:
+            vStateCtrl.onVehicleControlling -= self.__onVehicleControlling
+        self.__unsubscribeDualAccuracyCtrl()
+        return
+
+    def __onSetDualAccuracyState(self, *_):
+        isVisible = not self.__dualAccGunCtrl.isActive() if self.__dualAccGunCtrl is not None else False
+        self.parentObj.as_setDualAccActiveS(isVisible)
+        return
+
+    def __onVehicleControlling(self, vehicle):
+        if vehicle is not None and vehicle.typeDescriptor.hasDualAccuracy:
+            self.__subscribeDualAccuracyCtrl(vehicle.dynamicComponents.get('dualAccuracy'))
+        else:
+            self.__unsubscribeDualAccuracyCtrl()
+        return
+
+    def __subscribeDualAccuracyCtrl(self, dualAccuracyGunCtrl):
+        if dualAccuracyGunCtrl:
+            self.__dualAccGunCtrl = dualAccuracyGunCtrl
+            self.__dualAccGunCtrl.onSetDualAccState += self.__onSetDualAccuracyState
+        self.__onSetDualAccuracyState()
+
+    def __unsubscribeDualAccuracyCtrl(self):
+        if self.__dualAccGunCtrl:
+            self.__dualAccGunCtrl.onSetDualAccState -= self.__onSetDualAccuracyState
+            self.__dualAccGunCtrl = None
+        self.__onSetDualAccuracyState()
+        return
+
+
+class MutableDamagePlugin(_DistancePlugin):
+    __slots__ = ('__targetID', '__shellDescr')
+
+    def __init__(self, parentObj):
+        super(MutableDamagePlugin, self).__init__(parentObj)
+        self.__targetID = 0
+        self.__shellDescr = None
+        return
+
+    def start(self):
+        super(MutableDamagePlugin, self).start()
+        ctrl = self.sessionProvider.shared.feedback
+        if ctrl is not None:
+            ctrl.onVehicleFeedbackReceived += self.__onVehicleFeedbackReceived
+        ammoCtrl = self.sessionProvider.shared.ammo
+        if ammoCtrl is not None:
+            self.__invalidateCurrentShell()
+            ammoCtrl.onCurrentShellChanged += self.__invalidateCurrentShell
+            ammoCtrl.onCurrentShellReset += self.__invalidateCurrentShell
+        return
+
+    def stop(self):
+        super(MutableDamagePlugin, self).stop()
+        ctrl = self.sessionProvider.shared.feedback
+        if ctrl is not None:
+            ctrl.onVehicleFeedbackReceived -= self.__onVehicleFeedbackReceived
+        ammoCtrl = self.sessionProvider.shared.ammo
+        if ammoCtrl is not None:
+            ammoCtrl.onCurrentShellChanged -= self.__invalidateCurrentShell
+            ammoCtrl.onCurrentShellReset -= self.__invalidateCurrentShell
+        self.__shellDescr = None
+        return
+
+    def _update(self):
+        target = BigWorld.entity(self.__targetID)
+        isEnemy = self.sessionProvider.getCtx().isEnemy(self.__targetID)
+        if target and target.isAlive() and isEnemy:
+            self.__updateDamage(target)
+        else:
+            self.__stopTrack()
+
+    def _onCrosshairViewChanged(self, viewID):
+        if viewID not in (CROSSHAIR_VIEW_ID.ARCADE, CROSSHAIR_VIEW_ID.SNIPER):
+            self.__stopTrack(immediate=True)
+
+    def __startTrack(self, vehicleID, target):
+        self._interval.stop()
+        self.__targetID = vehicleID
+        self._interval.start()
+        self.__updateDamage(target)
+
+    def __stopTrack(self, immediate=False):
+        self._interval.stop()
+        self._parentObj.clearMutableDamage(immediate=immediate)
+        self.__targetID = 0
+
+    def __isShotWithMutableDamage(self):
+        return self.__shellDescr.isDamageMutable if self.__shellDescr else False
+
+    def __invalidateCurrentShell(self, *_):
+        ammoCtrl = self.sessionProvider.shared.ammo
+        currentShellCD, gunSettings = ammoCtrl.getCurrentShellCD(), ammoCtrl.getGunSettings()
+        self.__shellDescr = gunSettings.getShellDescriptor(currentShellCD) if currentShellCD else None
+        if not self.__isShotWithMutableDamage():
+            self._parentObj.clearMutableDamage(immediate=True)
+        return
+
+    def __updateDamage(self, target):
+        if self.__isShotWithMutableDamage():
+            dist = int(avatar_getter.getDistanceToTarget(target))
+            damage = int(computeDamageAtDist(self.__shellDescr.armorDamage, dist))
+            if damage > 0:
+                self._parentObj.setMutableDamage(damage)
+            else:
+                self._parentObj.clearMutableDamage()
+
+    def __onVehicleFeedbackReceived(self, eventID, vehicleID, value):
+        if eventID == FEEDBACK_EVENT_ID.ENTITY_IN_FOCUS:
+            if self._parentObj.getViewID() not in (CROSSHAIR_VIEW_ID.ARCADE, CROSSHAIR_VIEW_ID.SNIPER):
+                return
+            isInFocus, entityType = value
+            target = BigWorld.entity(vehicleID)
+            isEnemy = self.sessionProvider.getCtx().isEnemy(vehicleID)
+            if entityType == ENTITY_IN_FOCUS_TYPE.VEHICLE:
+                if isInFocus and target and target.isAlive() and isEnemy:
+                    self.__startTrack(vehicleID, target)
+                else:
+                    self.__stopTrack()

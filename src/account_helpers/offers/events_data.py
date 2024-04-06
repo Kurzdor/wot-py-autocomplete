@@ -76,6 +76,10 @@ class OfferEventData(object):
         return self._data.get('showInGUI')
 
     @property
+    def showWhenZeroCurrency(self):
+        return self._data.get('showWhenZeroCurrency', False)
+
+    @property
     def cdnLocFilePath(self):
         _path = self._data.get(CDN_KEY, {}).get('localization')
         return _path % self._langCode if _path else ''
@@ -97,6 +101,14 @@ class OfferEventData(object):
         return self._data.get(CDN_KEY, {}).get('giftTokenImg', '')
 
     @property
+    def cdnSignSmallImgPath(self):
+        return self._data.get(CDN_KEY, {}).get('signSmallImg', '')
+
+    @property
+    def cdnSignBigImgPath(self):
+        return self._data.get(CDN_KEY, {}).get('signBigImg', '')
+
+    @property
     def availableGifts(self):
         received = self._receivedGifts
         if received is None:
@@ -108,7 +120,7 @@ class OfferEventData(object):
         giftsData = self._data.get('gift')
         return OfferGift(giftID, self._data['gift'][giftID]) if giftsData and giftID in giftsData else None
 
-    def getGiftAvailabelCount(self, giftID):
+    def getGiftAvailableCount(self, giftID):
         received = self._receivedGifts
         if received is None:
             return 0
@@ -166,11 +178,15 @@ class OfferEventData(object):
 
     @property
     def expiration(self):
-        return min(self._tokensCache.getTokenExpiryTime(self.token), self._tokensCache.getTokenExpiryTime(self.giftToken), self.getFinishTime())
+        return min((value for value in [self._tokensCache.getTokenExpiryTime(self.token), self._tokensCache.getTokenExpiryTime(self.giftToken), self.getFinishTime()] if value != 0))
 
     @property
     def isOfferAvailable(self):
-        return self._tokensCache.isTokenAvailable(self.token) and self._tokensCache.isTokenAvailable(self.giftToken) and not self.isOutOfDate and bool(self.availableGiftsCount)
+        return self.isOfferUnlocked and self._tokensCache.isTokenAvailable(self.giftToken)
+
+    @property
+    def isOfferUnlocked(self):
+        return self._tokensCache.isTokenAvailable(self.token) and not self.isOutOfDate and bool(self.availableGiftsCount)
 
     @property
     def isOutOfDate(self):
@@ -299,6 +315,10 @@ class OfferGift(object):
         if self.bonuses:
             disabled = any((bonus.isMaxCountExceeded() for bonus in self.bonuses))
         return disabled
+
+    @property
+    def rawBonuses(self):
+        return self._data.get('bonus', dict())
 
     @property
     def bonuses(self):

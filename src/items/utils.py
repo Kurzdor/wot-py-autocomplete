@@ -2,15 +2,18 @@
 # Embedded file name: scripts/common/items/utils.py
 import copy
 from operator import sub
+from functools import partial
 from typing import Any, Dict, Tuple
-from VehicleDescrCrew import VehicleDescrCrew
 from constants import VEHICLE_TTC_ASPECTS
 from debug_utils import *
-from items import tankmen
+from items import tankmen, ITEM_TYPES
 from items import vehicles
 from items.components.c11n_constants import CUSTOMIZATION_SLOTS_VEHICLE_PARTS
-from items.tankmen import MAX_SKILL_LEVEL, MIN_ROLE_LEVEL
+from items.tankmen import MAX_SKILL_LEVEL, MIN_ROLE_LEVEL, getSkillsConfig
 from items.vehicles import vehicleAttributeFactors, VehicleDescriptor
+from items.artefacts import StaticOptionalDevice, AdditiveBattleBooster
+from items.components import component_constants
+from account_shared import AmmoIterator
 import ResMgr
 __defaultGlossTexture = None
 
@@ -180,7 +183,8 @@ def getInvisibility(vehicleDescr, factors, baseInvisibility, isMoving):
 
 if IS_CLIENT:
     CLIENT_VEHICLE_ATTRIBUTE_FACTORS = {'camouflage': 1.0,
-     'shotDispersion': 1.0}
+     'shotDispersion': 1.0,
+     'dualAccuracyCoolingDelay': 1.0}
     CLIENT_VEHICLE_ATTRIBUTE_FACTORS.update(vehicleAttributeFactors())
 
     def makeDefaultClientVehicleAttributeFactors():
@@ -207,13 +211,27 @@ if IS_CLIENT:
                 if not all(map(isclose, original[factor], changed[factor])):
                     result[factor] = map(sub, original[factor], changed[factor])
             if not isclose(original[factor], changed[factor]):
-                result[factor] = original.get(factor, CLIENT_VEHICLE_ATTRIBUTE_FACTORS[factor]) - changed[factor]
+                originalFactor = original.get(factor, CLIENT_VEHICLE_ATTRIBUTE_FACTORS[factor])
+                changedFactor = changed[factor]
+                if originalFactor == changedFactor:
+                    continue
+                else:
+                    result[factor] = originalFactor - changedFactor
 
         return result
 
 
     def getClientShotDispersion(vehicleDescr, shotDispersionFactor):
-        return vehicleDescr.gun.shotDispersionAngle * vehicleDescr.miscAttrs['multShotDispersionFactor'] * shotDispersionFactor
+        gun = vehicleDescr.gun
+        values = []
+        if 'dualAccuracy' in gun.tags:
+            values.append(gun.dualAccuracy.afterShotDispersionAngle)
+        values.append(gun.shotDispersionAngle)
+        return (value * vehicleDescr.miscAttrs['multShotDispersionFactor'] * shotDispersionFactor for value in values)
+
+
+    def getClientCoolingDelay(vehicleDescr, factors):
+        return float(vehicleDescr.gun.dualAccuracy.coolingDelay) * factors['dualAccuracyCoolingDelay']
 
 
     def getClientInvisibility(vehicleDescr, vehicle, camouflageFactor, factors):
@@ -231,16 +249,16 @@ if IS_CLIENT:
         return (moving, still)
 
 
-    def updateAttrFactorsWithSplit(vehicleDescr, crewCompactDescrs, eqs, factors, perksController=None):
+    def updateAttrFactorsWithSplit(vehicleDescr, crewCompactDescrs, eqs, factors):
         extras = {}
         extraAspects = {VEHICLE_TTC_ASPECTS.WHEN_STILL: ('invisibility',)}
         for aspect in extraAspects.iterkeys():
             currFactors = copy.deepcopy(factors)
-            updateVehicleAttrFactors(vehicleDescr, perksController, crewCompactDescrs, eqs, currFactors, aspect)
+            updateVehicleAttrFactors(vehicleDescr, crewCompactDescrs, eqs, currFactors, aspect)
             for coefficient in extraAspects[aspect]:
                 extras.setdefault(coefficient, {})[aspect] = currFactors[coefficient]
 
-        updateVehicleAttrFactors(vehicleDescr, perksController, crewCompactDescrs, eqs, factors, VEHICLE_TTC_ASPECTS.DEFAULT)
+        updateVehicleAttrFactors(vehicleDescr, crewCompactDescrs, eqs, factors, VEHICLE_TTC_ASPECTS.DEFAULT)
         for coefficientName, coefficientValue in extras.iteritems():
             coefficientValue[VEHICLE_TTC_ASPECTS.DEFAULT] = factors[coefficientName]
             factors[coefficientName] = coefficientValue
@@ -268,7 +286,8 @@ if IS_CLIENT:
         return sum(filter(None, [ getattr(eq, 'crewLevelIncrease', None) for eq in eqs ]))
 
 
-    def updateVehicleAttrFactors(vehicleDescr, perksController, crewCompactDescrs, eqs, factors, aspect):
+    def updateVehicleAttrFactors(vehicleDescr, crewCompactDescrs, eqs, factors, aspect):
+        from VehicleDescrCrew import VehicleDescrCrew
         factors['crewLevelIncrease'] = _sumCrewLevelIncrease(eqs)
         for eq in eqs:
             if eq is not None:
@@ -282,13 +301,19 @@ if IS_CLIENT:
 
         vehicleDescrCrew.onCollectFactors(factors)
         factors['camouflage'] = vehicleDescrCrew.camouflageFactor
-        if perksController and aspect == VEHICLE_TTC_ASPECTS.DEFAULT:
-            perksController.onCollectFactors(factors)
+        if vehicleDescr.hasDualAccuracy:
+            crewData = vehicleDescrCrew.collectDefaultCrewData()
+            vehicleDescrCrew.extendSkillProcessor('dualAccuracyCoolingDelay', crewData, partial(_updateDualAccuracyCoolingDelay, factors=factors))
         multShotDispersionFactor = factors.get('multShotDispersionFactor', 1.0)
         shotDispersionFactors = [multShotDispersionFactor, 0.0]
         vehicleDescrCrew.onCollectShotDispersionFactors(shotDispersionFactors)
         factors['shotDispersion'] = shotDispersionFactors
         return
+
+
+    def _updateDualAccuracyCoolingDelay(_, attr, factors):
+        coolingDelayFactor = factors.get('dualAccuracyCoolingDelay', 1.0)
+        factors['dualAccuracyCoolingDelay'] = coolingDelayFactor / attr.factor
 
 
 def getEditorOnlySection(section, createNewSection=False):
@@ -311,3 +336,51 @@ def getDifferVehiclePartNames(newVehDescr, oldVehDescr):
     elif 'gun' in differPartNames:
         differPartNames.append('turret')
     return differPartNames
+
+
+def commanderTutorXpBonusFactorForCrew(crew, ammo, vehCompDescr):
+    tutorLevel = component_constants.ZERO_FLOAT
+    brotherhoodSum = 0.0
+    vehDescriptor = VehicleDescriptor(compactDescr=vehCompDescr)
+    for t in crew:
+        if t.role == 'commander':
+            tutorLevel = t.skillLevel('commander_tutor')
+            if not tutorLevel:
+                return component_constants.ZERO_FLOAT
+            if not t.isOwnVehicleOrPremium(vehDescriptor.type):
+                return component_constants.ZERO_FLOAT
+            tutorLevel *= t.skillsEfficiency
+        tmanBrotherhoodLevel = t.skillLevel('brotherhood') or 0
+        brotherhoodSum += tmanBrotherhoodLevel * t.skillsEfficiency
+
+    brotherhoodLevel = brotherhoodSum / (len(crew) * MAX_SKILL_LEVEL)
+    skillsConfig = getSkillsConfig()
+    brotherhoodBonus = brotherhoodLevel * skillsConfig.getSkill('brotherhood').crewLevelIncrease
+    tutorLevel += brotherhoodBonus
+    equipCrewLevelIncrease = component_constants.ZERO_FLOAT
+    optionalDevCrewLevelIncrease = component_constants.ZERO_FLOAT
+    cache = vehicles.g_cache
+    optDev = set()
+    for compDescr, count in AmmoIterator(ammo):
+        itemTypeIdx, _, itemIdx = vehicles.parseIntCompactDescr(compDescr)
+        if itemTypeIdx == ITEM_TYPES.optionalDevice:
+            obj = cache.optionalDevices()[itemIdx]
+            if isinstance(obj, StaticOptionalDevice):
+                optionalDevCrewLevelIncrease += obj.getFactorValue(vehDescriptor, 'miscAttrs/crewLevelIncrease')
+                optDev.add(obj)
+
+    for compDescr, count in AmmoIterator(ammo):
+        itemTypeIdx, _, itemIdx = vehicles.parseIntCompactDescr(compDescr)
+        if itemTypeIdx == ITEM_TYPES.equipment:
+            eqip = cache.equipments()[itemIdx]
+            equipCrewLevelIncrease += getattr(eqip, 'crewLevelIncrease', component_constants.ZERO_FLOAT)
+            if isinstance(eqip, AdditiveBattleBooster):
+                for device in optDev:
+                    levelParams = eqip.getLevelParamsForDevice(device)
+                    if levelParams is not None and 'crewLevelIncrease' in levelParams:
+                        equipCrewLevelIncrease += levelParams[1]
+                        break
+
+    tutorLevel += optionalDevCrewLevelIncrease
+    tutorLevel += equipCrewLevelIncrease
+    return tutorLevel * skillsConfig.getSkill('commander_tutor').xpBonusFactorPerLevel

@@ -3,6 +3,7 @@
 import typing
 from constants import QUEUE_TYPE, DAILY_QUESTS_CONFIG
 from gui.Scaleform.framework.entities.inject_component_adaptor import InjectComponentAdaptor
+from gui.limited_ui.lui_rules_storage import LuiRules
 from gui.prb_control.entities.listener import IGlobalListener
 from gui.server_events.events_helpers import isDailyQuestsEnable
 from gui.impl.lobby.missions.daily_quests_widget_view import DailyQuestsWidgetView
@@ -10,7 +11,7 @@ from gui.Scaleform.daapi.view.meta.DailyQuestMeta import DailyQuestMeta
 from gui.Scaleform.managers import UtilsManager
 from helpers import dependency
 from helpers.CallbackDelayer import CallbackDelayer
-from skeletons.gui.game_control import IPromoController
+from skeletons.gui.game_control import IPromoController, ILimitedUIController
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.server_events import IEventsCache
 
@@ -18,6 +19,7 @@ class DailyQuestWidget(InjectComponentAdaptor, DailyQuestMeta, IGlobalListener):
     lobbyContext = dependency.descriptor(ILobbyContext)
     eventsCache = dependency.descriptor(IEventsCache)
     promoController = dependency.descriptor(IPromoController)
+    limitedUIController = dependency.descriptor(ILimitedUIController)
     __layout = 0
 
     def updateWidgetLayout(self, value):
@@ -27,7 +29,7 @@ class DailyQuestWidget(InjectComponentAdaptor, DailyQuestMeta, IGlobalListener):
         return
 
     def onPrbEntitySwitched(self):
-        if not (self._isRandomBattleSelected() or self._isMapboxSelected() or self._isComp7Selected()):
+        if not self._isQueueEnabled():
             self.__animateHide()
         else:
             self.__showOrHide()
@@ -49,14 +51,15 @@ class DailyQuestWidget(InjectComponentAdaptor, DailyQuestMeta, IGlobalListener):
     def _makeInjectView(self):
         return DailyQuestsWidgetView()
 
-    def _isRandomBattleSelected(self):
-        return self.__isQueueSelected(QUEUE_TYPE.RANDOMS)
+    def _isQueueEnabled(self):
+        enabledQueues = (QUEUE_TYPE.RANDOMS,
+         QUEUE_TYPE.MAPBOX,
+         QUEUE_TYPE.COMP7,
+         QUEUE_TYPE.WINBACK)
+        return any((self.__isQueueSelected(queueType) for queueType in enabledQueues))
 
-    def _isMapboxSelected(self):
-        return self.__isQueueSelected(QUEUE_TYPE.MAPBOX)
-
-    def _isComp7Selected(self):
-        return self.__isQueueSelected(QUEUE_TYPE.COMP7)
+    def isLimitedUiRuleCompleted(self):
+        return self.limitedUIController.isRuleCompleted(LuiRules.DAILY_MISSIONS)
 
     def __isQueueSelected(self, queueType):
         return self.prbDispatcher.getFunctionalState().isQueueSelected(queueType) if self.prbDispatcher is not None else False
@@ -97,7 +100,7 @@ class DailyQuestWidget(InjectComponentAdaptor, DailyQuestMeta, IGlobalListener):
         self.as_setEnabledS(isEnabled)
 
     def __shouldHide(self):
-        return not isDailyQuestsEnable() or self.promoController.isTeaserOpen() or not (self._isRandomBattleSelected() or self._isMapboxSelected() or self._isComp7Selected())
+        return not isDailyQuestsEnable() or self.promoController.isTeaserOpen() or not self._isQueueEnabled() or not self.isLimitedUiRuleCompleted()
 
     def __hasIncompleteQuests(self):
         for quest in self.eventsCache.getDailyQuests().values():
@@ -133,6 +136,7 @@ class DailyQuestWidget(InjectComponentAdaptor, DailyQuestMeta, IGlobalListener):
         self.eventsCache.onSyncCompleted += self.__onSyncCompleted
         self.promoController.onTeaserShown += self.__onTeaserShown
         self.promoController.onTeaserClosed += self.__onTeaserClosed
+        self.limitedUIController.startObserve(LuiRules.DAILY_MISSIONS, self.__updateDailyMissionVisibility)
 
     def __removeListeners(self):
         self.stopGlobalListening()
@@ -140,6 +144,10 @@ class DailyQuestWidget(InjectComponentAdaptor, DailyQuestMeta, IGlobalListener):
         self.eventsCache.onSyncCompleted -= self.__onSyncCompleted
         self.promoController.onTeaserShown -= self.__onTeaserShown
         self.promoController.onTeaserClosed -= self.__onTeaserClosed
+        self.limitedUIController.stopObserve(LuiRules.DAILY_MISSIONS, self.__updateDailyMissionVisibility)
         if self._injectView is not None:
             self._injectView.viewModel.onDisappear -= self.__hide
         return
+
+    def __updateDailyMissionVisibility(self, *_):
+        self.__showOrHide()

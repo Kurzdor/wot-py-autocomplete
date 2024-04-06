@@ -3,7 +3,7 @@
 from adisp import adisp_process
 from frameworks.wulf import ViewFlags, ViewSettings
 from fun_random.gui.feature.fun_constants import FunSubModesState
-from fun_random.gui.feature.util.fun_mixins import FunSubModesWatcher
+from fun_random.gui.feature.util.fun_mixins import FunAssetPacksMixin, FunSubModesWatcher
 from fun_random.gui.feature.util.fun_wrappers import hasAnySubMode, avoidSubModesStates
 from fun_random.gui.impl.gen.view_models.views.lobby.feature.fun_random_entry_point_view_model import FunRandomEntryPointViewModel
 from fun_random.gui.impl.gen.view_models.views.lobby.feature.fun_random_entry_point_view_model import State
@@ -22,7 +22,7 @@ def isFunRandomEntryPointAvailable(funRandomCtrl=None):
     return funRandomCtrl.subModesInfo.isEntryPointAvailable()
 
 
-class FunRandomEntryPointView(ViewImpl, FunSubModesWatcher, Notifiable):
+class FunRandomEntryPointView(ViewImpl, FunAssetPacksMixin, FunSubModesWatcher, Notifiable):
 
     def __init__(self, flags=ViewFlags.VIEW):
         settings = ViewSettings(layoutID=R.views.fun_random.lobby.feature.FunRandomEntryPointView(), flags=flags, model=FunRandomEntryPointViewModel())
@@ -71,6 +71,7 @@ class FunRandomEntryPointView(ViewImpl, FunSubModesWatcher, Notifiable):
 
     def __invalidate(self, status):
         with self.viewModel.transaction() as model:
+            model.setAssetsPointer(self.getModeAssetsPointer())
             model.setState(_ENTRY_POINT_STATE_MAP.get(status.state, State.AFTER))
             model.setStartTime(status.rightBorder)
             model.setLeftTime(status.primeDelta)

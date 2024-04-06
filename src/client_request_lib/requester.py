@@ -1,5 +1,6 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client_common/client_request_lib/requester.py
+from functools import wraps
 from client_request_lib.data_sources.staging import StagingDataAccessor
 from client_request_lib.data_sources.fake import FakeDataAccessor
 from client_request_lib.data_sources.gateway import GatewayDataAccessor
@@ -36,6 +37,7 @@ def _in_bigworld(func):
 
 def bigworld_callback_wrapper(func):
 
+    @wraps(func)
     def wrapped(*args, **kwargs):
         new_args = [ _in_bigworld(arg) for arg in args ]
         new_kwargs = {k:_in_bigworld(v) for k, v in kwargs.items()}
@@ -115,8 +117,14 @@ class AgateAccessor(BaseAccessor):
     def agate_v4_fetch_product_list_state(self, callback, params, fields=None):
         return self._data_source.agate_v4_fetch_product_list_state(callback, params, fields=fields)
 
+    def agate_v6_get_user_subscriptions2(self, callback, params, fields=None):
+        return self._data_source.agate_v6_get_user_subscriptions2(callback, params, fields=fields)
+
     def get_inventory_entitlements(self, callback, entitlement_codes):
         return self._data_source.get_inventory_entitlements(callback, entitlement_codes)
+
+    def get_inventory_entitlements_v5(self, callback, entitlementsFilter):
+        return self._data_source.get_inventory_entitlements_v5(callback, entitlementsFilter)
 
 
 class ClansAccessor(BaseAccessor):
@@ -208,6 +216,12 @@ class WgshAccessor(BaseAccessor):
     def get_wgsh_unit_info(self, callback, periphery_id, unit_server_id, rev, fields=None):
         return self._data_source.get_wgsh_unit_info(callback, periphery_id, unit_server_id, rev, fields=fields)
 
+    def get_wgsh_common_unit_info(self, callback, periphery_id, unit_server_id, rev, fields=None):
+        return self._data_source.get_wgsh_common_unit_info(callback, periphery_id, unit_server_id, rev, fields=fields)
+
+    def get_wgsh_account_unit_info(self, callback, periphery_id, unit_server_id, rev, fields=None):
+        return self._data_source.get_wgsh_account_unit_info(callback, periphery_id, unit_server_id, rev, fields=fields)
+
     def set_vehicle(self, callback, periphery_id, unit_server_id, vehicle_cd, fields=None):
         return self._data_source.set_vehicle(callback, periphery_id, unit_server_id, vehicle_cd, fields=fields)
 
@@ -274,6 +288,18 @@ class WgshAccessor(BaseAccessor):
     def account_statistics(self, callback, account_id, fields=None):
         return self._data_source.account_statistics(callback, account_id, fields=fields)
 
+    def get_event_settings(self, callback, fields=None):
+        return self._data_source.wgsh_event_settings(callback, fields=fields)
+
+    def get_event_clan_info(self, callback, fields=None):
+        return self._data_source.wgsh_event_clan_info(callback, fields=fields)
+
+    def get_event_frozen_vehicles(self, callback):
+        return self._data_source.wgsh_event_get_frozen_vehicles(callback)
+
+    def event_unfreeze_vehicle(self, callback, playerSpaID, vehicleCD, price):
+        return self._data_source.wgsh_event_unfreeze_vehicle(callback, playerSpaID, vehicleCD, price)
+
 
 class RblbAccessor(BaseAccessor):
 
@@ -325,8 +351,8 @@ class WgrmsAccessor(BaseAccessor):
 
 class PromoScreensAccessor(BaseAccessor):
 
-    def get_teaser(self, callback):
-        return self._data_source.get_teaser(callback)
+    def get_teaser(self, callback, additionalData=None):
+        return self._data_source.get_teaser(callback, additionalData)
 
     def send_teaser(self, callback, promo_id):
         return self._data_source.send_teaser(callback, promo_id)
@@ -368,6 +394,36 @@ class UILoggingAccessor(BaseAccessor):
         return self._data_source.get_uilogging_session(callback)
 
 
+class WotShopAccessor(BaseAccessor):
+
+    def get_storefront_products(self, callback, storefront):
+        return self._data_source.get_storefront_products(callback, storefront)
+
+    def buy_storefront_product(self, callback, ctx):
+        return self._data_source.buy_storefront_product(callback, ctx)
+
+
+class ClanSupplyAccessor(BaseAccessor):
+
+    def get_clan_supply_quests(self, callback):
+        return self._data_source.get_clan_supply_quests(callback)
+
+    def post_clan_supply_quests(self, callback):
+        return self._data_source.post_clan_supply_quests(callback)
+
+    def claim_quest_rewards(self, callback):
+        return self._data_source.claim_quest_rewards(callback)
+
+    def get_progression_settings(self, callback):
+        return self._data_source.get_progression_settings(callback)
+
+    def get_progression_progress(self, callback):
+        return self._data_source.get_progression_progress(callback)
+
+    def purchase_progression_stage(self, callback, region_number, expected_price):
+        return self._data_source.purchase_progression_stage(callback, region_number, expected_price)
+
+
 class Requester(object):
     available_data_sources = {'stagings': StagingDataAccessor,
      'fake': FakeDataAccessor,
@@ -389,7 +445,8 @@ class Requester(object):
     mapbox = RequestDescriptor(MapboxAccessor)
     gifts = RequestDescriptor(GiftSystemAccessor)
     uilogging = RequestDescriptor(UILoggingAccessor)
-    agate = RequestDescriptor(AgateAccessor)
+    wot_shop = RequestDescriptor(WotShopAccessor)
+    clan_supply = RequestDescriptor(ClanSupplyAccessor)
 
     @classmethod
     def create_requester(cls, url_fetcher, config, client_lang=None, user_agent=None):

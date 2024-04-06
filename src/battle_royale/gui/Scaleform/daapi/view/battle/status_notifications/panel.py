@@ -14,12 +14,12 @@ _logger = logging.getLogger(__name__)
 class _BattleRoyaleHighPriorityGroup(components.StatusNotificationsGroup):
 
     def __init__(self, updateCallback):
-        super(_BattleRoyaleHighPriorityGroup, self).__init__((br_sn_items.BRDeathZoneDamagingSN,
-         br_sn_items.BRDeathZoneDangerSN,
-         sn_items.FireSN,
-         sn_items.OverturnedSN,
+        super(_BattleRoyaleHighPriorityGroup, self).__init__((sn_items.OverturnedSN,
          br_sn_items.BRHalfOverturnedSN,
-         sn_items.DrownSN), updateCallback)
+         sn_items.DrownSN,
+         br_sn_items.BRDeathZoneDamagingSN,
+         br_sn_items.BRDeathZoneDangerSN,
+         sn_items.FireSN), updateCallback)
 
 
 class BRStatusNotificationTimerPanel(StatusNotificationTimerPanel):
@@ -54,11 +54,12 @@ class BRStatusNotificationTimerPanel(StatusNotificationTimerPanel):
         else:
             deathZoneIcon = _LINKS.DEATHZONE_ICON
             damaginDeathZoneIcon = _LINKS.DAMAGING_DEATHZONE_ICON
-        self._addNotificationTimerSetting(data, _TYPES.DEATH_ZONE, deathZoneIcon, link)
+        self._addNotificationTimerSetting(data, _TYPES.DEATH_ZONE, deathZoneIcon, link, _COLORS.RED)
         self._addNotificationTimerSetting(data, _TYPES.DAMAGING_ZONE, damaginDeathZoneIcon, _LINKS.BATTLE_ROYALE_TIMER_UI, _COLORS.RED, countdownVisible=False)
-        self._addNotificationTimerSetting(data, _TYPES.OVERTURNED, _LINKS.OVERTURNED_ICON, link)
+        self._addNotificationTimerSetting(data, _TYPES.OVERTURNED, _LINKS.OVERTURNED_GREEN_ICON, link, color=_COLORS.GREEN, iconOffsetY=1)
+        self._addNotificationTimerSetting(data, _TYPES.HALF_OVERTURNED, _LINKS.OVERTURNED_GREEN_ICON, link, noiseVisible=False, iconOffsetY=1, color=_COLORS.GREEN)
         self._addNotificationTimerSetting(data, _TYPES.FIRE, _LINKS.FIRE_ICON, link)
-        self._addNotificationTimerSetting(data, _TYPES.HALF_OVERTURNED, _LINKS.HALF_OVERTURNED_ICON, _LINKS.BATTLE_ROYALE_DESTROY_TIMER_UI, noiseVisible=False, iconOffsetY=-10)
+        self._addNotificationTimerSetting(data, _TYPES.ORANGE_ZONE, _LINKS.DESTROY_TIMER_DANGER_ZONE, _LINKS.STATUS_NOTIFICATION_TIMER, _COLORS.YELLOW, iconOffsetY=-11, iconSmallName=_LINKS.DESTROY_TIMER_DANGER_ZONE_SMALL)
         link = _LINKS.SECONDARY_TIMER_UI
         self._addNotificationTimerSetting(data, _TYPES.STUN, _LINKS.STUN_ICON, link, _COLORS.ORANGE, noiseVisible=True)
         self._addNotificationTimerSetting(data, _TYPES.CAPTURE_BLOCK, _LINKS.BLOCKED_ICON, link, _COLORS.ORANGE, noiseVisible=False)
@@ -76,7 +77,6 @@ class BRStatusNotificationTimerPanel(StatusNotificationTimerPanel):
         self._addNotificationTimerSetting(data, _TYPES.REPAIRING_CD, _LINKS.RECOVERY_ZONE_ICON, link, _COLORS.GREEN, noiseVisible=False)
         link = _LINKS.BATTLE_ROYALE_TIMER_UI
         self._addNotificationTimerSetting(data, _TYPES.LOOT_PICKUP, _LINKS.RECOVERY_ICON_CONTENT, link, _COLORS.GREEN, noiseVisible=False)
-        self._addNotificationTimerSetting(data, _TYPES.ORANGE_ZONE, _LINKS.ORANGE_ZONE_ICON_CONTENT, link, _COLORS.ORANGE, noiseVisible=False, countdownVisible=False)
         link = _LINKS.BATTLE_ROYALE_COUNTER_TIMER_UI
         self._addNotificationTimerSetting(data, _TYPES.SHOT_PASSION, _LINKS.SHOT_PASSION_ICON, link, _COLORS.GREEN, noiseVisible=False)
         self._addNotificationTimerSetting(data, _TYPES.HP_RESTORE_ON_DAMAGE, _LINKS.HP_RESTORE_ON_DAMAGE_ICON, link, _COLORS.GREEN, noiseVisible=False)

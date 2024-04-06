@@ -3,15 +3,15 @@
 import importlib
 import logging
 from frameworks.wulf import WindowLayer
-from gui.shared.events import ViewEventType
-from soft_exception import SoftException
-from gui.override_scaleform_views_manager import g_overrideScaleFormViewsConfig
 from gui.Scaleform.framework import g_entitiesFactories, GroupedViewSettings
 from gui.Scaleform.framework.managers import context_menu
 from gui.Scaleform.framework.managers.containers import POP_UP_CRITERIA
 from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
+from gui.override_scaleform_views_manager import g_overrideScaleFormViewsConfig
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
+from gui.shared.events import ViewEventType
 from ids_generators import SequenceIDGenerator
+from soft_exception import SoftException
 _logger = logging.getLogger(__name__)
 _logger.addHandler(logging.NullHandler())
 _addListener = g_eventBus.addListener
@@ -47,11 +47,11 @@ class PackageBusinessHandler(object):
         self._listeners = ()
         return
 
-    def loadViewWithDefName(self, alias, name=None, *args, **kwargs):
-        self._app.loadView(SFViewLoadParams(alias, name), *args, **kwargs)
+    def loadViewWithDefName(self, alias, name=None, parent=None, *args, **kwargs):
+        self._app.loadView(SFViewLoadParams(alias, name=name, parent=parent), *args, **kwargs)
 
-    def loadViewWithGenName(self, alias, *args, **kwargs):
-        self._app.loadView(SFViewLoadParams(alias, 'rw{0}'.format(self.__counter.next())), *args, **kwargs)
+    def loadViewWithGenName(self, alias, parent=None, *args, **kwargs):
+        self._app.loadView(SFViewLoadParams(alias, name='rw{0}'.format(self.__counter.next()), parent=parent), *args, **kwargs)
 
     def loadViewBySharedEvent(self, event):
         self._app.loadView(event.loadParams)

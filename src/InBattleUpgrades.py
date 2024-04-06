@@ -2,7 +2,6 @@
 # Embedded file name: battle_royale/scripts/client/InBattleUpgrades.py
 import BigWorld
 from aih_constants import CTRL_MODE_NAME
-from debug_utils import LOG_NOTE
 from wotdecorators import noexcept
 
 class UpgradeInProgressComponent(object):
@@ -27,7 +26,12 @@ class InBattleUpgrades(BigWorld.DynamicScriptComponent):
             vehicle.entityGameObject.removeComponentByType(UpgradeInProgressComponent)
         vehicle.entityGameObject.createComponent(UpgradeInProgressComponent)
         self.__onVehicleUpgraded(vehicle, newVehCompactDescr, newVehOutfitCompactDescr)
-        BigWorld.callback(0, lambda : vehicle.entityGameObject.removeComponentByType(UpgradeInProgressComponent))
+
+        def removeUpgrageInProgressComponent():
+            if vehicle and vehicle.entityGameObject:
+                vehicle.entityGameObject.removeComponentByType(UpgradeInProgressComponent)
+
+        BigWorld.callback(0, removeUpgrageInProgressComponent)
         vehicle.isUpgrading = False
 
     @noexcept
@@ -49,7 +53,6 @@ class InBattleUpgrades(BigWorld.DynamicScriptComponent):
         pass
 
     def set_upgradeReadinessTime(self, prev):
-        LOG_NOTE('Vehicle upgrade readiness time changed')
         vehicle = self.entity
         ctrl = vehicle.guiSessionProvider.dynamic.progression
         if ctrl is not None and vehicle.id == BigWorld.player().playerVehicleID:
@@ -57,18 +60,16 @@ class InBattleUpgrades(BigWorld.DynamicScriptComponent):
         return
 
 
-def onBattleRoyalePrerequisites(vehicle, oldTypeDescriptor):
+def onBattleRoyalePrerequisites(vehicle, oldTypeDescriptor, forceReloading):
     if 'battle_royale' not in vehicle.typeDescriptor.type.tags:
-        return False
+        return forceReloading
     if not oldTypeDescriptor:
         return True
-    forceReloding = False
     for moduleName in ('gun', 'turret', 'chassis'):
         oldModule = getattr(oldTypeDescriptor, moduleName)
         newModule = getattr(vehicle.typeDescriptor, moduleName)
         if oldModule.id != newModule.id:
-            forceReloding = True
-            vehicle.isForceReloading = True
+            forceReloading = True
             if moduleName == 'gun' and vehicle.id == BigWorld.player().getObservedVehicleID():
                 player = BigWorld.player()
                 if player.isObserver():
@@ -76,4 +77,6 @@ def onBattleRoyalePrerequisites(vehicle, oldTypeDescriptor):
                     vehicle.guiSessionProvider.shared.ammo.setGunSettings(newModule)
                 player.gunRotator.switchActiveGun(0)
 
-    return forceReloding
+    if forceReloading:
+        vehicle.isForceReloading = True
+    return forceReloading

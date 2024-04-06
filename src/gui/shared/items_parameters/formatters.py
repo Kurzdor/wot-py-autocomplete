@@ -1,8 +1,9 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/shared/items_parameters/formatters.py
+import typing
 from collections import namedtuple
 from itertools import chain
-from constants import BonusTypes
+from constants import BonusTypes, DAMAGE_INTERPOLATION_DIST_LAST
 from debug_utils import LOG_ERROR
 from gui.Scaleform.genConsts.HANGAR_ALIASES import HANGAR_ALIASES
 from gui.Scaleform.genConsts.TOOLTIPS_CONSTANTS import TOOLTIPS_CONSTANTS
@@ -11,11 +12,11 @@ from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from gui.impl import backport
 from gui.impl.gen import R
 from gui.shared.formatters import text_styles
-from gui.shared.gui_items import KPI, kpiFormatValue
+from gui.shared.gui_items import KPI, kpiFormatValue, kpiFormatNoSignValue
 from gui.shared.items_parameters import RELATIVE_PARAMS
 from gui.shared.items_parameters.comparator import PARAM_STATE
-from gui.shared.items_parameters.params_helper import hasGroupPenalties, getCommonParam, PARAMS_GROUPS
-from gui.shared.utils import AUTO_RELOAD_PROP_NAME, MAX_STEERING_LOCK_ANGLE, WHEELED_SWITCH_ON_TIME, WHEELED_SWITCH_OFF_TIME, WHEELED_SWITCH_TIME, WHEELED_SPEED_MODE_SPEED, DUAL_GUN_CHARGE_TIME, DUAL_GUN_RATE_TIME, TURBOSHAFT_SPEED_MODE_SPEED, TURBOSHAFT_ENGINE_POWER, TURBOSHAFT_INVISIBILITY_STILL_FACTOR, TURBOSHAFT_INVISIBILITY_MOVING_FACTOR, TURBOSHAFT_SWITCH_TIME, CHASSIS_REPAIR_TIME, CHASSIS_REPAIR_TIME_YOH, ROCKET_ACCELERATION_ENGINE_POWER, ROCKET_ACCELERATION_SPEED_LIMITS, ROCKET_ACCELERATION_REUSE_AND_DURATION
+from gui.shared.items_parameters.params_helper import hasGroupPenalties, getCommonParam, isValidEmptyValue, PARAMS_GROUPS
+from gui.shared.utils import AUTO_RELOAD_PROP_NAME, MAX_STEERING_LOCK_ANGLE, WHEELED_SWITCH_ON_TIME, WHEELED_SWITCH_OFF_TIME, WHEELED_SWITCH_TIME, WHEELED_SPEED_MODE_SPEED, DUAL_GUN_CHARGE_TIME, DUAL_GUN_RATE_TIME, TURBOSHAFT_SPEED_MODE_SPEED, TURBOSHAFT_ENGINE_POWER, TURBOSHAFT_INVISIBILITY_STILL_FACTOR, TURBOSHAFT_INVISIBILITY_MOVING_FACTOR, TURBOSHAFT_SWITCH_TIME, CHASSIS_REPAIR_TIME, CHASSIS_REPAIR_TIME_YOH, ROCKET_ACCELERATION_ENGINE_POWER, ROCKET_ACCELERATION_SPEED_LIMITS, ROCKET_ACCELERATION_REUSE_AND_DURATION, DUAL_ACCURACY_COOLING_DELAY, SHOT_DISPERSION_ANGLE, DISPERSION_RADIUS, BURST_FIRE_RATE, BURST_TIME_INTERVAL, BURST_SIZE, BURST_COUNT
 from helpers.i18n import makeString
 from items import vehicles, artefacts, getTypeOfCompactDescr, ITEM_TYPES
 from web_stubs import i18n
@@ -26,6 +27,8 @@ MEASURE_UNITS = {'aimingTime': MENU.TANK_PARAMS_S,
  'armor': MENU.TANK_PARAMS_FACEFRONTBOARDINMM,
  'artDelayRange': MENU.TANK_PARAMS_S,
  'avgDamageList': MENU.TANK_PARAMS_VAL,
+ 'maxAvgMutableDamageList': MENU.TANK_PARAMS_VAL,
+ 'minAvgMutableDamageList': MENU.TANK_PARAMS_VAL,
  'gunModuleAvgDamageList': MENU.TANK_PARAMS_VAL,
  'avgPiercingPower': MENU.TANK_PARAMS_MM,
  'bombDamage': MENU.TANK_PARAMS_VAL,
@@ -33,9 +36,13 @@ MEASURE_UNITS = {'aimingTime': MENU.TANK_PARAMS_S,
  'chassisRotationSpeed': MENU.TANK_PARAMS_GPS,
  'circularVisionRadius': MENU.TANK_PARAMS_M,
  'clipFireRate': MENU.TANK_PARAMS_CLIPSEC,
- 'burstFireRate': MENU.TANK_PARAMS_BURSTSEC,
+ BURST_FIRE_RATE: MENU.TANK_PARAMS_BURSTSEC,
  'turboshaftBurstFireRate': MENU.TANK_PARAMS_BURSTSEC,
+ BURST_TIME_INTERVAL: MENU.TANK_PARAMS_S,
+ BURST_COUNT: MENU.TANK_PARAMS_CNT,
+ BURST_SIZE: MENU.TANK_PARAMS_CNT,
  'avgDamage': MENU.TANK_PARAMS_VAL,
+ 'avgMutableDamage': MENU.TANK_PARAMS_VAL,
  'avgDamagePerMinute': MENU.TANK_PARAMS_VPM,
  'fireStartingChance': MENU.TANK_PARAMS_PERCENT,
  'maxHealth': MENU.TANK_PARAMS_VAL,
@@ -51,6 +58,8 @@ MEASURE_UNITS = {'aimingTime': MENU.TANK_PARAMS_S,
  'hullArmor': MENU.TANK_PARAMS_FACEFRONTBOARDINMM,
  'maxLoad': MENU.TANK_PARAMS_T,
  'piercingPower': MENU.TANK_PARAMS_MM,
+ 'maxPiercingPower': MENU.TANK_PARAMS_MM,
+ 'minPiercingPower': MENU.TANK_PARAMS_MM,
  'pitchLimits': MENU.TANK_PARAMS_GRADS,
  'radioDistance': MENU.TANK_PARAMS_M,
  'radarRadius': MENU.TANK_PARAMS_M,
@@ -64,7 +73,7 @@ MEASURE_UNITS = {'aimingTime': MENU.TANK_PARAMS_S,
  'chassisModuleRotationSpeed': MENU.TANK_PARAMS_GPS,
  'turretModuleRotationSpeed': MENU.TANK_PARAMS_GPS,
  'shellReloadingTime': MENU.TANK_PARAMS_S,
- 'shotDispersionAngle': MENU.TANK_PARAMS_M,
+ SHOT_DISPERSION_ANGLE: MENU.TANK_PARAMS_M,
  'shotsNumberRange': MENU.TANK_PARAMS_CNT,
  'shellsCount': MENU.TANK_PARAMS_CNT,
  'speedLimits': MENU.TANK_PARAMS_MPH,
@@ -76,6 +85,8 @@ MEASURE_UNITS = {'aimingTime': MENU.TANK_PARAMS_S,
  'hullAndChassisWeight': MENU.TANK_PARAMS_KG,
  'caliber': MENU.TANK_PARAMS_MM,
  'damage': MENU.TANK_PARAMS_VAL,
+ 'maxMutableDamage': MENU.TANK_PARAMS_VAL,
+ 'minMutableDamage': MENU.TANK_PARAMS_VAL,
  'turretRotationSpeed': MENU.TANK_PARAMS_GPS,
  'invisibilityStillFactor': MENU.TANK_PARAMS_PERCENT,
  'invisibilityMovingFactor': MENU.TANK_PARAMS_PERCENT,
@@ -101,15 +112,8 @@ MEASURE_UNITS = {'aimingTime': MENU.TANK_PARAMS_S,
  TURBOSHAFT_SPEED_MODE_SPEED: MENU.TANK_PARAMS_MPH,
  DUAL_GUN_CHARGE_TIME: MENU.TANK_PARAMS_S,
  DUAL_GUN_RATE_TIME: MENU.TANK_PARAMS_S,
+ DUAL_ACCURACY_COOLING_DELAY: MENU.TANK_PARAMS_S,
  'shotSpeed': MENU.TANK_PARAMS_MPS,
- 'vehicleGunShotDispersionAfterShot': MENU.TANK_PARAMS_PERCENT,
- 'vehicleGunShotDispersionChassisMovement': MENU.TANK_PARAMS_PERCENT,
- 'vehicleGunShotDispersionChassisRotation': MENU.TANK_PARAMS_PERCENT,
- 'vehicleGunShotDispersionTurretRotation': MENU.TANK_PARAMS_PERCENT,
- 'vehicleGunShotDispersionWhileGunDamaged': MENU.TANK_PARAMS_PERCENT,
- 'vehicleRamDamageResistance': MENU.TANK_PARAMS_PERCENT,
- 'damageEnemiesByRamming': MENU.TANK_PARAMS_PERCENT,
- 'vehicleInvisibilityAfterShot': MENU.TANK_PARAMS_PERCENT,
  CHASSIS_REPAIR_TIME: MENU.TANK_PARAMS_S,
  CHASSIS_REPAIR_TIME_YOH: MENU.TANK_PARAMS_YOH_S_S,
  'commonDelay': MENU.TANK_PARAMS_S,
@@ -118,11 +122,16 @@ MEASURE_UNITS = {'aimingTime': MENU.TANK_PARAMS_S,
  'commonAreaRadius': MENU.TANK_PARAMS_M,
  'crewRolesFactor': MENU.TANK_PARAMS_PERCENT,
  'maxDamage': MENU.TANK_PARAMS_VAL,
- 'increaseHealth': MENU.TANK_PARAMS_VAL}
+ 'increaseHealth': MENU.TANK_PARAMS_VAL,
+ 'artNotificationDelayFactor': MENU.TANK_PARAMS_S,
+ 'vehicleOwnSpottingTime': MENU.TANK_PARAMS_S,
+ 'damagedModulesDetectionTime': MENU.TANK_PARAMS_S}
 MEASURE_UNITS_NO_BRACKETS = {'weight': MENU.TANK_PARAMS_NO_BRACKETS_KG,
  'cooldownSeconds': MENU.TANK_PARAMS_NO_BRACKETS_S,
  'reloadCooldownSeconds': MENU.TANK_PARAMS_NO_BRACKETS_S,
  'caliber': MENU.TANK_PARAMS_NO_BRACKETS_MM}
+KPI_FORMATTERS = {KPI.Name.DAMAGED_MODULES_DETECTION_TIME: kpiFormatNoSignValue,
+ KPI.Name.ART_NOTIFICATION_DELAY_FACTOR: kpiFormatNoSignValue}
 COLORLESS_SCHEME = (text_styles.stats, text_styles.stats, text_styles.stats)
 NO_BONUS_SIMPLIFIED_SCHEME = (text_styles.warning, text_styles.warning, text_styles.warning)
 NO_BONUS_BASE_SCHEME = (text_styles.error, text_styles.stats, text_styles.stats)
@@ -149,7 +158,7 @@ ITEMS_PARAMS_LIST = {ITEM_TYPES.vehicleRadio: ('radioDistance', 'weight'),
                         artefacts.AttackArtilleryFortEquipment: ('maxDamage', 'areaRadius', 'duration', 'commonDelay'),
                         artefacts.FortConsumableInspire: ('crewRolesFactor', 'commonAreaRadius', 'inactivationDelay', 'duration'),
                         artefacts.ConsumableInspire: ('crewRolesFactor', 'commonAreaRadius', 'inactivationDelay', 'duration')},
- ITEM_TYPES.shell: ('caliber', 'damage', 'avgPiercingPower', 'shotSpeed', 'explosionRadius', 'stunDurationList'),
+ ITEM_TYPES.shell: ('caliber', 'avgDamage', 'avgMutableDamage', 'avgPiercingPower', 'shotSpeed', 'explosionRadius', 'stunDurationList'),
  ITEM_TYPES.optionalDevice: ('weight',),
  ITEM_TYPES.vehicleGun: ('caliber',
                          'shellsCount',
@@ -162,9 +171,12 @@ ITEMS_PARAMS_LIST = {ITEM_TYPES.vehicleRadio: ('radioDistance', 'weight'),
                          'chargeTime',
                          'avgPiercingPower',
                          'avgDamageList',
+                         'maxAvgDamageList',
+                         'minAvgDamageList',
                          'stunMinDurationList',
                          'stunMaxDurationList',
-                         'dispertionRadius',
+                         DISPERSION_RADIUS,
+                         DUAL_ACCURACY_COOLING_DELAY,
                          'aimingTime',
                          'maxShotDistance',
                          'weight')}
@@ -224,9 +236,15 @@ def formatModuleParamName(paramName, vDescr=None):
     builder = text_styles.builder(delimiter=_NBSP)
     hasBoost = vDescr and vDescr.gun.autoreloadHasBoost
     titleName = getTitleParamName(vDescr, paramName)
-    resource = R.strings.menu.moduleInfo.params.dyn(titleName)
-    paramMsgId = backport.msgid(resource.dyn('boost')() if hasBoost and resource.dyn('boost') else resource())
-    builder.addStyledText(text_styles.main, paramMsgId)
+    if paramName == 'minAvgMutableDamageList':
+        dist = DAMAGE_INTERPOLATION_DIST_LAST
+        if vDescr is not None:
+            dist = int(min(vDescr.shot.maxDistance, DAMAGE_INTERPOLATION_DIST_LAST))
+        textOrMsgId = backport.text(R.strings.menu.moduleInfo.params.dyn(titleName)(), dist=dist)
+    else:
+        resource = R.strings.menu.moduleInfo.params.dyn(titleName)
+        textOrMsgId = backport.msgid(resource.dyn('boost')() if hasBoost and resource.dyn('boost') else resource())
+    builder.addStyledText(text_styles.main, textOrMsgId)
     measureName = getMeasureParamName(vDescr, paramName)
     builder.addStyledText(text_styles.standard, MEASURE_UNITS.get(measureName, ''))
     return builder.render()
@@ -276,6 +294,9 @@ _listFormat = {'rounder': lambda v: backport.getIntegralFormat(int(v)),
  'separator': _SLASH}
 _niceListFormat = {'rounder': backport.getNiceNumberFormat,
  'separator': _SLASH}
+_niceListFormatWithoutNone = {'rounder': backport.getNiceNumberFormat,
+ 'separator': _SLASH,
+ 'skipNone': True}
 _integralFormat = {'rounder': backport.getIntegralFormat}
 _percentFormat = {'rounder': lambda v: '%d%%' % v}
 _plusPercentFormat = {'rounder': lambda v: '+%d%%' % v}
@@ -317,13 +338,23 @@ def _autoReloadPreprocessor(reloadTimes, rowStates):
         return (times, _SLASH, states if states else None)
 
 
+def shotDispersionAnglePreprocessor(values, states):
+    _, dualAccuracyParamDiff = states[0]
+    states = [(PARAM_STATE.WORSE, dualAccuracyParamDiff)] + [states[1]] if len(states) > 1 else states
+    return (values, _SLASH, states)
+
+
 def _getRoundReload(value):
     return backport.getNiceNumberFormat(round(value, 1))
 
 
 FORMAT_SETTINGS = {'relativePower': _integralFormat,
  'damage': _niceRangeFormat,
+ 'maxMutableDamage': _niceRangeFormat,
+ 'minMutableDamage': _niceRangeFormat,
  'piercingPower': _niceRangeFormat,
+ 'maxPiercingPower': _niceRangeFormat,
+ 'minPiercingPower': _niceRangeFormat,
  'reloadTime': _niceRangeFormat,
  'reloadTimeSecs': _niceListFormat,
  'turretRotationSpeed': _niceListFormat,
@@ -331,13 +362,16 @@ FORMAT_SETTINGS = {'relativePower': _integralFormat,
  'gunYawLimits': _niceListFormat,
  'pitchLimits': _niceListFormat,
  'clipFireRate': _niceListFormat,
- 'burstFireRate': _niceListFormat,
+ BURST_FIRE_RATE: _niceListFormat,
+ BURST_TIME_INTERVAL: _niceFormat,
+ BURST_COUNT: _integralFormat,
+ BURST_SIZE: _integralFormat,
  'turboshaftBurstFireRate': _niceListFormat,
  'aimingTime': _niceListFormat,
- 'shotDispersionAngle': _niceFormat,
  'avgDamagePerMinute': _niceFormat,
  'relativeArmor': _integralFormat,
  'avgDamage': _niceFormat,
+ 'avgMutableDamage': _niceRangeFormat,
  'maxHealth': _integralFormat,
  'hullArmor': _listFormat,
  'turretArmor': _listFormat,
@@ -372,7 +406,10 @@ FORMAT_SETTINGS = {'relativePower': _integralFormat,
  'reloadMagazineTime': _niceRangeFormat,
  'avgPiercingPower': _listFormat,
  'avgDamageList': _listFormat,
- 'dispertionRadius': _niceRangeFormat,
+ 'maxAvgMutableDamageList': _listFormat,
+ 'minAvgMutableDamageList': _listFormat,
+ SHOT_DISPERSION_ANGLE: _niceListFormatWithoutNone,
+ DISPERSION_RADIUS: _niceListFormatWithoutNone,
  'invisibilityStillFactor': _niceListFormat,
  'invisibilityMovingFactor': _niceListFormat,
  TURBOSHAFT_INVISIBILITY_STILL_FACTOR: _niceListFormat,
@@ -396,26 +433,22 @@ FORMAT_SETTINGS = {'relativePower': _integralFormat,
  WHEELED_SPEED_MODE_SPEED: _niceListFormat,
  DUAL_GUN_CHARGE_TIME: _niceListFormat,
  DUAL_GUN_RATE_TIME: _niceListFormat,
+ DUAL_ACCURACY_COOLING_DELAY: _niceFormat,
  'shotSpeed': _integralFormat,
  'extraRepairSpeed': _percentFormat,
  TURBOSHAFT_SPEED_MODE_SPEED: _niceListFormat,
  ROCKET_ACCELERATION_SPEED_LIMITS: _niceListFormat,
  ROCKET_ACCELERATION_REUSE_AND_DURATION: _niceListFormat,
- 'vehicleGunShotDispersionAfterShot': _integralFormat,
- 'vehicleGunShotDispersionChassisMovement': _integralFormat,
- 'vehicleGunShotDispersionChassisRotation': _integralFormat,
- 'vehicleGunShotDispersionTurretRotation': _integralFormat,
- 'vehicleGunShotDispersionWhileGunDamaged': _integralFormat,
- 'vehicleRamDamageResistance': _integralFormat,
- 'damageEnemiesByRamming': _integralFormat,
- 'vehicleInvisibilityAfterShot': _integralFormat,
  CHASSIS_REPAIR_TIME: _niceListFormat,
  'commonDelay': _niceFormat,
  'duration': _niceFormat,
  'inactivationDelay': _niceFormat,
  'commonAreaRadius': _niceFormat,
  'crewRolesFactor': _plusPercentFormat,
- 'maxDamage': _niceFormat}
+ 'maxDamage': _niceFormat,
+ 'artNotificationDelayFactor': _niceFormat,
+ 'vehicleOwnSpottingTime': _niceFormat,
+ 'damagedModulesDetectionTime': _niceFormat}
 
 def _deltaWrapper(fn):
 
@@ -447,7 +480,7 @@ _SMART_ROUND_PARAMS = ('damage',
  'shellReloadingTime',
  'reloadMagazineTime',
  'reloadTime',
- 'dispertionRadius',
+ DISPERSION_RADIUS,
  'aimingTime',
  'weight',
  DUAL_GUN_RATE_TIME,
@@ -491,7 +524,7 @@ def _applyFormat(value, state, settings, doSmartRound, colorScheme):
         value = _cutDigits(value)
     if isinstance(value, (str, unicode)):
         paramStr = value
-    elif value is None:
+    elif value is None or value == 0 and state is not None and state[0] == PARAM_STATE.NOT_APPLICABLE:
         paramStr = '--'
     else:
         paramStr = settings['rounder'](value)
@@ -514,7 +547,8 @@ def formatParameter(parameterName, paramValue, parameterState=None, colorScheme=
     doSmartRound = allowSmartRound and parameterName in _SMART_ROUND_PARAMS
     preprocessor = settings.get('preprocessor')
     if KPI.Name.hasValue(parameterName):
-        values, separator = kpiFormatValue(parameterName, paramValue), None
+        formatter = KPI_FORMATTERS.get(parameterName, kpiFormatValue)
+        values, separator = formatter(parameterName, round(paramValue, 3)), None
     elif preprocessor:
         values, separator, parameterState = preprocessor(paramValue, parameterState)
     else:
@@ -530,10 +564,15 @@ def formatParameter(parameterName, paramValue, parameterState=None, colorScheme=
                 return _applyFormat(values[0], parameterState[0], settings, doSmartRound, colorScheme)
             return
         separator = separator or settings.get('separator', '')
-        paramsList = [ _applyFormat(val, state, settings, doSmartRound, colorScheme) for val, state in zip(values, parameterState) ]
+        skipNone = settings.get('skipNone', False)
+        if skipNone:
+            params = [ (val, state) for val, state in zip(values, parameterState) if val is not None ]
+        else:
+            params = zip(values, parameterState)
+        paramsList = [ _applyFormat(val, state, settings, doSmartRound, colorScheme) for val, state in params ]
         return separator.join(paramsList)
     else:
-        return None if not showZeroDiff and values == 0 else _applyFormat(values, parameterState, settings, doSmartRound, colorScheme)
+        return None if not showZeroDiff and values == 0 and not isValidEmptyValue(parameterName, paramValue) else _applyFormat(values, parameterState, settings, doSmartRound, colorScheme)
 
 
 def formatParameterDelta(pInfo, deltaScheme=None, formatSettings=None):
@@ -557,7 +596,7 @@ def getFormattedParamsList(descriptor, parameters, excludeRelative=False):
         if excludeRelative and isRelativeParameter(paramName):
             continue
         paramValue = parameters.get(paramName)
-        if paramValue:
+        if paramValue or isValidEmptyValue(paramName, paramValue):
             fmtValue = formatParameter(paramName, paramValue)
             if fmtValue:
                 if paramName == 'autoReloadTime' and descriptor.gun.autoreloadHasBoost:
@@ -569,7 +608,7 @@ def getFormattedParamsList(descriptor, parameters, excludeRelative=False):
     return params
 
 
-def getBonusIcon(bonusId, bonusType):
+def getBonusIconRes(bonusId, bonusType, archetype=None):
     if bonusType == BonusTypes.PAIR_MODIFICATION:
         mod = vehicles.g_cache.postProgression().getModificationByName(bonusId)
         if mod is not None:
@@ -578,13 +617,23 @@ def getBonusIcon(bonusId, bonusType):
             iconR = R.invalid()
     elif bonusId.find('Rammer') >= 0 and bonusId != 'deluxRammer' and bonusId.find('trophy') == -1:
         iconR = R.images.gui.maps.icons.vehParams.tooltips.bonuses.rammer()
+    elif archetype:
+        iconR = R.images.gui.maps.icons.vehParams.tooltips.bonuses.archetypes.dyn(archetype, R.invalid)()
     else:
         iconR = R.images.gui.maps.icons.vehParams.tooltips.bonuses.dyn(bonusId.split('_class')[0], R.invalid)()
-    return backport.image(iconR)
+    return iconR
+
+
+def getBonusIcon(bonusId, bonusType, archetype=None):
+    return backport.image(getBonusIconRes(bonusId, bonusType, archetype))
+
+
+def getPenaltyIconRes(penaltyId):
+    return R.images.gui.maps.icons.vehParams.tooltips.penalties.dyn(penaltyId, R.invalid)()
 
 
 def getPenaltyIcon(penaltyId):
-    return backport.image(R.images.gui.maps.icons.vehParams.tooltips.penalties.dyn(penaltyId, R.invalid)())
+    return backport.image(getPenaltyIconRes(penaltyId))
 
 
 def packSituationalIcon(text, icon):
@@ -601,7 +650,7 @@ def getAllParametersTitles():
         data = getCommonParam(HANGAR_ALIASES.VEH_PARAM_RENDERER_STATE_SIMPLE_TOP, groupName)
         data['titleText'] = formatVehicleParamName(groupName)
         data['isEnabled'] = True
-        data['tooltip'] = TOOLTIPS_CONSTANTS.BASE_VEHICLE_PARAMETERS
+        data['tooltip'] = TOOLTIPS_CONSTANTS.VEHICLE_ADVANCED_PARAMETERS
         result.append(data)
         for paramName in PARAMS_GROUPS[groupName]:
             data = getCommonParam(HANGAR_ALIASES.VEH_PARAM_RENDERER_STATE_ADVANCED, paramName, groupName)

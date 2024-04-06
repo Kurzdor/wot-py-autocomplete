@@ -3,7 +3,8 @@
 from collections import namedtuple
 from functools import partial
 import BigWorld
-from constants import VEHICLE_SETTING, DAMAGE_INFO_CODES, DAMAGE_INFO_INDICES
+import math
+from constants import VEHICLE_SETTING, DAMAGE_INFO_CODES, DAMAGE_INFO_INDICES, RespawnState
 from items import vehicles, ITEM_TYPES
 from wotdecorators import noexcept
 Cooldowns = namedtuple('Cooldows', ['id', 'leftTime', 'baseTime'])
@@ -37,16 +38,25 @@ class OwnVehicleBase(BigWorld.DynamicScriptComponent):
         self.__dict__.clear()
         return
 
+    @property
+    def __inRespawn(self):
+        return self.entity.enableExternalRespawn and self.entity.VehicleRespawnComponent.respawnState == RespawnState.RESPAWNING
+
     @noexcept
     def update_vehicleAmmoList(self, ammoList):
-        avatar = self._avatar()
-        if not avatar:
+        if self.__inRespawn:
             return
-        for vehicleAmmo in ammoList:
-            timeRemainig = vehicleAmmo.endTime
-            if timeRemainig > 0:
-                timeRemainig = max(vehicleAmmo.endTime - self._serverTime(), 0)
-            avatar.updateVehicleAmmo(self.entity.id, vehicleAmmo.compactDescr, vehicleAmmo.quantity, vehicleAmmo.quantityInClip, vehicleAmmo.previousStage, timeRemainig, vehicleAmmo.totalTime)
+        else:
+            avatar = self._avatar()
+            if not avatar:
+                return
+            for vehicleAmmo in ammoList:
+                timeRemaining = vehicleAmmo.endTime
+                if timeRemaining > 0:
+                    timeRemaining = max(timeRemaining - self._serverTime(), 0)
+                avatar.updateVehicleAmmo(self.entity.id, vehicleAmmo.compactDescr, vehicleAmmo.quantity, vehicleAmmo.quantityInClip, None if self.__isAttachingToVehicle else vehicleAmmo.previousStage, math.floor(timeRemaining), vehicleAmmo.totalTime, vehicleAmmo.index)
+
+            return
 
     @noexcept
     def update_syncVehicleAttrs(self, syncVehicleAttrs):
@@ -214,6 +224,8 @@ class OwnVehicleBase(BigWorld.DynamicScriptComponent):
 
     @noexcept
     def update_vehicleHealthInfo(self, data):
+        if self.__inRespawn:
+            return
         avatar = self._avatar()
         if not avatar:
             return
@@ -262,6 +274,12 @@ class OwnVehicleBase(BigWorld.DynamicScriptComponent):
             self._doLog('onSectorShooting {}'.format(sectorID))
         avatar.onSectorShooting(sectorID)
 
+    def stopSetupSelection(self):
+        avatar = self._avatar()
+        if not avatar:
+            return
+        avatar.stopSetupSelection()
+
     def beforeSetupUpdate(self):
         avatar = self._avatar()
         if not avatar:
@@ -294,15 +312,17 @@ class OwnVehicleBase(BigWorld.DynamicScriptComponent):
         return self.__getTimeLeft(self.siegeStateStatus, useEndTime=True) if self.siegeStateStatus else 0
 
     def setNested_vehicleAmmoList(self, path, prev):
+        if self.__inRespawn:
+            return
         avatar = self._avatar()
         if not avatar:
             return
         changedAmmo = self.vehicleAmmoList[path[0]]
         if changedAmmo.compactDescr != prev.compactDescr:
-            timeRemaining = changedAmmo.endTime - self._serverTime()
-            if 1 > timeRemaining > 0:
-                timeRemaining = -1
-            avatar.resetVehicleAmmo(oldCompactDescr=prev.compactDescr, newCompactDescr=changedAmmo.compactDescr, quantity=changedAmmo.quantity, stage=changedAmmo.previousStage, timeRemaining=timeRemaining, totalTime=changedAmmo.totalTime)
+            timeRemaining = changedAmmo.endTime
+            if timeRemaining > 0:
+                timeRemaining = max(timeRemaining - self._serverTime(), 0)
+            avatar.resetVehicleAmmo(oldCompactDescr=prev.compactDescr, newCompactDescr=changedAmmo.compactDescr, quantity=changedAmmo.quantity, stage=changedAmmo.previousStage, timeRemaining=math.floor(timeRemaining), totalTime=changedAmmo.totalTime, index=changedAmmo.index)
         else:
             self.__setNested(self.update_vehicleAmmoList, 'vehicleAmmoList', path, prev)
 
@@ -435,3 +455,6 @@ class OwnVehicleBase(BigWorld.DynamicScriptComponent):
 
     def _avatar(self):
         raise NotImplementedError('_avatar must be overrided in ownVehicle')
+
+    def _entities(self):
+        raise NotImplementedError('_entities must be overrided in ownVehicle')

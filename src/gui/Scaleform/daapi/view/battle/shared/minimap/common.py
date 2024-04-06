@@ -74,7 +74,10 @@ class SimplePlugin(IPlugin):
         self._parentObj.playSound2D(soundID)
 
     def _isInStrategicMode(self):
-        return self._ctrlMode in (CTRL_MODE_NAME.STRATEGIC, CTRL_MODE_NAME.ARTY, CTRL_MODE_NAME.MAP_CASE)
+        return self._ctrlMode in (CTRL_MODE_NAME.STRATEGIC,
+         CTRL_MODE_NAME.ARTY,
+         CTRL_MODE_NAME.MAP_CASE,
+         CTRL_MODE_NAME.MAP_CASE_EPIC)
 
     def _isInArcadeMode(self):
         return self._ctrlMode in (CTRL_MODE_NAME.ARCADE, CTRL_MODE_NAME.SNIPER)
@@ -87,6 +90,9 @@ class SimplePlugin(IPlugin):
 
     def _isInVideoMode(self):
         return self._ctrlMode in (CTRL_MODE_NAME.VIDEO, CTRL_MODE_NAME.DEATH_FREE_CAM)
+
+    def _isInFreeCamMode(self):
+        return self._ctrlMode in CTRL_MODE_NAME.DEATH_FREE_CAM
 
     def _isInRespawnDeath(self):
         return self._ctrlMode == CTRL_MODE_NAME.RESPAWN_DEATH
@@ -135,6 +141,16 @@ class EntriesPlugin(SimplePlugin):
         if model:
             self._setMatrix(model.getID(), matrix)
         return
+
+    def _invokeEx(self, uniqueID, name, *args):
+        model = self._entries.get(uniqueID)
+        if model:
+            self._invoke(model.getID(), name, *args)
+
+    def _setActiveEx(self, uniqueID, isActive):
+        model = self._entries.get(uniqueID)
+        if model:
+            self._setActive(model.getID(), isActive)
 
 
 class IntervalPlugin(EntriesPlugin):
@@ -206,3 +222,9 @@ class BaseAreaMarkerEntriesPlugin(EntriesPlugin):
 
     def update(self, *args, **kwargs):
         super(BaseAreaMarkerEntriesPlugin, self).update()
+
+    def invoke(self, uniqueID, name, *args):
+        self._invokeEx(uniqueID, name, *args)
+
+    def setActive(self, uniqueID, isActive):
+        self._setActiveEx(uniqueID, isActive)

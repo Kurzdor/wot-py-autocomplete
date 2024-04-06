@@ -11,7 +11,6 @@ _logger.addHandler(logging.NullHandler())
 
 class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     GOLD_FISH_WINDOW = 'goldFishWindow'
-    PERSONAL_CASE = 'personalCase'
     EULA = 'EULA'
     EULA_FULL = 'EULAFull'
     LOGIN_QUEUE = 'loginQueue'
@@ -46,6 +45,7 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     LOBBY_EVENT_BOARDS_MAINTENANCE = 'eventBoardsMaintenanceLobby'
     PROFILE_TAB_NAVIGATOR = 'profileTabNavigator'
     PROFILE_SUMMARY_PAGE = 'profileSummaryPage'
+    PROFILE_TOTAL_PAGE = 'profileTotalPage'
     PROFILE_SUMMARY_WINDOW = 'profileSummaryWindow'
     PROFILE_AWARDS = 'profileAwards'
     PROFILE_STATISTICS = 'profileStatistics'
@@ -53,12 +53,14 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     PROFILE_TECHNIQUE_WINDOW = 'profileTechniqueWindow'
     PROFILE_FORMATIONS_PAGE = 'profileFormationsPage'
     PROFILE_HOF = 'profileHof'
+    PROFILE_COLLECTIONS_PAGE = 'profileCollectionsPage'
+    PROFILE_PRESTIGE_WIDGET = 'profilePrestigeWidget'
+    PROFILE_PRESTIGE_EMBLEM_WIDGET = 'profilePrestigeEmblemWidget'
     GAMMA_WIZARD = 'gammaWizard'
     COLOR_SETTING = 'colorSettings'
     WIKI_VIEW = 'wikiView'
     MANUAL_CHAPTER_VIEW = 'manualChapterView'
     WOT_PLUS_INFO_VIEW = 'wotPlusInfoView'
-    VEHICLE_RENTAL_VIEW = 'vehicleRentalView'
     TELECOM_RENTAL_VIEW = 'telecomRentalView'
     AMMUNITION_SETUP_VIEW = 'ammunitionSetupView'
     LOBBY_TECHTREE = 'techtree'
@@ -76,19 +78,18 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     CONTACTS_LIST_BUTTON = 'contactsListButton'
     VEHICLE_COMPARE_CART_BUTTON = 'vehicleCompareCartButton'
     TEST_WINDOW = 'testWindow'
-    RECRUIT_WINDOW = 'recruitWindow'
-    CREW_ABOUT_DOG_WINDOW = 'aboutDogWindow'
     EXCHANGE_WINDOW = 'exchangeWindow'
+    EXCHANGE_WINDOW_MODAL = 'exchangeWindowModal'
     PROFILE_WINDOW = 'profileWindow'
     EXCHANGE_XP_WINDOW = 'exchangeXPWindow'
     EXCHANGE_XP_WINDOW_DIALOG_MODAL = 'exchangeXPWindowDialog'
-    EXCHANGE_FREE_TO_TANKMAN_XP_WINDOW = 'exchangeFreeToTankmanXpWindow'
     VEHICLE_BUY_WINDOW = 'vehicleBuyWindow'
     VEHICLE_RESTORE_WINDOW = 'vehicleRestoreWindow'
     BATTLE_QUEUE = 'battleQueue'
     BATTLE_STRONGHOLDS_QUEUE = 'battleStrongholdsQueue'
     BATTLE_LOADING = 'battleLoading'
     LEGAL_INFO_WINDOW = 'legalInfoWindow'
+    LEGAL_INFO_TOP_WINDOW = 'legalInfoTopWindow'
     VEHICLE_INFO_WINDOW = 'vehicleInfoWindow'
     MODULE_INFO_WINDOW = 'moduleInfoWindow'
     BOOSTER_INFO_WINDOW = 'boosterInfoWindow'
@@ -96,7 +97,6 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     VEHICLE_SELL_DIALOG = 'vehicleSellDialog'
     SETTINGS_WINDOW = 'settingsWindow'
     BATTLE_RESULTS = 'battleResults'
-    TANKMAN_SKILLS_DROP_WINDOW = 'tankmanSkillsDropWindow'
     BROWSER_WINDOW = 'browserWindow'
     BROWSER_WINDOW_MODAL = 'browserWindowModal'
     DEMONSTRATOR_WINDOW = 'demonstratorWindow'
@@ -104,10 +104,11 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     STYLE_PREVIEW = 'vehicleStylePreview'
     STYLE_PROGRESSION_PREVIEW = 'vehicleStyleProgressionPreview'
     STYLE_BUYING_PREVIEW = 'vehicleStyleBuyingPreview'
+    SHOWCASE_STYLE_BUYING_PREVIEW = 'vehicleShowcaseStyleBuyingPreview'
     IMAGE_VIEW = 'imageView'
     HERO_VEHICLE_PREVIEW = 'heroVehiclePreviewPage'
     TRADE_IN_VEHICLE_PREVIEW = 'tradeInVehiclePreview'
-    WOT_PLUS_VEHICLE_PREVIEW = 'wotPlusVehiclePreview'
+    RENTAL_VEHICLE_PREVIEW = 'rentalVehiclePreview'
     BATTLE_PASS_VEHICLE_PREVIEW = 'battlePassVehiclePreview'
     MARATHON_VEHICLE_PREVIEW = 'marathonVehiclePreview'
     CONFIGURABLE_VEHICLE_PREVIEW = 'configurableVehiclePreview'
@@ -126,19 +127,14 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     USE_FREEW_AWARD_SHEET_DIALOG = 'useFreeAwardSheetDialog'
     ICON_DIALOG = 'iconDialog'
     ICON_PRICE_DIALOG = 'iconPriceDialog'
-    CREW_SKINS_COMPENSATION_DIALOG = 'crewSkinsCompensationDialog'
     PM_CONFIRMATION_DIALOG = 'pmConfirmationDialog'
-    PUNISHMENT_DIALOG = 'punishmentDialog'
     SYSTEM_MESSAGE_DIALOG = 'systemMessageDialog'
     NOTIFICATIONS_LIST = 'notificationsList'
-    RETRAIN_CREW = 'retrainCrewWindow'
     CREW_OPERATIONS_POPOVER = 'crewOperationsPopOver'
     BATTLE_TYPE_SELECT_POPOVER = 'battleTypeSelectPopover'
     SQUAD_TYPE_SELECT_POPOVER = 'squadTypeSelectPopover'
     TRADEIN_POPOVER = 'TradeInPopover'
     ACOUSTIC_POPOVER = 'acousticPopover'
-    DISMISS_TANKMAN_DIALOG = 'dismissTankmanDialog'
-    RESTORE_TANKMAN_DIALOG = 'restoreTankmanDialog'
     ADVENT_CALENDAR = 'adventCalendar'
     AWARD_WINDOW = 'awardWindow'
     AWARD_WINDOW_MODAL = 'awardWindowModal'
@@ -150,6 +146,7 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     UI_LOGGER_TEST_DIALOG = 'uiLoggerDialog'
     VEH_POST_PROGRESSION = 'vehPostProgression'
     VEH_POST_PROGRESSION_CMP = 'vehPostProgressionCmp'
+    CLAN_SUPPLY_INFO_VIEW = 'clanSupplyInfoView'
     MINIMAP_LOBBY = 'minimapLobby'
     MINIMAP_GRID = 'minimapGridLobby'
     MINIMAP_ON_BATTLE_LOADING = 'minimapOnBattleLoading'
@@ -167,7 +164,6 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     CONFIRM_EXCHANGE_DIALOG_MODAL = 'ConfirmExchangeDialogModal'
     QUESTS_SEASON_AWARDS_WINDOW = 'QuestsSeasonAwardsWindow'
     CHECK_BOX_DIALOG = 'CheckBoxDialog'
-    ROLE_CHANGE = 'roleChange'
     REPORT_BUG = 'reportBug'
     SQUAD_PROMO_WINDOW = 'squadPromoWindow'
     BOOSTERS_PANEL = 'boostersPanel'
@@ -200,43 +196,16 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
     RANKED_BATTLE_PAGE = 'rankedBattlePage'
     BATTLE_ROYALE_PAGE = 'battleRoyalePage'
     MISSION_AWARD_WINDOW = 'missionAwardWindow'
-    BOOTCAMP_BATTLE_PAGE = 'bootcampBattlePage'
     UNBOUND_INJECT_WINDOW = 'unboundInjectWindow'
     BATTLE_PASS_BADGES_DEMO = 'battlePassBadgesDemoView'
     MAPS_TRAINING_PAGE = 'mapsTrainingBattlePage'
     COMP7_BATTLE_PAGE = 'comp7BattlePage'
+    WINBACK_BATTLE_PAGE = 'winbackBattlePage'
     INGAME_MENU = 'ingameMenu'
     INGAME_HELP = 'ingameHelp'
     INGAME_DETAILS_HELP = 'ingameDetailsHelp'
     BOTS_MENU = 'botsMenu'
     EVENT_LOADING = 'eventLoading'
-    BOOTCAMP_INTRO = 'bootcampIntro'
-    BOOTCAMP_INTRO_VIDEO = 'bootcampIntroVideo'
-    BOOTCAMP_OUTRO_VIDEO = 'bootcampOutroVideo'
-    BOOTCAMP_INTRO_FADEOUT = 'bootcampIntroFadeout'
-    BOOTCAMP_BATTLE_TOP_HINT = 'bootcampBattleTopHint'
-    BOOTCAMP_TOOLTIPS_WINDOW = 'bootcampTooltipsWindow'
-    BOOTCAMP_MESSAGE_WINDOW = 'bootcampMessageWindow'
-    BOOTCAMP_VEHICLE_BUY_VIEW = 'bootcampVehicleBuyView'
-    BOOTCAMP_LOBBY_HIGHLIGHTS = 'bootcampLobbyHighlights'
-    BOOTCAMP_BATTLE_HIGHLIGHTS = 'bootcampBattleHighlights'
-    BOOTCAMP_QUESTS_VIEW = 'bootcampQuestsView'
-    BOOTCAMP_SECONDARY_HINT = 'bootcampSecondaryHint'
-    BOOTCAMP_PREBATTLE_HITNS = 'bootcampPrebattleHints'
-    BOOTCAMP_QUEUE_DIALOG = 'bootcampQueueDialog'
-    BOOTCAMP_EXECUTION_CHOOSER = 'bootcampExecutionChooser'
-    BOOTCAMP_HINT_HIDE = 'HintHide'
-    BOOTCAMP_HINT_COMPLETE = 'HintComplete'
-    BOOTCAMP_HINT_CLOSE = 'HintClose'
-    BOOTCAMP_INTERLUDE_VIDEO = 'bootcampInterludeVideo'
-    BOOTCAMP_ADD_HIGHLIGHT = 'ShowHighlight'
-    BOOTCAMP_REMOVE_HIGHLIGHT = 'RemoveHighlight'
-    BOOTCAMP_CLOSE_PREBATTLE = 'ClosePrebattle'
-    BOOTCAMP_QUEUE_DIALOG_SHOW = 'QueueDialogShow'
-    BOOTCAMP_QUEUE_DIALOG_CLOSE = 'QueueDialogClose'
-    BOOTCAMP_QUEUE_DIALOG_CANCEL = 'QueueDialogCancel'
-    BOOTCAMP_PROGRESS = 'BootcampProgress'
-    SUBTITLES_WINDOW = 'subtitlesWindow'
     FEEDBACK_DAMAGE_LOG = 'feedbackDamageLog'
     FEEDBACK_BATTLE_EVENTS = 'feedbackBattleEvents'
     FEEDBACK_DAMAGE_INDICATOR = 'feedbackDamageIndicator'
@@ -246,23 +215,25 @@ class VIEW_ALIAS(COMMON_VIEW_ALIAS):
      DEV_BATTLE_PAGE,
      EVENT_BATTLE_PAGE,
      RANKED_BATTLE_PAGE,
-     BOOTCAMP_BATTLE_PAGE,
      EPIC_BATTLE_PAGE,
-     BATTLE_ROYALE_PAGE)
+     BATTLE_ROYALE_PAGE,
+     WINBACK_BATTLE_PAGE)
 
 
 VIEW_BATTLE_PAGE_ALIAS_BY_ARENA_GUI_TYPE = {ARENA_GUI_TYPE.EPIC_RANDOM: VIEW_ALIAS.EPIC_RANDOM_PAGE,
  ARENA_GUI_TYPE.EPIC_RANDOM_TRAINING: VIEW_ALIAS.EPIC_RANDOM_PAGE,
  ARENA_GUI_TYPE.RANKED: VIEW_ALIAS.RANKED_BATTLE_PAGE,
  ARENA_GUI_TYPE.BATTLE_ROYALE: VIEW_ALIAS.BATTLE_ROYALE_PAGE,
- ARENA_GUI_TYPE.BOOTCAMP: VIEW_ALIAS.BOOTCAMP_BATTLE_PAGE,
  ARENA_GUI_TYPE.EPIC_BATTLE: VIEW_ALIAS.EPIC_BATTLE_PAGE,
  ARENA_GUI_TYPE.EPIC_TRAINING: VIEW_ALIAS.EPIC_BATTLE_PAGE,
  ARENA_GUI_TYPE.EVENT_BATTLES: VIEW_ALIAS.EVENT_BATTLE_PAGE,
  ARENA_GUI_TYPE.MAPS_TRAINING: VIEW_ALIAS.MAPS_TRAINING_PAGE,
  ARENA_GUI_TYPE.SORTIE_2: VIEW_ALIAS.STRONGHOLD_BATTLE_PAGE,
  ARENA_GUI_TYPE.FORT_BATTLE_2: VIEW_ALIAS.STRONGHOLD_BATTLE_PAGE,
- ARENA_GUI_TYPE.COMP7: VIEW_ALIAS.COMP7_BATTLE_PAGE}
+ ARENA_GUI_TYPE.COMP7: VIEW_ALIAS.COMP7_BATTLE_PAGE,
+ ARENA_GUI_TYPE.TOURNAMENT_COMP7: VIEW_ALIAS.COMP7_BATTLE_PAGE,
+ ARENA_GUI_TYPE.TRAINING_COMP7: VIEW_ALIAS.COMP7_BATTLE_PAGE,
+ ARENA_GUI_TYPE.WINBACK: VIEW_ALIAS.WINBACK_BATTLE_PAGE}
 
 def addViewBattlePageAliasByArenaGUIType(arenaGuiType, viewAlias, personality):
     if arenaGuiType in VIEW_BATTLE_PAGE_ALIAS_BY_ARENA_GUI_TYPE:

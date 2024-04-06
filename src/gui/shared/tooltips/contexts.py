@@ -1,6 +1,5 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/shared/tooltips/contexts.py
-from collections import namedtuple
 import typing
 import constants
 import gui
@@ -16,22 +15,19 @@ from gui.Scaleform.daapi.view.lobby.techtree.techtree_dp import g_techTreeDP
 from gui.Scaleform.daapi.view.lobby.vehicle_compare import cmp_helpers
 from gui.Scaleform.daapi.view.lobby.veh_post_progression.veh_post_progression_vehicle import g_postProgressionVehicle
 from gui.Scaleform.daapi.view.lobby.vehicle_compare.cmp_configurator_vehicle import g_cmpConfiguratorVehicle
-from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.battle_pass.battle_pass_helpers import getOfferTokenByGift
+from gui.battle_pass.rewards_sort import getRewardsComparator
 from gui.server_events import recruit_helper
-from gui.shared.formatters import text_styles
 from gui.shared.gui_items import GUI_ITEM_TYPE
-from gui.shared.gui_items.Tankman import getTankmanSkill, SabatonTankmanSkill, TankmanSkill, OffspringTankmanSkill, YhaTankmanSkill, WitchesTankmanSkill
 from gui.shared.gui_items.dossier import factories, loadDossier
 from gui.shared.items_parameters import params_helper, bonus_helper
 from gui.shared.items_parameters.formatters import NO_BONUS_SIMPLIFIED_SCHEME
 from gui.shared.tooltips import TOOLTIP_COMPONENT
 from gui.shared.utils.requesters.blueprints_requester import getFragmentNationID
 from helpers import dependency
-from helpers.i18n import makeString
 from items import vehicles
 from rent_common import RENT_TYPE_TO_DURATION
-from shared_utils import findFirst, first
+from shared_utils import first
 from skeletons.gui.game_control import IRankedBattlesController, IBattlePassController, IComp7Controller
 from skeletons.gui.goodies import IGoodiesCache
 from skeletons.gui.offers import IOffersDataProvider
@@ -287,21 +283,39 @@ class AwardContext(DefaultContext):
 
 class ExtendedAwardContext(AwardContext):
 
-    def __init__(self, fieldsToExclude=None):
+    def __init__(self, fieldsToExclude=None, showBuyPrice=False, showUnlockPrice=False, isAwardWindow=True):
         super(ExtendedAwardContext, self).__init__(fieldsToExclude)
         self._showCrew = False
         self._showVehicleSlot = False
+        self._allModulesAvailable = False
+        self._showBuyPrice = showBuyPrice
+        self._showUnlockPrice = showUnlockPrice
+        self._isAwardWindow = isAwardWindow
 
-    def buildItem(self, intCD, tmanCrewLevel=None, rentExpiryTime=None, rentBattles=None, rentWins=None, rentSeason=None, showCrew=False, _showVehicleSlot=False):
+    def buildItem(self, intCD, tmanCrewLevel=None, rentExpiryTime=None, rentBattles=None, rentWins=None, rentSeason=None, rentCycle=None, isSeniority=False, showCrew=False, showVehicleSlot=False, allModulesAvailable=False):
         self._showCrew = showCrew
-        self._showVehicleSlot = _showVehicleSlot
-        return super(ExtendedAwardContext, self).buildItem(intCD, tmanCrewLevel, rentExpiryTime, rentBattles, rentWins, rentSeason)
+        self._showVehicleSlot = showVehicleSlot
+        self._allModulesAvailable = allModulesAvailable
+        return super(ExtendedAwardContext, self).buildItem(intCD, tmanCrewLevel, rentExpiryTime, rentBattles, rentWins, rentSeason, rentCycle, isSeniority)
 
     def getParams(self):
         params = super(ExtendedAwardContext, self).getParams()
         params['showCrew'] = self._showCrew
         params['showVehicleSlot'] = self._showVehicleSlot
+        params['allModulesAvailable'] = self._allModulesAvailable
         return params
+
+    def getStatsConfiguration(self, item):
+        result = super(ExtendedAwardContext, self).getStatsConfiguration(item)
+        result.buyPrice = self._showBuyPrice
+        result.unlockPrice = self._showUnlockPrice
+        result.isAwardWindow = self._isAwardWindow
+        return result
+
+    def getStatusConfiguration(self, item):
+        result = super(ExtendedAwardContext, self).getStatusConfiguration(item)
+        result.isAwardWindow = self._isAwardWindow
+        return result
 
 
 class SeniorityAwardContext(ExtendedAwardContext):
@@ -310,6 +324,32 @@ class SeniorityAwardContext(ExtendedAwardContext):
         super(SeniorityAwardContext, self).__init__(fieldsToExclude)
         self._showCrew = True
         self._showVehicleSlot = True
+
+
+class WinbackDiscountContext(ExtendedAwardContext):
+
+    def __init__(self, fieldsToExclude=None):
+        super(WinbackDiscountContext, self).__init__(fieldsToExclude=fieldsToExclude, showBuyPrice=True, showUnlockPrice=True, isAwardWindow=False)
+        self._blueprintsFragmentsCount = 0
+        self._customPrice = None
+        self._hideStatus = True
+        self._showDiscount = True
+        return
+
+    def buildItem(self, intCD, tmanCrewLevel=None, rentExpiryTime=None, rentBattles=None, rentWins=None, rentSeason=None, rentCycle=None, isSeniority=False, showCrew=False, showVehicleSlot=False, allModulesAvailable=False, blueprintsFragmentsCount=0, customPrice=None, hideStatus=True, showDiscount=True):
+        self._blueprintsFragmentsCount = blueprintsFragmentsCount
+        self._customPrice = customPrice
+        self._hideStatus = hideStatus
+        self._showDiscount = showDiscount
+        return super(WinbackDiscountContext, self).buildItem(intCD, tmanCrewLevel, rentExpiryTime, rentBattles, rentWins, rentSeason, rentCycle, isSeniority, showCrew, showVehicleSlot, allModulesAvailable)
+
+    def getParams(self):
+        params = super(WinbackDiscountContext, self).getParams()
+        params['blueprintFragmentsCount'] = self._blueprintsFragmentsCount
+        params['customPrice'] = self._customPrice
+        params['hideStatus'] = self._hideStatus
+        params['showDiscount'] = self._showDiscount
+        return params
 
 
 class ShopContext(AwardContext):
@@ -482,7 +522,7 @@ class BaseHangarParamContext(ToolTipContext):
         self.showTitleValue = showTitleValue
 
     def getComparator(self):
-        return params_helper.idealCrewComparator(g_currentVehicle.item)
+        return params_helper.similarCrewComparator(g_currentVehicle.item)
 
     def buildItem(self, *args, **kwargs):
         return None
@@ -534,7 +574,7 @@ class TankSetupParamContext(HangarParamContext):
         self.formatters = NO_BONUS_SIMPLIFIED_SCHEME
 
     def getComparator(self):
-        return params_helper.idealCrewComparator(g_tankSetupVehicle.item)
+        return params_helper.similarCrewComparator(g_tankSetupVehicle.item)
 
     def buildItem(self, *args, **kwargs):
         return g_tankSetupVehicle.item
@@ -892,36 +932,6 @@ class TechMainContext(HangarContext):
         return value
 
 
-class PersonalCaseContext(ToolTipContext):
-    itemsCache = dependency.descriptor(IItemsCache)
-
-    def __init__(self, fieldsToExclude=None):
-        super(PersonalCaseContext, self).__init__(TOOLTIP_COMPONENT.PERSONAL_CASE, fieldsToExclude)
-
-    def buildItem(self, skillID, tankmanID, *args, **kwargs):
-        tankman = self.itemsCache.items.getTankman(int(tankmanID))
-        skill = findFirst(lambda x: x.name == skillID, tankman.skills)
-        if skill is None:
-            skill = getTankmanSkill(skillID, tankman=tankman)
-        return skill
-
-
-class PreviewCaseContext(ToolTipContext):
-    itemsCache = dependency.descriptor(IItemsCache)
-
-    def __init__(self, fieldsToExclude=None):
-        super(PreviewCaseContext, self).__init__(TOOLTIP_COMPONENT.PERSONAL_CASE, fieldsToExclude)
-
-    def buildItem(self, skillID):
-        if skillID == 'sabaton_brotherhood':
-            return SabatonTankmanSkill('brotherhood')
-        if skillID == 'offspring_brotherhood':
-            return OffspringTankmanSkill('brotherhood')
-        if skillID == 'yha_brotherhood':
-            return YhaTankmanSkill('brotherhood')
-        return WitchesTankmanSkill('brotherhood') if skillID == 'witches_brotherhood' else TankmanSkill(skillID)
-
-
 class CrewSkinContext(ToolTipContext):
     itemsCache = dependency.descriptor(IItemsCache)
 
@@ -932,17 +942,6 @@ class CrewSkinContext(ToolTipContext):
         return self.itemsCache.items.getCrewSkin(skinID)
 
 
-class CrewSkinTankmanContext(ToolTipContext):
-    TankmanContext = namedtuple('SkinTankmnaContext', ('tankman', 'crewSkin'))
-    itemsCache = dependency.descriptor(IItemsCache)
-
-    def __init__(self, fieldsToExclude=None):
-        super(CrewSkinTankmanContext, self).__init__(TOOLTIP_COMPONENT.PERSONAL_CASE, fieldsToExclude)
-
-    def buildItem(self, tankmanID, skinID):
-        return self.TankmanContext(self.itemsCache.items.getTankman(tankmanID), self.itemsCache.items.getCrewSkin(skinID))
-
-
 class CrewBookContext(ToolTipContext):
     itemsCache = dependency.descriptor(IItemsCache)
 
@@ -951,31 +950,6 @@ class CrewBookContext(ToolTipContext):
 
     def buildItem(self, bookCD):
         return self.itemsCache.items.getItemByCD(bookCD)
-
-
-class CrewBookVehicleContext(ToolTipContext):
-    VehicleContext = namedtuple('BookVehicleContext', 'vehicle')
-    itemsCache = dependency.descriptor(IItemsCache)
-
-    def __init__(self, fieldsToExclude=None):
-        super(CrewBookVehicleContext, self).__init__(TOOLTIP_COMPONENT.CREW_BOOK, fieldsToExclude)
-
-    def buildItem(self, vehicleID):
-        return self.VehicleContext(self.itemsCache.items.getVehicle(vehicleID))
-
-
-class NewSkillContext(PersonalCaseContext):
-    SKILL_MOCK = namedtuple('SkillMock', ('header', 'userName', 'shortDescription', 'description', 'count', 'level'))
-
-    def buildItem(self, tankmanID):
-        tankman = self.itemsCache.items.getTankman(int(tankmanID))
-        skillsCount, lastSkillLevel = (0, 0)
-        if tankman is not None:
-            skillsCount, lastSkillLevel = tankman.newSkillCount
-        header = text_styles.main(TOOLTIPS.BUYSKILL_HEADER)
-        if skillsCount > 1 or lastSkillLevel > 0:
-            header = text_styles.highTitle(TOOLTIPS.BUYSKILL_HEADER)
-        return self.SKILL_MOCK(header, makeString('#tooltips:personal_case/skills/new/header'), makeString('#tooltips:personal_case/skills/new/body'), makeString('#tooltips:personal_case/skills/new/body'), skillsCount, lastSkillLevel)
 
 
 class ProfileContext(ToolTipContext):
@@ -1357,7 +1331,9 @@ class BattlePassGiftTokenContext(ToolTipContext):
                 if gift is not None:
                     result.append(gift.bonus.displayedItem.getXP())
             else:
-                for gift in offer.getAllGifts():
+                shortOfferName = offerToken.split(':')[2]
+                gifts = sorted(offer.getAllGifts(), cmp=getRewardsComparator(shortOfferName), key=lambda item: (item.bonus.getLightViewModelData()[0],))
+                for gift in gifts:
                     result.append(gift.title)
 
             return result

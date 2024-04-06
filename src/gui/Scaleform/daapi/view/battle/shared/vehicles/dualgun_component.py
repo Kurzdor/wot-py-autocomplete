@@ -14,6 +14,7 @@ from debug_utils import LOG_WARNING
 from dualgun_sounds import DualGunSounds
 from items.utils import getFirstReloadTime
 from gui.Scaleform.daapi.view.meta.DualGunPanelMeta import DualGunPanelMeta
+from gui.battle_control import avatar_getter
 from gui.battle_control.battle_constants import VEHICLE_VIEW_STATE, FEEDBACK_EVENT_ID, DestroyTimerViewState
 from gui.battle_control.controllers.prebattle_setups_ctrl import IPrebattleSetupsListener
 from gui.shared import g_eventBus, EVENT_BUS_SCOPE
@@ -21,6 +22,7 @@ from gui.shared.events import GameEvent
 from helpers import dependency
 from helpers.time_utils import MS_IN_SECOND
 from skeletons.gui.battle_session import IBattleSessionProvider
+from wotdecorators import noexceptReturn
 
 class GunStatesUI(object):
     EMPTY = 1
@@ -122,6 +124,7 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
          VEHICLE_VIEW_STATE.STUN: StunAffectPolicy(self.__reloadingState, VEHICLE_VIEW_STATE.STUN),
          VEHICLE_VIEW_STATE.DESTROY_TIMER: DestroyStateAffectPolicy(self.__reloadingState, VEHICLE_VIEW_STATE.DESTROY_TIMER)}
         self.__isEnabled = False
+        self.__isObservingVehicle = False
         self.__isAllowedByContext = True
         self.__chargeState = DUALGUN_CHARGER_STATUS.BEFORE_PREPARING
         self.__prevChargeState = DUALGUN_CHARGER_STATUS.BEFORE_PREPARING
@@ -155,7 +158,7 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
             vStateCtrl.onVehicleStateUpdated += self.__onVehicleStateUpdated
             vStateCtrl.onVehicleControlling += self.__onVehicleControlling
             vStateCtrl.onPostMortemSwitched += self.__onPostMortemSwitched
-        specCtrl = self.__sessionProvider.dynamic.spectator
+        specCtrl = self.__sessionProvider.shared.spectator
         if specCtrl is not None:
             specCtrl.onSpectatorViewModeChanged += self.__onSpectatorModeChanged
         ammoCtrl = self.__sessionProvider.shared.ammo
@@ -203,7 +206,7 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
             vStateCtrl.onVehicleStateUpdated -= self.__onVehicleStateUpdated
             vStateCtrl.onVehicleControlling -= self.__onVehicleControlling
             vStateCtrl.onPostMortemSwitched -= self.__onPostMortemSwitched
-        specCtrl = self.__sessionProvider.dynamic.spectator
+        specCtrl = self.__sessionProvider.shared.spectator
         if specCtrl is not None:
             specCtrl.onSpectatorViewModeChanged -= self.__onSpectatorModeChanged
         ammoCtrl = self.__sessionProvider.shared.ammo
@@ -261,12 +264,11 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
 
     def __onVehicleControlling(self, vehicle):
         vTypeDesc = vehicle.typeDescriptor
+        self.__isObservingVehicle = avatar_getter.getIsObserverFPV()
         self.__isEnabled = False
-        if vehicle.isAlive() and vTypeDesc.isDualgunVehicle:
+        if vehicle.isAlive() and vTypeDesc.isDualgunVehicle and (vehicle.isPlayerVehicle or self.__isObservingVehicle):
             self.__isEnabled = True
-        if not vehicle.isAlive() and self.__isObserver:
-            self.__isEnabled = False
-        self.as_setVisibleS(self.__isEnabled and self.__isAllowedByContext)
+        self.as_setVisibleS(self.__isVisible())
         if self.__isObserver:
             self.__soundManager.onObserverSwitched()
         self.__reloadingState.cleanup()
@@ -298,7 +300,7 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
 
     def __onBattleStarted(self):
         self.__updateContextAvailability()
-        self.as_setVisibleS(self.__isAllowedByContext and self.__isEnabled)
+        self.as_setVisibleS(self.__isVisible())
 
     def __updateContextAvailability(self):
         prebattleCtrl = self.__sessionProvider.dynamic.comp7PrebattleSetup
@@ -327,8 +329,8 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
         else:
             if cameraName != 'video':
                 vehicle = BigWorld.entities.get(currentVehicleId)
-                if vehicle and vehicle.isAlive() and vehicle.typeDescriptor.isDualgunVehicle:
-                    self.as_setVisibleS(True)
+                if vehicle and self.__isEnabled and vehicle.isAlive() and vehicle.typeDescriptor.isDualgunVehicle:
+                    self.as_setVisibleS(self.__isVisible())
             else:
                 self.as_setVisibleS(False)
             return
@@ -398,8 +400,8 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
 
     def __onControlModeChange(self, event):
         mode = event.ctx.get('mode')
-        if mode is not None and mode in (CTRL_MODE_NAME.ARCADE, CTRL_MODE_NAME.DUAL_GUN):
-            self.as_setVisibleS(True)
+        if self.__isEnabled and mode is not None and mode in (CTRL_MODE_NAME.ARCADE, CTRL_MODE_NAME.DUAL_GUN):
+            self.as_setVisibleS(self.__isVisible())
         else:
             self.as_setVisibleS(False)
         return
@@ -463,3 +465,12 @@ class DualGunComponent(DualGunPanelMeta, IPrebattleSetupsListener):
     def __isPlayerVehicle(self):
         player = BigWorld.player()
         return player.vehicle.isPlayerVehicle if player is not None and player.vehicle is not None else False
+
+    @noexceptReturn(False)
+    def __isVisible(self):
+        isVisible = self.__isEnabled and self.__isAllowedByContext
+        if isVisible:
+            ctrl = self.__sessionProvider.shared.vehicleState
+            if ctrl.isInPostmortem and avatar_getter.getInputHandler().ctrlModeName == CTRL_MODE_NAME.POSTMORTEM and not self.__isObservingVehicle:
+                isVisible = False
+        return isVisible

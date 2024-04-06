@@ -15,6 +15,7 @@ from shared_utils import CONST_CONTAINER
 from skeletons.gui.impl import IGuiLoader
 _logger = logging.getLogger(__name__)
 DialogResult = namedtuple('DialogResult', ('result', 'data'))
+SingleDialogResult = namedtuple('SingleDialogResult', ('busy', 'result'))
 
 class DialogButtons(CONST_CONTAINER):
     SUBMIT = DialogButtonModel.BTN_SUBMIT
@@ -122,11 +123,11 @@ class DialogWindow(Window):
         self.viewModel.buttons.onUserItemClicked += self._onButtonClick
 
     def _finalize(self):
+        self.__blur.fini()
         self.viewModel.onClosed -= self._onClosed
         self.viewModel.buttons.onUserItemClicked -= self._onButtonClick
         super(DialogWindow, self)._finalize()
         self.__scope.destroy()
-        self.__blur.fini()
 
     def _onClosed(self, _=None):
         self.destroy()

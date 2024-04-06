@@ -44,7 +44,8 @@ class BadgesController(IBadgesController, Notifiable):
     def onLobbyStarted(self, ctx):
         self.__initCurrentBadges()
         self.__badgesProcessing()
-        g_clientUpdateManager.addCallbacks({'badges': self.__updateBadges})
+        g_clientUpdateManager.addCallbacks({'badges': self.__updateBadges,
+         'stats.dossier': self.__updateBadges})
         self.itemsCache.onSyncCompleted += self.__onSyncCompleted
 
     def select(self, badges):
@@ -85,7 +86,7 @@ class BadgesController(IBadgesController, Notifiable):
             if badge.isSelected:
                 if badge.isPrefixLayout() and badge.isAchieved:
                     self.__currentSelectedPrefix = badge
-                elif badge.isSuffixLayout():
+                elif badge.isSuffixLayout() and badge.isAchieved:
                     self.__currentSelectedSuffix = badge
 
         return

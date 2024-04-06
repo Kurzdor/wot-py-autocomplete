@@ -1,13 +1,8 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/common/visual_script/block.py
 from typing import List, Any, Sequence
-from misc import ASPECT, BLOCK_MODE
+from misc import ASPECT, BLOCK_MODE, EDITOR_TYPE
 from itertools import imap
-
-class EDITOR_TYPE(object):
-    STR_KEY_SELECTOR = 1
-    ENUM_SELECTOR = 2
-
 
 def buildStrKeysValue(*args):
     return ';'.join(args)
@@ -35,6 +30,10 @@ class DataInputSlot(object):
 
     @staticmethod
     def hasValue():
+        return False
+
+    @staticmethod
+    def isConstValue():
         return False
 
     @staticmethod
@@ -134,6 +133,13 @@ class Block(Meta):
 
     def _makeDataInputSlot(self, name, slotType, editorType=-1):
         return self.__agent.makeDataInputSlot(name, slotType, editorType)
+
+    def planName(self):
+        return self.__agent.planName()
+
+    def blockId(self):
+        id = self.__agent.blockId()
+        return id if id else self.blockName()
 
     def _makeDataOutputSlot(self, name, slotType, fun):
         return self.__agent.makeDataOutputSlot(name, slotType, fun)

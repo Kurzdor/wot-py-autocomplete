@@ -11,7 +11,7 @@ from gui.shared.formatters import text_styles
 from gui.shared.items_parameters import params_helper, formatters
 from gui.shared.items_parameters.comparator import PARAM_STATE
 from gui.shared.items_parameters.param_name_helper import getVehicleParameterText
-from gui.shared.items_parameters.params_helper import VehParamsBaseGenerator, getParameters, getCommonParam, SimplifiedBarVO
+from gui.shared.items_parameters.params_helper import VehParamsBaseGenerator, getParameters, getCommonParam, isValidEmptyValue, SimplifiedBarVO
 from helpers import dependency
 from skeletons.gui.shared import IItemsCache
 
@@ -51,17 +51,11 @@ class VehicleParameters(VehicleParametersMeta):
         super(VehicleParameters, self)._populate()
         self._vehParamsDP = self._createDataProvider()
         self._vehParamsDP.setFlashObject(self.as_getDPS())
-        self.update()
 
     def _dispose(self):
         self._vehParamsDP.fini()
         self._vehParamsDP = None
         self._paramsProviderCls = None
-        cache = self._getVehicleCache()
-        if cache and cache.item:
-            perksController = cache.item.getPerksController()
-            if perksController:
-                perksController.setVehParams(None)
         super(VehicleParameters, self)._dispose()
         return
 
@@ -72,12 +66,7 @@ class VehicleParameters(VehicleParametersMeta):
         cache = self._getVehicleCache()
         if not cache.item:
             return
-        perksController = cache.item.getPerksController()
-        if not perksController:
-            self.rebuildParams()
-        elif not perksController.isEnabled():
-            perksController.recalc(self)
-            self.rebuildParams()
+        self.rebuildParams()
 
     def _getVehicleCache(self):
         return g_currentVehicle
@@ -90,6 +79,7 @@ class VehiclePreviewParameters(VehicleParameters):
 
     def _populate(self):
         super(VehiclePreviewParameters, self)._populate()
+        self.update()
         g_currentPreviewVehicle.onComponentInstalled += self.update
         g_currentPreviewVehicle.onChanged += self.update
         g_currentPreviewVehicle.onPostProgressionChanged += self.update
@@ -140,7 +130,7 @@ class _VehParamsGenerator(VehParamsBaseGenerator):
         return self._AVERAGE_TOOLTIPS_MAP[self._tooltipType] if param.name in self._AVERAGE_PARAMS and self._tooltipType in self._AVERAGE_TOOLTIPS_MAP else self._tooltipType
 
     def _makeAdvancedParamVO(self, param, parentID, highlight):
-        if param.value:
+        if param.value or isValidEmptyValue(param.name, param.value):
             data = super(_VehParamsGenerator, self)._makeAdvancedParamVO(param, parentID, highlight)
             data.update({'titleText': formatters.formatVehicleParamName(param.name, False),
              'valueText': formatters.colorizedFullFormatParameter(param, self._getAdvancedFormatters()),
@@ -282,7 +272,7 @@ class _VehParamsDataProvider(SortableDAAPIDataProvider):
             self._buildSimplifiedList()
 
     def _getComparator(self):
-        return params_helper.idealCrewComparator(self._cache.item)
+        return params_helper.similarCrewComparator(self._cache.item)
 
     def _getDiffComparator(self):
         return None

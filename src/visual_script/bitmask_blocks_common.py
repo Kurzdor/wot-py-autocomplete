@@ -1,7 +1,7 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/common/visual_script/bitmask_blocks_common.py
-from visual_script.block import Block, InitParam, EDITOR_TYPE, buildStrKeysValue, Meta
-from visual_script.misc import errorVScript
+from visual_script.block import Block, InitParam, buildStrKeysValue, Meta
+from visual_script.misc import errorVScript, EDITOR_TYPE
 from visual_script.slot_types import SLOT_TYPE
 
 class BitMaskMeta(Meta):
@@ -26,7 +26,8 @@ class BitMaskBase(Block, BitMaskMeta):
         super(BitMaskBase, self).__init__(*args, **kwargs)
         self._flags = []
         flagsCount, bitMaskType = self._getInitParams()
-        self._inFlags = {name:value for name, value in self._MASK_TYPES[bitMaskType].__dict__.iteritems() if not name.startswith('_')}
+        type = self._MASK_TYPES[bitMaskType]
+        self._inFlags = {name:getattr(type, name) for name, value in type.__dict__.iteritems() if not name.startswith('_')}
         for _ in xrange(flagsCount):
             self._addInputNode()
 

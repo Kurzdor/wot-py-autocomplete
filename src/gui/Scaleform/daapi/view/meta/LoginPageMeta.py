@@ -37,12 +37,6 @@ class LoginPageMeta(View):
     def isCSISUpdateOnRequest(self):
         self._printOverrideError('isCSISUpdateOnRequest')
 
-    def isPwdInvalid(self, password):
-        self._printOverrideError('isPwdInvalid')
-
-    def isLoginInvalid(self, login):
-        self._printOverrideError('isLoginInvalid')
-
     def startListenCsisUpdate(self, startListenCsis):
         self._printOverrideError('startListenCsisUpdate')
 
@@ -51,21 +45,6 @@ class LoginPageMeta(View):
 
     def changeAccount(self):
         self._printOverrideError('changeAccount')
-
-    def onVideoLoaded(self):
-        self._printOverrideError('onVideoLoaded')
-
-    def musicFadeOut(self):
-        self._printOverrideError('musicFadeOut')
-
-    def videoLoadingFailed(self):
-        self._printOverrideError('videoLoadingFailed')
-
-    def switchBgMode(self):
-        self._printOverrideError('switchBgMode')
-
-    def setMute(self, value):
-        self._printOverrideError('setMute')
 
     def as_setDefaultValuesS(self, data):
         return self.flashObject.as_setDefaultValues(data) if self._isDAAPIInited() else None
@@ -82,12 +61,6 @@ class LoginPageMeta(View):
     def as_setLoginWarningS(self, value):
         return self.flashObject.as_setLoginWarning(value) if self._isDAAPIInited() else None
 
-    def as_showWallpaperS(self, isShow, path, showSwitcher, isMuted):
-        return self.flashObject.as_showWallpaper(isShow, path, showSwitcher, isMuted) if self._isDAAPIInited() else None
-
-    def as_showLoginVideoS(self, path, bufferTime, isMuted):
-        return self.flashObject.as_showLoginVideo(path, bufferTime, isMuted) if self._isDAAPIInited() else None
-
     def as_setLoginWarningHideS(self):
         return self.flashObject.as_setLoginWarningHide() if self._isDAAPIInited() else None
 
@@ -96,12 +69,6 @@ class LoginPageMeta(View):
 
     def as_setKeyboardLangS(self, value):
         return self.flashObject.as_setKeyboardLang(value) if self._isDAAPIInited() else None
-
-    def as_pausePlaybackS(self):
-        return self.flashObject.as_pausePlayback() if self._isDAAPIInited() else None
-
-    def as_resumePlaybackS(self):
-        return self.flashObject.as_resumePlayback() if self._isDAAPIInited() else None
 
     def as_doAutoLoginS(self):
         return self.flashObject.as_doAutoLogin() if self._isDAAPIInited() else None

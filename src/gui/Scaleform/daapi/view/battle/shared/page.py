@@ -2,26 +2,30 @@
 # Embedded file name: scripts/client/gui/Scaleform/daapi/view/battle/shared/page.py
 import logging
 import typing
+from account_helpers.settings_core.settings_constants import SPGAim
+import BigWorld
 import BattleReplay
 import aih_constants
 from AvatarInputHandler import aih_global_binding
-from account_helpers.settings_core.settings_constants import SPGAim
+from Event import EventsSubscriber
 from frameworks.wulf import WindowLayer
 from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
-from gui.Scaleform.daapi.view.battle.shared import crosshair
+from gui.Scaleform.daapi.view.battle.shared import crosshair, kill_cam_sound_player
 from gui.Scaleform.daapi.view.battle.shared import indicators
 from gui.Scaleform.daapi.view.battle.shared import markers2d
 from gui.Scaleform.daapi.view.meta.BattlePageMeta import BattlePageMeta
 from gui.Scaleform.framework.package_layout import PackageBusinessHandler
 from gui.Scaleform.genConsts.BATTLE_VIEW_ALIASES import BATTLE_VIEW_ALIASES as _ALIASES
 from gui.app_loader import settings as app_settings
-from gui.battle_control import avatar_getter
+from gui.battle_control import avatar_getter, event_dispatcher
 from gui.battle_control.battle_constants import VIEW_COMPONENT_RULE, BATTLE_CTRL_ID, CROSSHAIR_VIEW_ID
+from gui.battle_control.controllers.spectator_ctrl import SPECTATOR_MODE
 from gui.shared import EVENT_BUS_SCOPE, events
 from helpers import dependency, uniprof
 from skeletons.account_helpers.settings_core import ISettingsCore
 from skeletons.gameplay import IGameplayLogic, PlayerEventID
 from skeletons.gui.battle_session import IBattleSessionProvider
+from skeletons.gui.prebattle_hints.controller import IPrebattleHintsController
 if typing.TYPE_CHECKING:
     from gui.shared.events import LoadViewEvent
 _logger = logging.getLogger(__name__)
@@ -68,7 +72,10 @@ class ComponentsConfig(IComponentsConfig):
 class _SharedComponentsConfig(ComponentsConfig):
 
     def __init__(self):
-        super(_SharedComponentsConfig, self).__init__(((BATTLE_CTRL_ID.BATTLE_NOTIFIER, (_ALIASES.BATTLE_NOTIFIER,)), (BATTLE_CTRL_ID.ARENA_LOAD_PROGRESS, (_ALIASES.BATTLE_NOTIFIER,)), (BATTLE_CTRL_ID.PREBATTLE_SETUPS_CTRL, (_ALIASES.DUAL_GUN_PANEL,))))
+        super(_SharedComponentsConfig, self).__init__(((BATTLE_CTRL_ID.BATTLE_NOTIFIER, (_ALIASES.BATTLE_NOTIFIER,)),
+         (BATTLE_CTRL_ID.ARENA_LOAD_PROGRESS, (_ALIASES.BATTLE_NOTIFIER,)),
+         (BATTLE_CTRL_ID.PREBATTLE_SETUPS_CTRL, (_ALIASES.DUAL_GUN_PANEL,)),
+         (BATTLE_CTRL_ID.KILL_CAM_CTRL, (_ALIASES.KILL_CAM_SOUND_PLAYER,))), ((_ALIASES.KILL_CAM_SOUND_PLAYER, kill_cam_sound_player.KillCamSoundPlayer),))
 
 
 class _HitDirectionComponentsConfig(ComponentsConfig):
@@ -84,6 +91,7 @@ class SharedPage(BattlePageMeta):
     sessionProvider = dependency.descriptor(IBattleSessionProvider)
     gameplay = dependency.descriptor(IGameplayLogic)
     __settingsCore = dependency.descriptor(ISettingsCore)
+    __prebattleHints = dependency.descriptor(IPrebattleHintsController)
 
     def __init__(self, components=None, external=None):
         super(SharedPage, self).__init__()
@@ -92,18 +100,20 @@ class SharedPage(BattlePageMeta):
         self._isVisible = True
         self._blToggling = set()
         self._fsToggling = set()
+        self._deathCamToggling = set()
+        self._spectatorModeToggling = set()
         self._destroyTimerToggling = set()
         self._isDestroyTimerShown = False
         if external is None:
-            external = (crosshair.CrosshairPanelContainer, markers2d.MarkersManager)
+            external = (crosshair.CrosshairPanelContainer, markers2d.MarkersManager, markers2d.KillCamMarkersManager)
         self._external = [ item() for item in external ]
         if components is None:
             components = _SHARED_COMPONENTS_CONFIG
         else:
             components += _SHARED_COMPONENTS_CONFIG
-        if BATTLE_CTRL_ID.HIT_DIRECTION not in dict(components.getConfig()):
-            components += _HIT_DIRECTION_COMPONENTS_CONFIG
+        components = self._addDefaultHitDirectionController(components)
         self.__componentsConfig = components
+        self._battleSessionES = EventsSubscriber()
         return
 
     def __del__(self):
@@ -114,13 +124,28 @@ class SharedPage(BattlePageMeta):
 
     def reload(self):
         self._stopBattleSession()
-        self.__onPostMortemReload()
+        self._onPostMortemReload()
         self._startBattleSession()
         self.reloadComponents()
         for component in self._external:
             component.startPlugins()
             if self.sessionProvider.isReplayPlaying:
                 component.invokeRegisterComponentForReplay()
+
+    def setComponentsVisibilityWithFade(self, visible=None, hidden=None):
+        viewsToShow = {view for view in visible if view in self.components} if visible else None
+        viewsToHide = {view for view in hidden if view in self.components} if hidden else None
+        if self._fsToggling:
+            if viewsToShow:
+                self._fsToggling.update(viewsToShow)
+            if viewsToHide:
+                self._fsToggling.difference_update(viewsToHide)
+        if viewsToShow:
+            viewsToShow.difference_update(self._fsToggling)
+        if viewsToHide:
+            viewsToHide.difference_update(self._fsToggling)
+        self._setComponentsVisibilityWithFade(visible=viewsToShow, hidden=viewsToHide)
+        return
 
     @uniprof.regionDecorator(label='avatar.show_gui', scope='enter')
     def _populate(self):
@@ -145,6 +170,8 @@ class SharedPage(BattlePageMeta):
         self.addListener(events.GameEvent.CALLOUT_DISPLAY_EVENT, self.__handleCalloutDisplayEvent, scope=EVENT_BUS_SCOPE.GLOBAL)
         self.addListener(events.ViewEventType.LOAD_VIEW, self.__handleLobbyEvent, scope=EVENT_BUS_SCOPE.BATTLE)
         self.addListener(events.GameEvent.DESTROY_TIMERS_PANEL, self.__destroyTimersListener, scope=EVENT_BUS_SCOPE.BATTLE)
+        self.addListener(events.DeathCamEvent.DEATH_CAM_HIDDEN, self.__handleDeathCamHiddenEvent, scope=EVENT_BUS_SCOPE.BATTLE)
+        self.addListener(events.DeathCamEvent.DEATH_CAM_SPECTATOR_MODE, self.__handleDeathCamSpectatorModeEvent, scope=EVENT_BUS_SCOPE.BATTLE)
         self.addListener(events.GameEvent.TOGGLE_DEBUG_PIERCING_PANEL, self.__toggleDebugPiercingPanel, scope=EVENT_BUS_SCOPE.BATTLE)
         self.gameplay.postStateEvent(PlayerEventID.AVATAR_SHOW_GUI)
 
@@ -169,9 +196,16 @@ class SharedPage(BattlePageMeta):
         self.removeListener(events.GameEvent.CALLOUT_DISPLAY_EVENT, self.__handleCalloutDisplayEvent, scope=EVENT_BUS_SCOPE.GLOBAL)
         self.removeListener(events.ViewEventType.LOAD_VIEW, self.__handleLobbyEvent, scope=EVENT_BUS_SCOPE.BATTLE)
         self.removeListener(events.GameEvent.DESTROY_TIMERS_PANEL, self.__destroyTimersListener, scope=EVENT_BUS_SCOPE.BATTLE)
+        self.removeListener(events.DeathCamEvent.DEATH_CAM_HIDDEN, self.__handleDeathCamHiddenEvent, scope=EVENT_BUS_SCOPE.BATTLE)
+        self.removeListener(events.DeathCamEvent.DEATH_CAM_SPECTATOR_MODE, self.__handleDeathCamSpectatorModeEvent, scope=EVENT_BUS_SCOPE.BATTLE)
         self.removeListener(events.GameEvent.TOGGLE_DEBUG_PIERCING_PANEL, self.__toggleDebugPiercingPanel, scope=EVENT_BUS_SCOPE.BATTLE)
         self._stopBattleSession()
         super(SharedPage, self)._dispose()
+
+    def _addDefaultHitDirectionController(self, components):
+        if BATTLE_CTRL_ID.HIT_DIRECTION not in dict(components.getConfig()):
+            components += _HIT_DIRECTION_COMPONENTS_CONFIG
+        return components
 
     def _toggleGuiVisible(self):
         self._isVisible = not self._isVisible
@@ -192,6 +226,16 @@ class SharedPage(BattlePageMeta):
             self.as_setComponentsVisibilityS(visible, hidden)
         return
 
+    def _setComponentsVisibilityWithFade(self, visible=None, hidden=None):
+        if visible is None:
+            visible = set()
+        if hidden is None:
+            hidden = set()
+        if visible or hidden:
+            _logger.debug('Sets components visibility with fade: visible = %r, hidden = %r', visible, hidden)
+            self.as_setComponentsVisibilityWithFadeS(visible, hidden)
+        return
+
     def _onRegisterFlashComponent(self, viewPy, alias):
         self.sessionProvider.addViewComponent(alias, viewPy)
 
@@ -210,36 +254,32 @@ class SharedPage(BattlePageMeta):
             if ctrl.isInPostmortem:
                 self._onPostMortemSwitched(noRespawnPossible=False, respawnAvailable=False)
             self._isInPostmortem = ctrl.isInPostmortem
-            ctrl.onPostMortemSwitched += self._onPostMortemSwitched
-            ctrl.onRespawnBaseMoving += self.__onRespawnBaseMoving
+            self._battleSessionES.subscribeToEvent(ctrl.onPostMortemSwitched, self._onPostMortemSwitched)
+            self._battleSessionES.subscribeToEvent(ctrl.onRespawnBaseMoving, self._onRespawnBaseMoving)
+        killCamCtrl = self.sessionProvider.shared.killCamCtrl
+        if killCamCtrl:
+            killCamCtrl.onKillCamModeStateChanged += self.__onKillCamStateChanged
         crosshairCtrl = self.sessionProvider.shared.crosshair
         if crosshairCtrl is not None:
-            crosshairCtrl.onCrosshairViewChanged += self.__onCrosshairViewChanged
+            self._battleSessionES.subscribeToEvent(crosshairCtrl.onCrosshairViewChanged, self.__onCrosshairViewChanged)
             self.__onCrosshairViewChanged(crosshairCtrl.getViewID())
-        self.__settingsCore.onSettingsChanged += self.__onSettingsChanged
+        self._battleSessionES.subscribeToEvent(self.__settingsCore.onSettingsChanged, self.__onSettingsChanged)
         if not self.__settingsCore.isReady:
-            self.__settingsCore.onSettingsReady += self.__onSettingsReady
+            self._battleSessionES.subscribeToEvent(self.__settingsCore.onSettingsReady, self.__onSettingsReady)
         aih_global_binding.subscribe(aih_global_binding.BINDING_ID.CTRL_MODE_NAME, self._onAvatarCtrlModeChanged)
         return
 
     def _stopBattleSession(self):
-        self.__settingsCore.onSettingsReady -= self.__onSettingsReady
-        self.__settingsCore.onSettingsChanged -= self.__onSettingsChanged
-        crosshairCtrl = self.sessionProvider.shared.crosshair
-        if crosshairCtrl is not None:
-            crosshairCtrl.onCrosshairViewChanged -= self.__onCrosshairViewChanged
-        ctrl = self.sessionProvider.shared.vehicleState
-        if ctrl is not None:
-            ctrl.onPostMortemSwitched -= self._onPostMortemSwitched
-            ctrl.onRespawnBaseMoving -= self.__onRespawnBaseMoving
+        self._battleSessionES.unsubscribeFromAllEvents()
+        killCamCtrl = self.sessionProvider.shared.killCamCtrl
+        if killCamCtrl:
+            killCamCtrl.onKillCamModeStateChanged -= self.__onKillCamStateChanged
         aih_global_binding.unsubscribe(aih_global_binding.BINDING_ID.CTRL_MODE_NAME, self._onAvatarCtrlModeChanged)
         for alias, _ in self.__componentsConfig.getViewsConfig():
             self.sessionProvider.removeViewComponent(alias)
 
         for component in self._external:
             component.stopPlugins()
-
-        return
 
     def _handleRadialMenuCmd(self, event):
         raise NotImplementedError
@@ -259,20 +299,25 @@ class SharedPage(BattlePageMeta):
     def _handleHelpEvent(self, event):
         raise NotImplementedError
 
+    def _hasBattleMessenger(self):
+        return True
+
     def _onBattleLoadingStart(self):
         self._isBattleLoading = True
         if not self._blToggling:
             self._blToggling = set(self.as_getComponentsVisibilityS())
-        self._blToggling.difference_update([_ALIASES.BATTLE_LOADING])
-        if not avatar_getter.isObserverSeesAll():
+        if self._hasBattleMessenger() and not avatar_getter.isObserverSeesAll():
             self._blToggling.add(_ALIASES.BATTLE_MESSENGER)
         hintPanel = self.getComponent(_ALIASES.HINT_PANEL)
         if hintPanel and hintPanel.getActiveHint():
             self._blToggling.add(_ALIASES.HINT_PANEL)
-        visible, additionalToggling = {_ALIASES.BATTLE_LOADING}, set()
+        visible, additionalToggling = set(), set()
         if self.getComponent(_ALIASES.PREBATTLE_AMMUNITION_PANEL) is not None:
             visible.add(_ALIASES.PREBATTLE_AMMUNITION_PANEL)
             additionalToggling.add(_ALIASES.PREBATTLE_AMMUNITION_PANEL)
+        if not self.__prebattleHints.isEnabledForCurrentBattleSession():
+            additionalToggling.add(_ALIASES.BATTLE_LOADING)
+            visible.add(_ALIASES.BATTLE_LOADING)
         self._blToggling.difference_update(additionalToggling)
         self._setComponentsVisibility(visible=visible, hidden=self._blToggling)
         self._blToggling.update(additionalToggling)
@@ -285,7 +330,9 @@ class SharedPage(BattlePageMeta):
         for component in self._external:
             component.active(True)
 
-        self.sessionProvider.shared.hitDirection.setVisible(True)
+        if self.sessionProvider.shared.hitDirection is not None:
+            self.sessionProvider.shared.hitDirection.setVisible(True)
+        return
 
     def _onDestroyTimerStart(self):
         hintPanel = self.getComponent(_ALIASES.HINT_PANEL)
@@ -310,6 +357,8 @@ class SharedPage(BattlePageMeta):
             self._handleHelpEvent(event)
 
     def __handleBattleLoading(self, event):
+        if self.as_isComponentVisibleS(_ALIASES.DEATH_CAM_HUD):
+            return
         if event.ctx['isShown']:
             self._onBattleLoadingStart()
         else:
@@ -369,18 +418,17 @@ class SharedPage(BattlePageMeta):
         return not self.sessionProvider.getCtx().isPlayerObserver() and not BattleReplay.g_replayCtrl.isPlaying
 
     def _onPostMortemSwitched(self, noRespawnPossible, respawnAvailable):
-        if self._canShowPostmortemTips():
-            self.as_setPostmortemTipsVisibleS(True)
+        self.as_onPostmortemActiveS(True)
         if not self.sessionProvider.getCtx().isPlayerObserver():
             self._isInPostmortem = True
             self._switchToPostmortem()
 
-    def __onRespawnBaseMoving(self):
-        if not self.sessionProvider.getCtx().isPlayerObserver() and not BattleReplay.g_replayCtrl.isPlaying:
-            self.as_setPostmortemTipsVisibleS(False)
+    def _onRespawnBaseMoving(self):
+        if self._canShowPostmortemTips():
+            self.as_onPostmortemActiveS(False)
             self._isInPostmortem = False
 
-    def __onPostMortemReload(self):
+    def _onPostMortemReload(self):
         self._isInPostmortem = False
         self._reloadPostmortem()
 
@@ -399,13 +447,17 @@ class SharedPage(BattlePageMeta):
         for component in self._external:
             component.active(True)
 
-        self.sessionProvider.shared.hitDirection.setVisible(True)
+        if self.sessionProvider.shared.hitDirection is not None:
+            self.sessionProvider.shared.hitDirection.setVisible(True)
+        return
 
     def __handleHideExternals(self, _):
         for component in self._external:
             component.active(False)
 
-        self.sessionProvider.shared.hitDirection.setVisible(False)
+        if self.sessionProvider.shared.hitDirection is not None:
+            self.sessionProvider.shared.hitDirection.setVisible(False)
+        return
 
     def __handleShowBtnHint(self, _):
         self._processHint(True)
@@ -416,9 +468,50 @@ class SharedPage(BattlePageMeta):
     def __handleCalloutDisplayEvent(self, event):
         self._processCallout(needShow=event.ctx['isDown'])
 
+    def __onKillCamStateChanged(self, state, _):
+        if state is events.DeathCamEvent.State.INACTIVE:
+            self._onKillCamCtrlModeActivated()
+        if state is events.DeathCamEvent.State.STARTING:
+            self._onKillCamSimulationStart()
+        elif state is events.DeathCamEvent.State.ACTIVE:
+            self._setComponentsVisibility(visible={_ALIASES.DEATH_CAM_HUD})
+        elif state is events.DeathCamEvent.State.FINISHED:
+            self._onKillCamSimulationFinish()
+
+    def _onKillCamCtrlModeActivated(self):
+        event_dispatcher.killHelpView()
+
+    def _onKillCamSimulationStart(self):
+        self._deathCamToggling = set(self.as_getComponentsVisibilityS())
+        self._deathCamToggling.discard(_ALIASES.DEATH_CAM_HUD)
+        avatar = BigWorld.player()
+        isSimplifiedDC = avatar.isSimpleDeathCam() if avatar else False
+        if isSimplifiedDC:
+            self._deathCamToggling.discard(_ALIASES.POSTMORTEM_PANEL)
+        self._setComponentsVisibility(hidden=self._deathCamToggling)
+
+    def _onKillCamSimulationFinish(self):
+        self._setComponentsVisibility(visible=self._deathCamToggling or None, hidden={_ALIASES.DEATH_CAM_HUD})
+        self._deathCamToggling.clear()
+        return
+
     def __onCrosshairViewChanged(self, viewID):
         artyShotIndicatorVisible = self.__settingsCore.isReady and viewID in (CROSSHAIR_VIEW_ID.STRATEGIC,) and self.__settingsCore.getSetting(SPGAim.SHOTS_RESULT_INDICATOR)
         self.__setArtyShotIndicatorFlag(artyShotIndicatorVisible)
+
+    def __handleDeathCamHiddenEvent(self, _):
+        self._setComponentsVisibility(hidden={_ALIASES.DEATH_CAM_HUD})
+
+    def __handleDeathCamSpectatorModeEvent(self, event):
+        if event.ctx['mode']:
+            mode = event.ctx['mode']
+            if mode == SPECTATOR_MODE.NONE:
+                return
+            if mode == SPECTATOR_MODE.FREECAM:
+                self._spectatorModeToggling = set(self.as_getComponentsVisibilityS())
+                self._setComponentsVisibility(hidden={_ALIASES.DAMAGE_PANEL, _ALIASES.POSTMORTEM_PANEL, _ALIASES.BATTLE_DAMAGE_LOG_PANEL})
+            else:
+                self._onPostMortemSwitched(False, False)
 
     def __onSettingsChanged(self, diff):
         crosshairCtrl = self.sessionProvider.shared.crosshair

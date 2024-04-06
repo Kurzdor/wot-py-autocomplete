@@ -1,6 +1,6 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/shared/gui_items/processors/offers.py
-import cPickle
+import json
 import logging
 from functools import partial
 import BigWorld
@@ -83,7 +83,7 @@ class ReceiveMultipleOfferGiftsProcessor(Processor):
     def _request(self, callback):
         _logger.debug('Make server request to receive offers gifts. Choices: %s', self.__chosenGifts)
         Waiting.show('loadContent')
-        choices = cPickle.dumps(self.__chosenGifts)
+        choices = json.dumps(self.__chosenGifts)
         BigWorld.player().receiveMultipleOfferGifts(choices, lambda requestID, resultID, errStr, ext=None: self._response(resultID, callback, ctx=ext, errStr=errStr))
         return
 
@@ -94,4 +94,19 @@ class BattleMattersOfferProcessor(ReceiveOfferGiftProcessor):
     def _successHandler(self, code, ctx=None):
         Waiting.hide('loadContent')
         self.__systemMessages.proto.serviceChannel.pushClientMessage(ctx, SCH_CLIENT_MSG_TYPE.BATTLE_MATTERS_TOKEN_AWARD)
+        return makeSuccess(auxData=ctx)
+
+
+class WinbackMultipleOfferProcessor(ReceiveMultipleOfferGiftsProcessor):
+    __systemMessages = dependency.descriptor(ISystemMessages)
+
+    def _successHandler(self, code, ctx=None):
+        Waiting.hide('loadContent')
+        successData = ctx.get(RES_SUCCESS)
+        if successData:
+            self.__systemMessages.proto.serviceChannel.pushClientMessage(successData, SCH_CLIENT_MSG_TYPE.WINBACK_SELECTABLE_REWARD)
+        failureData = ctx.get(RES_FAILURE)
+        if failureData:
+            msg = self._errorHandler(code, self.ERROR_CODE_MULTI_ERROR, ctx=failureData)
+            SystemMessages.pushMessage(msg.userMsg, msg.sysMsgType)
         return makeSuccess(auxData=ctx)

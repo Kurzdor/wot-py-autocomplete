@@ -8,7 +8,7 @@ from account_helpers.AccountSettings import AccountSettings
 from account_helpers.settings_core.ServerSettingsManager import ServerSettingsManager, SETTINGS_SECTIONS
 from account_helpers.settings_core.settings_constants import SPGAim, CONTOUR
 from adisp import adisp_process
-from debug_utils import LOG_DEBUG
+from debug_utils import LOG_DEBUG, LOG_ERROR
 from gui.Scaleform.locale.SETTINGS import SETTINGS
 from helpers import dependency
 from skeletons.account_helpers.settings_core import ISettingsCore
@@ -36,6 +36,8 @@ class SettingsCore(ISettingsCore):
         self.__interfaceScale = None
         self.__storages = None
         self.__options = None
+        self.__disabledStorages = set()
+        self.__overriddenUserSettings = None
         self.__isReady = False
         return
 
@@ -107,7 +109,7 @@ class SettingsCore(ISettingsCore):
          'contour': CONTOUR_SETTINGS_STORAGE}
         self.isDeviseRecreated = False
         self.isChangesConfirmed = True
-        graphicSettings = tuple(((settingName, options.GraphicSetting(settingName, settingName == GRAPHICS.COLOR_GRADING_TECHNIQUE)) for settingName in BigWorld.generateGfxSettings()))
+        graphicSettings = tuple(((settingName, options.GraphicSetting(settingName)) for settingName in BigWorld.generateGfxSettings() if settingName != GRAPHICS.COLOR_GRADING_TECHNIQUE))
         self.__options = options.SettingsContainer(graphicSettings + ((GAME.REPLAY_ENABLED, options.ReplaySetting(GAME.REPLAY_ENABLED, storage=GAME_SETTINGS_STORAGE)),
          (GAME.SNIPER_ZOOM, options.SniperZoomSetting(GAME.SNIPER_ZOOM, storage=EXTENDED_GAME_SETTINGS_STORAGE)),
          (GAME.HULLLOCK_ENABLED, options.HullLockSetting(GAME.HULLLOCK_ENABLED, storage=EXTENDED_GAME_SETTINGS_STORAGE)),
@@ -117,10 +119,13 @@ class SettingsCore(ISettingsCore):
          (GAME.SHOW_VEHICLE_HP_IN_MINIMAP, options.MinimapHPSettings(GAME.SHOW_VEHICLE_HP_IN_MINIMAP, storage=BATTLE_HUD_SETTINGS_STORAGE)),
          (GAME.HANGAR_CAM_PERIOD, options.HangarCamPeriodSetting(GAME.HANGAR_CAM_PERIOD, storage=EXTENDED_GAME_SETTINGS_STORAGE)),
          (GAME.HANGAR_CAM_PARALLAX_ENABLED, options.HangarCamParallaxEnabledSetting(GAME.HANGAR_CAM_PARALLAX_ENABLED, storage=EXTENDED_GAME_SETTINGS_STORAGE)),
-         (GAME.ENABLE_SERVER_AIM, options.StorageAccountSetting(GAME.ENABLE_SERVER_AIM, storage=GAME_SETTINGS_STORAGE)),
+         (GAME.ENABLE_SERVER_AIM, options.StorageAccountSetting(GAME.ENABLE_SERVER_AIM, storage=EXTENDED_GAME_2_SETTINGS_STORAGE)),
          (GAME.SHOW_DAMAGE_ICON, options.ShowDamageIconSetting(GAME.SHOW_DAMAGE_ICON, storage=GAME_SETTINGS_STORAGE)),
+         (GAME.MINIMAP_SIZE, options.MinimapSizeSetting(GAME.MINIMAP_SIZE, GAME.MINIMAP_SIZE)),
+         (GAME.TRAINING_MINIMAP_SIZE, options.MinimapSizeSetting(GAME.TRAINING_MINIMAP_SIZE, GAME.TRAINING_MINIMAP_SIZE)),
+         (GAME.COMP7_MINIMAP_SIZE, options.AccountDumpSetting(GAME.COMP7_MINIMAP_SIZE, GAME.COMP7_MINIMAP_SIZE)),
          (GAME.MINIMAP_ALPHA, options.StorageAccountSetting(GAME.MINIMAP_ALPHA, storage=GAME_SETTINGS_STORAGE)),
-         (GAME.ENABLE_POSTMORTEM_DELAY, options.PostMortemDelaySetting(GAME.ENABLE_POSTMORTEM_DELAY, storage=GAME_SETTINGS_STORAGE)),
+         (GAME.POSTMORTEM_MODE, options.PostMortemModeSetting(GAME.POSTMORTEM_MODE, storage=GAME_SETTINGS_STORAGE)),
          (GAME.SHOW_VEHICLES_COUNTER, options.StorageAccountSetting(GAME.SHOW_VEHICLES_COUNTER, storage=GAME_SETTINGS_STORAGE)),
          (GAME.BATTLE_LOADING_INFO, options.BattleLoadingTipSetting(GAME.BATTLE_LOADING_INFO, GAME.BATTLE_LOADING_INFO)),
          (GAME.BATTLE_LOADING_RANKED_INFO, options.BattleLoadingTipSetting(GAME.BATTLE_LOADING_RANKED_INFO, GAME.BATTLE_LOADING_RANKED_INFO)),
@@ -128,6 +133,7 @@ class SettingsCore(ISettingsCore):
          (GAME.ANONYMIZER, options.AnonymizerSetting(GAME.ANONYMIZER)),
          (GAME.SHOW_VICTIMS_DOGTAG, options.DogtagsSetting(GAME.SHOW_VICTIMS_DOGTAG, storage=DOG_TAGS_SETTINGS_STORAGE)),
          (GAME.SHOW_DOGTAG_TO_KILLER, options.DogtagsSetting(GAME.SHOW_DOGTAG_TO_KILLER, storage=DOG_TAGS_SETTINGS_STORAGE)),
+         (GAME.SHOW_KILLERS_DOGTAG, options.DogtagsSetting(GAME.SHOW_KILLERS_DOGTAG, storage=DOG_TAGS_SETTINGS_STORAGE)),
          (GAME.DYNAMIC_CAMERA, options.DynamicCamera(GAME.DYNAMIC_CAMERA, storage=GAME_SETTINGS_STORAGE)),
          (GAME.INCREASED_ZOOM, options.IncreasedZoomSetting(GAME.INCREASED_ZOOM, storage=EXTENDED_GAME_SETTINGS_STORAGE)),
          (GAME.SNIPER_MODE_BY_SHIFT, options.SniperModeByShiftSetting(GAME.SNIPER_MODE_BY_SHIFT, storage=EXTENDED_GAME_SETTINGS_STORAGE)),
@@ -148,7 +154,7 @@ class SettingsCore(ISettingsCore):
          (GAME.CHAT_CONTACTS_LIST_ONLY, options.MessengerSetting(GAME.CHAT_CONTACTS_LIST_ONLY, storage=EXTENDED_MESSENGER_SETTINGS_STORAGE)),
          (GAME.PLAYERS_PANELS_SHOW_LEVELS, options.PlayersPanelSetting(GAME.PLAYERS_PANELS_SHOW_LEVELS, 'players_panel', 'showLevels', storage=GAME_SETTINGS_STORAGE)),
          (GAME.PLAYERS_PANELS_SHOW_TYPES, options.AccountDumpSetting(GAME.PLAYERS_PANELS_SHOW_TYPES, 'players_panel', 'showTypes')),
-         (GAME.PLAYERS_PANELS_STATE, options.AccountDumpSetting(GAME.PLAYERS_PANELS_STATE, 'players_panel', 'state')),
+         (GAME.PLAYERS_PANELS_STATE, options.PlayersPanelStateSetting(GAME.PLAYERS_PANELS_STATE, 'players_panel', 'state')),
          (GAME.EPIC_RANDOM_PLAYERS_PANELS_STATE, options.AccountDumpSetting(GAME.EPIC_RANDOM_PLAYERS_PANELS_STATE, 'epic_random_players_panel', 'state')),
          (GAME.SNIPER_MODE_SWINGING_ENABLED, options.SniperModeSwingingSetting()),
          (GAME.GAMEPLAY_CTF, options.GameplaySetting(GAME.GAMEPLAY_MASK, 'ctf', storage=GAMEPLAY_SETTINGS_STORAGE)),
@@ -157,6 +163,7 @@ class SettingsCore(ISettingsCore):
          (GAME.GAMEPLAY_NATIONS, options.GameplaySetting(GAME.GAMEPLAY_MASK, 'nations', storage=GAMEPLAY_SETTINGS_STORAGE)),
          (GAME.GAMEPLAY_EPIC_STANDARD, options.GameplaySetting(GAME.GAMEPLAY_MASK, 'ctf30x30', storage=GAMEPLAY_SETTINGS_STORAGE, delegate=_getEpicRandomSwitch)),
          (GAME.GAMEPLAY_ONLY_10_MODE, options.RandomOnly10ModeSetting(GAME.GAMEPLAY_ONLY_10_MODE, storage=EXTENDED_GAME_2_SETTINGS_STORAGE)),
+         (GAME.GAMEPLAY_DEV_MAPS, options.DevMapsSetting(GAME.GAMEPLAY_DEV_MAPS, storage=EXTENDED_GAME_2_SETTINGS_STORAGE)),
          (GAME.GAMEPLAY_EPIC_DOMINATION, options.GameplaySetting(GAME.GAMEPLAY_MASK, 'domination30x30', storage=GAMEPLAY_SETTINGS_STORAGE, delegate=_getEpicRandomSwitch)),
          (GAME.LENS_EFFECT, options.LensEffectSetting(GAME.LENS_EFFECT, storage=GRAPHICS_SETTINGS_STORAGE)),
          (GAME.SHOW_VECTOR_ON_MAP, options.MinimapSetting(GAME.SHOW_VECTOR_ON_MAP, storage=GAME_SETTINGS_STORAGE)),
@@ -176,6 +183,8 @@ class SettingsCore(ISettingsCore):
          (GAME.MINIMAP_MIN_SPOTTING_RANGE, options.StorageAccountSetting(GAME.MINIMAP_MIN_SPOTTING_RANGE, storage=EXTENDED_GAME_SETTINGS_STORAGE)),
          (GAME.SWITCH_SETUPS_IN_LOADING, options.SwitchSetupsInLoadingSetting(GAME.SWITCH_SETUPS_IN_LOADING)),
          (GAME.SCROLL_SMOOTHING, options.StorageAccountSetting(GAME.SCROLL_SMOOTHING, storage=EXTENDED_GAME_2_SETTINGS_STORAGE)),
+         (GAME.NEWBIE_PREBATTLE_HINTS, options.NewbiePrebattleHintsSetting(GAME.NEWBIE_PREBATTLE_HINTS, storage=EXTENDED_GAME_2_SETTINGS_STORAGE)),
+         (GAME.NEWBIE_BATTLE_HINTS, options.NewbieBattleHintsSetting(GAME.NEWBIE_BATTLE_HINTS, storage=EXTENDED_GAME_2_SETTINGS_STORAGE)),
          (GRAPHICS.MONITOR, options.MonitorSetting(storage=VIDEO_SETTINGS_STORAGE)),
          (GRAPHICS.WINDOW_SIZE, options.WindowSizeSetting(storage=VIDEO_SETTINGS_STORAGE)),
          (GRAPHICS.RESOLUTION, options.ResolutionSetting(storage=VIDEO_SETTINGS_STORAGE)),
@@ -190,6 +199,7 @@ class SettingsCore(ISettingsCore):
          (GRAPHICS.GRAPHICS_QUALITY_HD_SD_HIGH, options.GraphicsHigtQualityNote()),
          (GRAPHICS.GAMMA_SETTING, options.ReadOnlySetting(lambda : SETTINGS.GAMMABTN_LABEL)),
          (GRAPHICS.NATIVE_RESOLUTION, options.ReadOnlySetting(graphics.getNativeResolutionIndex)),
+         (GRAPHICS.COLOR_GRADING_TECHNIQUE, options.ColorGradingSetting(GRAPHICS.COLOR_GRADING_TECHNIQUE, True)),
          (GRAPHICS.BRIGHTNESS_CORRECTION, options.BrightnessCorrectionSetting(True)),
          (GRAPHICS.CONTRAST_CORRECTION, options.ContrastCorrectionSetting(True)),
          (GRAPHICS.SATURATION_CORRECTON, options.SaturationCorrectionSetting(True)),
@@ -243,6 +253,7 @@ class SettingsCore(ISettingsCore):
          (CONTROLS.MOUSE_SNIPER_SENS, options.MouseSensitivitySetting('dualgun')),
          (CONTROLS.MOUSE_STRATEGIC_SENS, options.MouseSensitivitySetting('strategic')),
          (CONTROLS.MOUSE_ASSIST_AIM_SENS, options.MouseSensitivitySetting('arty', masterSwitch='spgAlternativeAimingCameraEnabled')),
+         (CONTROLS.MOUSE_FREECAM_SENS, options.MouseSensitivitySetting('deathfreecam')),
          (CONTROLS.MOUSE_HORZ_INVERSION, options.MouseInversionSetting(CONTROLS.MOUSE_HORZ_INVERSION, 'horzInvert', storage=CONTROLS_SETTINGS_STORAGE)),
          (CONTROLS.MOUSE_VERT_INVERSION, options.MouseInversionSetting(CONTROLS.MOUSE_VERT_INVERSION, 'vertInvert', storage=CONTROLS_SETTINGS_STORAGE)),
          (CONTROLS.BACK_DRAFT_INVERSION, options.BackDraftInversionSetting(storage=CONTROLS_SETTINGS_STORAGE)),
@@ -294,6 +305,7 @@ class SettingsCore(ISettingsCore):
          (BATTLE_EVENTS.RECEIVED_CRITS, options.SettingFalseByDefault(BATTLE_EVENTS.RECEIVED_CRITS, storage=BATTLE_EVENTS_SETTINGS_STORAGE)),
          (BATTLE_EVENTS.ENEMY_ASSIST_STUN, options.BattleEventsSetting(BATTLE_EVENTS.ENEMY_ASSIST_STUN, storage=BATTLE_EVENTS_SETTINGS_STORAGE, delegate=_getStunSwitch)),
          (BATTLE_EVENTS.ENEMIES_STUN, options.SettingFalseByDefault(BATTLE_EVENTS.ENEMIES_STUN, storage=BATTLE_EVENTS_SETTINGS_STORAGE)),
+         (BATTLE_EVENTS.CREW_PERKS, options.SettingTrueByDefault(BATTLE_EVENTS.CREW_PERKS, storage=BATTLE_EVENTS_SETTINGS_STORAGE)),
          (BATTLE_BORDER_MAP.MODE_SHOW_BORDER, options.BattleBorderMapModeShow(BATTLE_BORDER_MAP.MODE_SHOW_BORDER, storage=BATTLE_BORDER_MAP_SETTINGS_STORAGE)),
          (BATTLE_BORDER_MAP.TYPE_BORDER, options.BattleBorderMapType(BATTLE_BORDER_MAP.TYPE_BORDER, storage=BATTLE_BORDER_MAP_SETTINGS_STORAGE)),
          (QUESTS_PROGRESS.VIEW_TYPE, options.QuestsProgressViewType(QUESTS_PROGRESS.VIEW_TYPE, storage=QUESTS_PROGRESS_SETTINGS_STORAGE)),
@@ -328,6 +340,7 @@ class SettingsCore(ISettingsCore):
         if self.__interfaceScale is not None:
             self.__interfaceScale.fini()
             self.__interfaceScale = None
+        self.__disabledStorages.clear()
         g_playerEvents.onDisconnected -= self.revertSettings
         g_playerEvents.onAvatarBecomeNonPlayer -= self.revertSettings
         g_playerEvents.onAccountBecomeNonPlayer -= self.revertSettings
@@ -397,10 +410,11 @@ class SettingsCore(ISettingsCore):
     def isSettingChanged(self, name, value):
         return not self.__options.getSetting(name).isEqual(value)
 
-    def applyStorages(self, restartApproved):
+    def applyStorages(self, restartApproved, force=False):
         confirmators = []
         for storage in self.__storages.values():
-            confirmators.append(storage.apply(restartApproved))
+            if storage not in self.__disabledStorages or force:
+                confirmators.append(storage.apply(restartApproved))
 
         return confirmators
 
@@ -418,7 +432,28 @@ class SettingsCore(ISettingsCore):
 
     def clearStorages(self):
         for storage in self.__storages.values():
-            storage.clear()
+            if storage not in self.__disabledStorages:
+                storage.clear()
+
+    def setOverrideSettings(self, overrideDict, disableStorages):
+        if self.__overriddenUserSettings is not None:
+            LOG_ERROR('SettingsCore.setOverrideSettings: settings are already overridden!')
+            return
+        else:
+            self.__overriddenUserSettings = {setting:self.getSetting(setting) for setting in overrideDict}
+            self.__disabledStorages = set((self.__storages[name] for name in disableStorages))
+            self.applySettings(overrideDict)
+            return
+
+    def unsetOverrideSettings(self):
+        if self.__overriddenUserSettings is None:
+            LOG_ERROR('SettingsCore.unsetOverrideSettings: settings were not overridden!')
+            return
+        else:
+            self.__disabledStorages.clear()
+            self.applySettings(self.__overriddenUserSettings)
+            self.__overriddenUserSettings = None
+            return
 
     def isReady(self):
         return self.__isReady

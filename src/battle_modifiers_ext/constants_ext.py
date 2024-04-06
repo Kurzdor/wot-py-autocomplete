@@ -2,15 +2,17 @@
 # Embedded file name: battle_modifiers/scripts/common/battle_modifiers_ext/constants_ext.py
 import typing
 from collections import OrderedDict
-from constants import IS_DEVELOPMENT, SHELL_TYPES, SHELL_MECHANICS_TYPE
+from constants import IS_DEVELOPMENT, SHELL_TYPES, BATTLE_LOG_SHELL_TYPES
 if typing.TYPE_CHECKING:
     from items.vehicle_items import Shell
 BATTLE_PARAMS_XML_PATH = 'scripts/item_defs/battle_params.xml'
 REMAPPING_XML_PATH = 'scripts/item_defs/remapping.xml'
 BATTLE_MODIFIERS_DIR = 'scripts/server_xml/battle_modifiers/'
 BATTLE_MODIFIERS_XML = 'battle_modifiers.xml'
-USE_MODIFICATION_CACHE = True
-MAX_MODIFICATION_LAYER_COUNT = 5
+USE_VEHICLE_CACHE = True
+USE_CONSTANTS_CACHE = True
+MAX_VEHICLE_CACHE_LAYER_COUNT = 5
+MAX_CONSTANTS_CACHE_LAYER_COUNT = 5
 FAKE_MODIFIER_NAME = 'fakeModifier'
 FAKE_PARAM_NAME = 'fakeParam'
 DEBUG_MODIFIERS = IS_DEVELOPMENT
@@ -98,6 +100,7 @@ class ModifierDomain(object):
     ENGINE = 1024
     HULL = 2048
     VEHICLE = 4096
+    CONSTANTS = 8192
     SHELL_COMPONENTS = SHELL | SHELL_TYPE
     SHOT_COMPONENTS = SHOT | SHELL_COMPONENTS
     GUN_COMPONENTS = GUN | SHOT_COMPONENTS
@@ -117,7 +120,8 @@ class ModifierDomain(object):
      PHYSICS: 'physics',
      ENGINE: 'engine',
      HULL: 'hull',
-     VEHICLE: 'vehicle'}
+     VEHICLE: 'vehicle',
+     CONSTANTS: 'constants'}
     NAME_TO_ID = dict(((v, k) for k, v in ID_TO_NAME.items()))
     ALL = set(NAME_TO_ID.itervalues())
     NAMES = set(ID_TO_NAME.itervalues())
@@ -201,43 +205,28 @@ class ShellCaliber(object):
 
 
 class ShellKind(object):
-    HOLLOW_CHARGE = 'HOLLOW_CHARGE'
-    ARMOR_PIERCING = 'ARMOR_PIERCING'
-    ARMOR_PIERCING_HE = 'ARMOR_PIERCING_HE'
-    ARMOR_PIERCING_CR = 'ARMOR_PIERCING_CR'
-    SMOKE = 'SMOKE'
-    HIGH_EXPLOSIVE_MODERN = 'HIGH_EXPLOSIVE_MODERN'
-    HIGH_EXPLOSIVE_LEGACY_STUN = 'HIGH_EXPLOSIVE_LEGACY_STUN'
-    HIGH_EXPLOSIVE_LEGACY_NO_STUN = 'HIGH_EXPLOSIVE_LEGACY_NO_STUN'
-    IMPROVED_POSTFIX = '_GOLD'
+    IMPROVED_POSTFIX = SHELL_TYPES.IMPROVED_POSTFIX
     ALL_KEY = 'ALL'
-    ALL_REGULAR = {HOLLOW_CHARGE,
-     ARMOR_PIERCING,
-     ARMOR_PIERCING_HE,
-     ARMOR_PIERCING_CR,
-     SMOKE,
-     HIGH_EXPLOSIVE_MODERN,
-     HIGH_EXPLOSIVE_LEGACY_STUN,
-     HIGH_EXPLOSIVE_LEGACY_NO_STUN}
-    ALL_IMPROVED = set([ key + IMPROVED_POSTFIX for key in ALL_REGULAR ])
+    ALL_REGULAR = {SHELL_TYPES.HOLLOW_CHARGE,
+     SHELL_TYPES.ARMOR_PIERCING,
+     SHELL_TYPES.ARMOR_PIERCING_HE,
+     SHELL_TYPES.ARMOR_PIERCING_CR,
+     SHELL_TYPES.SMOKE,
+     SHELL_TYPES.HIGH_EXPLOSIVE_MODERN,
+     SHELL_TYPES.HIGH_EXPLOSIVE_LEGACY_STUN,
+     SHELL_TYPES.HIGH_EXPLOSIVE_LEGACY_NO_STUN}
+    ALL_IMPROVED = set([ key + SHELL_TYPES.IMPROVED_POSTFIX for key in ALL_REGULAR ])
 
     @classmethod
     def get(cls, shellDescr, withGold=True):
-        if shellDescr.kind != SHELL_TYPES.HIGH_EXPLOSIVE:
-            kind = shellDescr.kind
-        elif shellDescr.type.mechanics == SHELL_MECHANICS_TYPE.MODERN:
-            kind = cls.HIGH_EXPLOSIVE_MODERN
-        elif shellDescr.hasStun:
-            kind = cls.HIGH_EXPLOSIVE_LEGACY_STUN
-        else:
-            kind = cls.HIGH_EXPLOSIVE_LEGACY_NO_STUN
-        return kind + cls.IMPROVED_POSTFIX if shellDescr.isGold and withGold else kind
+        return BATTLE_LOG_SHELL_TYPES.getShellType(shellDescr, withGold)
 
 
 class ModifiersWithRemapping(object):
     GUN_EFFECTS = 'gunEffects'
     SHOT_EFFECTS = 'shotEffects'
-    ALL = {GUN_EFFECTS, SHOT_EFFECTS}
+    SOUND_NOTIFICATIONS = 'soundNotifications'
+    ALL = {GUN_EFFECTS, SHOT_EFFECTS, SOUND_NOTIFICATIONS}
 
 
 class RemappingConditionNames(object):

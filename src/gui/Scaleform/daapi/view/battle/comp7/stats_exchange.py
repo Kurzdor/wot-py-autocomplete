@@ -11,6 +11,7 @@ from gui.battle_control.arena_info import vos_collections
 from gui.battle_control.arena_info.arena_vos import Comp7Keys
 from gui.impl import backport
 from gui.impl.gen import R
+from gui.impl.lobby.comp7.comp7_i18n_helpers import RANK_MAP, DIVISION_MAP
 from helpers import dependency
 from skeletons.gui.battle_session import IBattleSessionProvider
 if typing.TYPE_CHECKING:
@@ -23,11 +24,15 @@ class Comp7VehicleInfoComponent(vehicle.VehicleInfoComponent):
     def addVehicleInfo(self, vInfoVO, overrides):
         super(Comp7VehicleInfoComponent, self).addVehicleInfo(vInfoVO, overrides)
         rank, division = vInfoVO.gameModeSpecific.getValue(Comp7Keys.RANK, default=(0, 0))
+        rankName = RANK_MAP[rank] if rank > 0 else ''
+        divisionName = DIVISION_MAP[division] if division > 0 else ''
         return self._data.update({'role': ROLE_TYPE_TO_LABEL.get(vInfoVO.vehicleType.role, ''),
          'skillLevel': vInfoVO.gameModeSpecific.getValue(Comp7Keys.ROLE_SKILL_LEVEL, default=0),
-         'rank': rank,
-         'rankDivision': division,
-         'voiceChatConnected': self.__getVoiceChatConnected(vInfoVO)})
+         'rank': rankName,
+         'rankDivision': divisionName,
+         'isQualification': vInfoVO.gameModeSpecific.getValue(Comp7Keys.IS_QUAL_ACTIVE, default=False),
+         'voiceChatConnected': self.__getVoiceChatConnected(vInfoVO),
+         'isSuperSquad': self.__isSuperSquad(vInfoVO)})
 
     @classmethod
     def __getVoiceChatConnected(cls, vInfoVO):
@@ -36,6 +41,10 @@ class Comp7VehicleInfoComponent(vehicle.VehicleInfoComponent):
             return True
         else:
             return True if vInfoVO.isEnemy() or not vInfoVO.isPlayer() else vInfoVO.gameModeSpecific.getValue(Comp7Keys.VOIP_CONNECTED, default=False)
+
+    def __isSuperSquad(self, vInfoVO):
+        superSquads = self.__sessionProvider.arenaVisitor.getArenaExtraData().get('superSquads', [])
+        return vInfoVO.prebattleID in superSquads
 
 
 class Comp7StatisticsDataController(Comp7BattleStatisticDataControllerMeta):

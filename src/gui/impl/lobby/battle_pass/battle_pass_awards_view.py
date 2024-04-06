@@ -2,7 +2,7 @@
 # Embedded file name: scripts/client/gui/impl/lobby/battle_pass/battle_pass_awards_view.py
 import SoundGroups
 from battle_pass_common import BattlePassRewardReason, FinalReward
-from frameworks.wulf import ViewSettings, WindowFlags
+from frameworks.wulf import ViewSettings, WindowFlags, ViewStatus
 from gui.battle_pass.battle_pass_award import BattlePassAwardsManager
 from gui.battle_pass.battle_pass_bonuses_packers import packBonusModelAndTooltipData, useBigAwardInjection
 from gui.battle_pass.battle_pass_decorators import createBackportTooltipDecorator, createTooltipContentDecorator
@@ -18,6 +18,7 @@ from helpers import dependency
 from skeletons.gui.game_control import IBattlePassController
 MAP_REWARD_REASON = {BattlePassRewardReason.PURCHASE_BATTLE_PASS: RewardReason.BUY_BATTLE_PASS,
  BattlePassRewardReason.PURCHASE_BATTLE_PASS_LEVELS: RewardReason.BUY_BATTLE_PASS_LEVELS,
+ BattlePassRewardReason.PURCHASE_BATTLE_PASS_WITH_LEVELS: RewardReason.BUY_BATTLE_PASS_WITH_LEVELS,
  BattlePassRewardReason.STYLE_UPGRADE: RewardReason.STYLE_UPGRADE,
  BattlePassRewardReason.PURCHASE_BATTLE_PASS_MULTIPLE: RewardReason.BUY_MULTIPLE_BATTLE_PASS,
  BattlePassRewardReason.SELECT_REWARD: RewardReason.BUY_BATTLE_PASS_LEVELS}
@@ -30,7 +31,7 @@ REWARD_SIZES = {'Standard': STANDART_REWARD_SIZE,
  'None': 0}
 
 class BattlePassAwardsView(ViewImpl):
-    __slots__ = ('__tooltipItems', '__closeCallback', '__needNotifyClosing', '__showBuyCallback')
+    __slots__ = ('__tooltipItems', '__closeCallback', '__needNotifyClosing', '__showBuyCallback', '__exitCallback')
     __battlePass = dependency.descriptor(IBattlePassController)
 
     def __init__(self, *args, **kwargs):
@@ -40,6 +41,7 @@ class BattlePassAwardsView(ViewImpl):
         settings.kwargs = kwargs
         self.__tooltipItems = {}
         self.__closeCallback = None
+        self.__exitCallback = None
         self.__showBuyCallback = None
         self.__needNotifyClosing = True
         super(BattlePassAwardsView, self).__init__(settings)
@@ -62,7 +64,7 @@ class BattlePassAwardsView(ViewImpl):
         return None if tooltipId is None else self.__tooltipItems.get(tooltipId)
 
     def _getEvents(self):
-        return ((self.viewModel.onBuyClick, self.__onBuyClick),)
+        return ((self.viewModel.onBuyClick, self.__onBuyClick), (self.viewModel.onClose, self.__close))
 
     def _onLoading(self, bonuses, packageBonuses, data, needNotifyClosing, *args, **kwargs):
         super(BattlePassAwardsView, self)._onLoading(*args, **kwargs)
@@ -70,13 +72,14 @@ class BattlePassAwardsView(ViewImpl):
         newLevel = data.get('newLevel', 0) or 0
         reason = data.get('reason', BattlePassRewardReason.DEFAULT)
         self.__closeCallback = data.get('callback')
+        self.__exitCallback = data.get('exitCallback')
         self.__showBuyCallback = data.get('showBuyCallback')
         isFinalReward = self.__battlePass.isFinalLevel(chapterID, newLevel) and reason not in (BattlePassRewardReason.PURCHASE_BATTLE_PASS, BattlePassRewardReason.PURCHASE_BATTLE_PASS_MULTIPLE, BattlePassRewardReason.SELECT_REWARD)
         isPurchase = reason in BattlePassRewardReason.PURCHASE_REASONS
         rewardReason = MAP_REWARD_REASON.get(reason, RewardReason.DEFAULT)
         isBattlePassPurchased = self.__battlePass.isBought(chapterID=chapterID) or isPurchase
-        if chapterID and self.__battlePass.getRewardType(chapterID) == FinalReward.STYLE:
-            _, styleLevel = getStyleInfoForChapter(chapterID) if chapterID else (None, None)
+        if chapterID and FinalReward.PROGRESSIVE_STYLE in self.__battlePass.getFreeFinalRewardTypes(chapterID):
+            _, styleLevel = getStyleInfoForChapter(chapterID)
         else:
             styleLevel = None
         with self.viewModel.transaction() as tx:
@@ -90,28 +93,28 @@ class BattlePassAwardsView(ViewImpl):
             tx.setIsExtra(self.__battlePass.isExtraChapter(chapterID))
         if packageBonuses is not None and packageBonuses:
             self.__setPackageRewards(packageBonuses)
-        else:
-            self.__setAwards(bonuses, isFinalReward)
+        self.__setAwards(bonuses, isFinalReward)
         isRewardSelected = reason == BattlePassRewardReason.SELECT_REWARD
         self.viewModel.setIsNeedToShowOffer(not (isBattlePassPurchased or isRewardSelected))
         switchHangarOverlaySoundFilter(on=True)
-        SoundGroups.g_instance.playSound2D(BattlePassSounds.REWARD_SCREEN)
+        SoundGroups.g_instance.playSound2D(BattlePassSounds.HOLIDAY_REWARD_SCREEN if self.__battlePass.isHoliday() else BattlePassSounds.REWARD_SCREEN)
         self.__needNotifyClosing = needNotifyClosing
         return
 
     def _onLoaded(self, data, *args, **kwargs):
         reason = data.get('reason', BattlePassRewardReason.DEFAULT)
-        if reason in (BattlePassRewardReason.PURCHASE_BATTLE_PASS, BattlePassRewardReason.PURCHASE_BATTLE_PASS_LEVELS):
+        if reason in (BattlePassRewardReason.PURCHASE_BATTLE_PASS, BattlePassRewardReason.PURCHASE_BATTLE_PASS_LEVELS, BattlePassRewardReason.PURCHASE_BATTLE_PASS_WITH_LEVELS):
             g_eventBus.handleEvent(events.BattlePassEvent(events.BattlePassEvent.BUYING_THINGS), scope=EVENT_BUS_SCOPE.LOBBY)
 
     def _finalize(self):
         super(BattlePassAwardsView, self)._finalize()
         self.__tooltipItems = None
         switchHangarOverlaySoundFilter(on=False)
-        if callable(self.__closeCallback):
-            self.__closeCallback()
-            self.__closeCallback = None
-            self.__showBuyCallback = None
+        self.__closeCallback = None
+        self.__showBuyCallback = None
+        if callable(self.__exitCallback):
+            self.__exitCallback()
+            self.__exitCallback = None
         if self.__needNotifyClosing:
             g_eventBus.handleEvent(events.BattlePassEvent(events.BattlePassEvent.AWARD_VIEW_CLOSE), scope=EVENT_BUS_SCOPE.LOBBY)
         return
@@ -156,6 +159,19 @@ class BattlePassAwardsView(ViewImpl):
             self.__showBuyCallback()
             self.__showBuyCallback = None
             self.__closeCallback = None
+            if self.viewStatus not in (ViewStatus.DESTROYING, ViewStatus.DESTROYED):
+                self.destroyWindow()
+        return
+
+    def __close(self):
+        if callable(self.__closeCallback):
+            self.__closeCallback()
+            self.__closeCallback = None
+            if callable(self.__exitCallback):
+                self.__exitCallback()
+                self.__exitCallback = None
+        if self.viewStatus not in (ViewStatus.DESTROYING, ViewStatus.DESTROYED):
+            self.destroyWindow()
         return
 
 

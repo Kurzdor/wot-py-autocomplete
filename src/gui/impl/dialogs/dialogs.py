@@ -1,6 +1,5 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/impl/dialogs/dialogs.py
-from collections import namedtuple
 import typing
 from BWUtil import AsyncReturn
 from wg_async import wg_async, wg_await
@@ -8,22 +7,17 @@ from helpers import dependency
 from gui.impl.gen import R
 from gui.impl.lobby.battle_pass.trophy_device_confirm_view import TrophyDeviceUpgradeConfirmView
 from gui.impl.lobby.blueprints.blueprints_conversion_view import BlueprintsConversionView
-from gui.impl.lobby.crew_books.crew_books_buy_dialog import CrewBooksBuyDialog
-from gui.impl.lobby.crew_books.crew_books_dialog import CrewBooksDialog
 from gui.impl.lobby.dialogs.exchange_with_items import ExchangeToBuyItems, ExchangeToUpgradeDevice
 from gui.impl.lobby.dialogs.full_screen_dialog_view import FullScreenDialogWindowWrapper
 from gui.impl.lobby.dialogs.quit_game_dialog import QuitGameDialogWindow
 from gui.impl.lobby.premacc.maps_blacklist_confirm_view import MapsBlacklistConfirmView
-from gui.impl.lobby.frontline.skill_drop_dialog import SkillDropDialog
 from gui.impl.lobby.crew.free_skill_confirmation_dialog import FreeSkillConfirmationDialog
 from gui.impl.lobby.tank_setup.upgradable_device.UpgradeDeviceView import UpgradableDeviceUpgradeConfirmView
-from gui.impl.pub.dialog_window import DialogButtons, DialogWindow
+from gui.impl.pub.dialog_window import DialogButtons, DialogWindow, SingleDialogResult
 from skeletons.gui.impl import IGuiLoader
-from frameworks.wulf import WindowStatus
+from frameworks.wulf import WindowStatus, WindowLayer
 if typing.TYPE_CHECKING:
     from typing import Any, Optional, Iterable, Union
-    from frameworks.wulf import View
-SingleDialogResult = namedtuple('SingleDialogResult', ('busy', 'result'))
 
 @wg_async
 def show(dialog):
@@ -88,20 +82,6 @@ def modernizedDeviceUpgradeConfirm(currentModule, vehicle=None, onDeconstructed=
 
 
 @wg_async
-def useCrewBook(parent, crewBookCD, vehicleIntCD, tankmanInvId):
-    dialog = CrewBooksDialog(parent.getParentWindow(), crewBookCD, vehicleIntCD, tankmanInvId)
-    result = yield wg_await(showSimple(dialog))
-    raise AsyncReturn(result)
-
-
-@wg_async
-def buyCrewBook(parent, crewBookCD):
-    dialog = CrewBooksBuyDialog(parent.getParentWindow(), crewBookCD)
-    result = yield wg_await(showSimple(dialog))
-    raise AsyncReturn(result)
-
-
-@wg_async
 def showExchangeToBuyItemsDialog(itemsCountMap, parent=None):
     result = yield wg_await(showSingleDialog(layoutID=R.views.lobby.tanksetup.dialogs.ExchangeToBuyItems(), parent=parent, wrappedViewClass=ExchangeToBuyItems, itemsCountMap=itemsCountMap))
     raise AsyncReturn(result)
@@ -134,16 +114,83 @@ def showExchangeToUpgradeDeviceDialog(device, parent=None):
 
 
 @wg_async
-def showDropSkillDialog(tankman, price=None, isBlank=False, freeDropSave100=False):
-    result = yield wg_await(showSingleDialogWithResultData(price=price, isBlank=isBlank, tankman=tankman, freeDropSave100=freeDropSave100, layoutID=SkillDropDialog.LAYOUT_ID, wrappedViewClass=SkillDropDialog))
-    if result.busy:
-        raise AsyncReturn((False, {}))
-    else:
-        isOk, _ = result.result
-        raise AsyncReturn((isOk, {}))
+def showFreeSkillConfirmationDialog(skill):
+    result = yield wg_await(showSingleDialogWithResultData(skill=skill, layoutID=FreeSkillConfirmationDialog.LAYOUT_ID, wrappedViewClass=FreeSkillConfirmationDialog))
+    raise AsyncReturn(result)
 
 
 @wg_async
-def showFreeSkillConfirmationDialog(skill):
-    result = yield wg_await(showSingleDialogWithResultData(skill=skill, layoutID=FreeSkillConfirmationDialog.LAYOUT_ID, wrappedViewClass=FreeSkillConfirmationDialog))
+def showLearnPerkConfirmationDialog(skill, level):
+    from gui.impl.lobby.crew.dialogs.perk_learn_confirmation_dialog import PerkLearnConfirmationDialog
+    result = yield wg_await(showSingleDialogWithResultData(skill=skill, level=level, layoutID=PerkLearnConfirmationDialog.LAYOUT_ID, wrappedViewClass=PerkLearnConfirmationDialog))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showPerksDropDialog(tankmanId):
+    from gui.impl.lobby.crew.dialogs.perks_reset_dialog import PerksResetDialog
+    result = yield wg_await(showSingleDialog(layoutID=PerksResetDialog.LAYOUT_ID, wrappedViewClass=PerksResetDialog, tankmanId=tankmanId))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showRetrainMassiveDialog(tankmenIds, vehicleCD):
+    from gui.impl.lobby.crew.dialogs.retrain_massive_dialog import RetrainMassiveDialog
+    result = yield wg_await(showSingleDialog(layoutID=RetrainMassiveDialog.LAYOUT_ID, wrappedViewClass=RetrainMassiveDialog, tankmenIds=tankmenIds, vehicleCD=vehicleCD))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showRetrainSingleDialog(tankmanId, vehicleCD, targetRole=None, targetSlotIdx=None, isChangeRoleVisible=False, beforeActions=None, parentViewKey=None):
+    from gui.impl.lobby.crew.dialogs.retrain_single_dialog import RetrainSingleDialog
+    result = yield wg_await(showSingleDialog(layoutID=RetrainSingleDialog.LAYOUT_ID, wrappedViewClass=RetrainSingleDialog, tankmanId=tankmanId, vehicleCD=vehicleCD, targetRole=targetRole, targetSlotIdx=targetSlotIdx, isChangeRoleVisible=isChangeRoleVisible, beforeActions=beforeActions, parentViewKey=parentViewKey))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showRecruitNewTankmanDialog(vehicleCD, slotIdx, putInTank=False):
+    from gui.impl.lobby.crew.dialogs.recruit_new_tankman_dialog import RecruitNewTankmanDialog
+    result = yield wg_await(showSingleDialog(layoutID=RecruitNewTankmanDialog.LAYOUT_ID, wrappedViewClass=RecruitNewTankmanDialog, vehicleCD=vehicleCD, slotIdx=slotIdx, putInTank=putInTank))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showEnlargeBarracksDialog():
+    from gui.impl.lobby.crew.dialogs.enlarge_barracks_dialog import EnlargeBarracksDialog
+    result = yield wg_await(showSimple(FullScreenDialogWindowWrapper(EnlargeBarracksDialog(), layer=WindowLayer.FULLSCREEN_WINDOW)))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showCrewBooksPurchaseDialog(crewBookCD):
+    from gui.impl.lobby.crew.dialogs.crew_books_purchase_dialog import CrewBooksPurchaseDialog
+    result = yield wg_await(showSingleDialog(layoutID=CrewBooksPurchaseDialog.LAYOUT_ID, wrappedViewClass=CrewBooksPurchaseDialog, crewBookCD=crewBookCD))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showDocumentChangeDialog(tankmanInvID, ctx=None):
+    from gui.impl.lobby.crew.dialogs.document_change_dialog import DocumentChangeDialog
+    result = yield wg_await(showSingleDialog(layoutID=DocumentChangeDialog.LAYOUT_ID, wrappedViewClass=DocumentChangeDialog, tankmanInvID=tankmanInvID, ctx=ctx))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showSkinApplyDialog(crewSkinID, tankManInvID):
+    from gui.impl.lobby.crew.dialogs.skin_apply_dialog import SkinApplyDialog
+    result = yield wg_await(showSingleDialogWithResultData(crewSkinID=crewSkinID, tankManInvID=tankManInvID, layoutID=SkinApplyDialog.LAYOUT_ID, wrappedViewClass=SkinApplyDialog))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showDismissTankmanDialog(tankmanId, parentViewKey=None):
+    from gui.impl.lobby.crew.dialogs.dismiss_tankman_dialog import DismissTankmanDialog
+    result = yield wg_await(showSingleDialog(layoutID=DismissTankmanDialog.LAYOUT_ID, wrappedViewClass=DismissTankmanDialog, tankmanId=tankmanId, parentViewKey=parentViewKey))
+    raise AsyncReturn(result)
+
+
+@wg_async
+def showRestoreTankmanDialog(tankmanId, vehicleId, slotIdx, parentViewKey=None):
+    from gui.impl.lobby.crew.dialogs.restore_tankman_dialog import RestoreTankmanDialog
+    result = yield wg_await(showSingleDialog(layoutID=RestoreTankmanDialog.LAYOUT_ID, wrappedViewClass=RestoreTankmanDialog, tankmanId=tankmanId, vehicleId=vehicleId, slotIdx=slotIdx, parentViewKey=parentViewKey))
     raise AsyncReturn(result)

@@ -1,16 +1,22 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/battle_control/arena_info/interfaces.py
 import typing
+from typing import Tuple
 from gui.battle_control.arena_info.settings import ARENA_LISTENER_SCOPE as _SCOPE
 from gui.battle_control.controllers.interfaces import IBattleController
 from gui.battle_control.view_components import ViewComponentsController
 if typing.TYPE_CHECKING:
+    from Math import Matrix
     from EmptyEntity import EmptyEntity
     from items.vehicles import VehicleDescr
     from gui.shared.gui_items.Vehicle import Vehicle
     from vehicle_systems.appearance_cache import VehicleAppearanceCacheInfo
     from vehicle_systems.CompoundAppearance import CompoundAppearance
     from points_of_interest.components import PoiStateComponent
+    from cgf_components.zone_components import ZoneMarker, ZoneUINotification
+    from UIComponents import MinimapChangerComponent
+    from pve_battle_hud import WidgetType
+    from gui.battle_control.controllers.vse_hud_settings_ctrl.vse_hud_settings_ctrl import SettingsTypes, ItemSettingsTypes
 
 class IArenaController(IBattleController):
     __slots__ = ('__weakref__',)
@@ -171,6 +177,9 @@ class IBattleFieldController(IArenaVehiclesController):
     def stopVehicleVisual(self, vehicleID):
         pass
 
+    def getAliveVehicles(self):
+        pass
+
 
 class IProgressionController(IArenaLoadController):
     __slots__ = ()
@@ -319,6 +328,9 @@ class IVehicleCountController(IArenaVehiclesController, ViewComponentsController
     def updateAttachedVehicle(self, vehicleID):
         raise NotImplementedError
 
+    def updateLives(self, lives):
+        raise NotImplementedError
+
 
 class IPrebattleSetupsController(IArenaPeriodController, IArenaLoadController, ViewComponentsController):
 
@@ -352,9 +364,6 @@ class IPrebattleSetupsController(IArenaPeriodController, IArenaLoadController, V
     def setEnhancements(self, vehicleID, enhancements):
         raise NotImplementedError
 
-    def setPerks(self, vehicleID, perks):
-        raise NotImplementedError
-
     def setPostProgression(self, vehicleID, postProgression):
         raise NotImplementedError
 
@@ -382,7 +391,7 @@ class IPrebattleSetupsController(IArenaPeriodController, IArenaLoadController, V
 
 class IAppearanceCacheController(IArenaVehiclesController):
 
-    def getAppearance(self, vId, vInfo, callback=None, strCD=None):
+    def getAppearance(self, vId, vInfo, callback=None, strCD=None, needLoad=True):
         raise NotImplementedError
 
     def reloadAppearance(self, vId, vInfo, callback=None, strCD=None, oldStrCD=None):
@@ -392,6 +401,7 @@ class IAppearanceCacheController(IArenaVehiclesController):
 class IPointsOfInterestController(IBattleController):
     onPoiEquipmentUsed = None
     onPoiCaptured = None
+    onPoiInvaderDestroyed = None
 
     @staticmethod
     def getPoiState(poiID):
@@ -478,4 +488,107 @@ class IComp7VOIPController(IArenaLoadController):
         raise NotImplementedError
 
     def toggleChannelConnection(self):
+        raise NotImplementedError
+
+
+class IBRVOIPController(IArenaLoadController):
+    __slots__ = ()
+
+    @property
+    def isVoipSupported(self):
+        raise NotImplementedError
+
+    @property
+    def isVoipEnabled(self):
+        raise NotImplementedError
+
+    @property
+    def isJoined(self):
+        raise NotImplementedError
+
+    @property
+    def isTeamVoipEnabled(self):
+        raise NotImplementedError
+
+    def toggleChannelConnection(self):
+        raise NotImplementedError
+
+
+class IMapZonesController(IBattleController):
+    onMarkerToZoneAdded = None
+    onMarkerFromZoneRemoved = None
+    onMarkerProgressUpdated = None
+    onZoneTransformed = None
+    onTransformedZoneRemoved = None
+
+    def addMarkerToZone(self, zoneMarker, matrix):
+        raise NotImplementedError
+
+    def removeMarkerFromZone(self, zoneMarker):
+        raise NotImplementedError
+
+    def addTransformedZone(self, zone):
+        raise NotImplementedError
+
+    def removeTransformedZone(self, zone):
+        raise NotImplementedError
+
+    def enterDangerZone(self, zone):
+        raise NotImplementedError
+
+    def exitDangerZone(self, zone):
+        raise NotImplementedError
+
+    def removeDangerZone(self, zone):
+        raise NotImplementedError
+
+    def getZoneMarkers(self):
+        raise NotImplementedError
+
+    def getTransformedZones(self):
+        raise NotImplementedError
+
+
+class IOverrideSettingsController(IArenaController):
+    __slots__ = ()
+
+    @property
+    def defaultTab(self):
+        raise NotImplementedError
+
+    @property
+    def disabledTabs(self):
+        raise NotImplementedError
+
+    def getCtrlScope(self):
+        return _SCOPE.OVERRIDE_SETTINGS
+
+
+class IAimingSoundsCtrl(IBattleController):
+
+    def startControl(self, *_):
+        pass
+
+    def stopControl(self):
+        pass
+
+    def updateDispersion(self, multFactor, aimingFactor, idealFactor, dualAccMultFactor, dualAccFactor, idealDualAccFactor, hasDualAcc):
+        raise NotImplementedError
+
+
+class IVSEHUDSettingsController(IBattleController):
+    __slots__ = ()
+    onSettingsChanged = None
+    onItemSettingsChanged = None
+
+    def setSettings(self, settingsID, settings):
+        raise NotImplementedError
+
+    def getSettings(self, settingsID):
+        raise NotImplementedError
+
+    def setItemSettings(self, settingsID, itemID, settings):
+        raise NotImplementedError
+
+    def getItemSettings(self, settingsID, itemID):
         raise NotImplementedError

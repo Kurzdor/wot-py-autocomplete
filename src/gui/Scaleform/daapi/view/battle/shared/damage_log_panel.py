@@ -4,7 +4,7 @@ from collections import defaultdict
 from BattleFeedbackCommon import BATTLE_EVENT_TYPE as _BET
 from account_helpers.settings_core.options import DamageLogDetailsSetting as _VIEW_MODE, DamageLogEventPositionsSetting as _EVENT_POSITIONS, DamageLogEventTypesSetting as _DISPLAYED_EVENT_TYPES
 from account_helpers.settings_core.settings_constants import DAMAGE_LOG, GRAPHICS
-from constants import BATTLE_LOG_SHELL_TYPES
+from constants import BATTLE_LOG_SHELL_TYPES, BOT_DISPLAY_CLASS_NAMES
 from gui.Scaleform.daapi.view.meta.BattleDamageLogPanelMeta import BattleDamageLogPanelMeta
 from gui.Scaleform.genConsts.BATTLEDAMAGELOG_IMAGES import BATTLEDAMAGELOG_IMAGES as _IMAGES
 from gui.Scaleform.genConsts.DAMAGE_LOG_SHELL_BG_TYPES import DAMAGE_LOG_SHELL_BG_TYPES
@@ -13,6 +13,7 @@ from gui.battle_control.battle_constants import PERSONAL_EFFICIENCY_TYPE as _ETY
 from gui.battle_control.controllers.personal_efficiency_ctrl import _DamageEfficiencyInfo
 from gui.impl import backport
 from gui.shared import events as gui_events, EVENT_BUS_SCOPE
+from gui.shared.gui_items.Vehicle import VEHICLE_CLASS_NAME
 from helpers import dependency
 from helpers import i18n
 from shared_utils import BitmaskHelper
@@ -44,11 +45,17 @@ _TOTAL_DAMAGE_SETTINGS_TO_CONTENT_MASK = {DAMAGE_LOG.TOTAL_DAMAGE: _ETYPE.DAMAGE
  DAMAGE_LOG.BLOCKED_DAMAGE: _ETYPE.BLOCKED_DAMAGE,
  DAMAGE_LOG.ASSIST_STUN: _ETYPE.STUN}
 _LOGS_SETTINGS = (DAMAGE_LOG.SHOW_DETAILS, DAMAGE_LOG.EVENT_POSITIONS, DAMAGE_LOG.SHOW_EVENT_TYPES)
-_VEHICLE_CLASS_TAGS_ICONS = {'lightTank': _IMAGES.WHITE_ICON_LIGHTTANK_16X16,
- 'mediumTank': _IMAGES.WHITE_ICON_MEDIUM_TANK_16X16,
- 'heavyTank': _IMAGES.WHITE_ICON_HEAVYTANK_16X16,
- 'SPG': _IMAGES.WHITE_ICON_SPG_16X16,
- 'AT-SPG': _IMAGES.WHITE_ICON_AT_SPG_16X16}
+_VEHICLE_CLASS_TAGS_ICONS = {VEHICLE_CLASS_NAME.LIGHT_TANK: _IMAGES.WHITE_ICON_LIGHTTANK_16X16,
+ VEHICLE_CLASS_NAME.MEDIUM_TANK: _IMAGES.WHITE_ICON_MEDIUM_TANK_16X16,
+ VEHICLE_CLASS_NAME.HEAVY_TANK: _IMAGES.WHITE_ICON_HEAVYTANK_16X16,
+ VEHICLE_CLASS_NAME.SPG: _IMAGES.WHITE_ICON_SPG_16X16,
+ VEHICLE_CLASS_NAME.AT_SPG: _IMAGES.WHITE_ICON_AT_SPG_16X16,
+ BOT_DISPLAY_CLASS_NAMES.LIGHT_TANK_ELITE.value: _IMAGES.WHITE_ICON_LIGHTTANK_ELITE_16X16,
+ BOT_DISPLAY_CLASS_NAMES.MEDIUM_TANK_ELITE.value: _IMAGES.WHITE_ICON_MEDIUM_TANK_ELITE_16X16,
+ BOT_DISPLAY_CLASS_NAMES.HEAVY_TANK_ELITE.value: _IMAGES.WHITE_ICON_HEAVYTANK_ELITE_16X16,
+ BOT_DISPLAY_CLASS_NAMES.SPG_ELITE.value: _IMAGES.WHITE_ICON_SPG_ELITE_16X16,
+ BOT_DISPLAY_CLASS_NAMES.AT_SPG_ELITE.value: _IMAGES.WHITE_ICON_AT_SPG_ELITE_16X16,
+ BOT_DISPLAY_CLASS_NAMES.BOSS.value: _IMAGES.WHITE_ICON_BOSS_16X16}
 _SHELL_TYPES_TO_STR = {BATTLE_LOG_SHELL_TYPES.ARMOR_PIERCING: INGAME_GUI.DAMAGELOG_SHELLTYPE_ARMOR_PIERCING,
  BATTLE_LOG_SHELL_TYPES.ARMOR_PIERCING_HE: INGAME_GUI.DAMAGELOG_SHELLTYPE_ARMOR_PIERCING_HE,
  BATTLE_LOG_SHELL_TYPES.ARMOR_PIERCING_CR: INGAME_GUI.DAMAGELOG_SHELLTYPE_ARMOR_PIERCING_CR,
@@ -56,7 +63,6 @@ _SHELL_TYPES_TO_STR = {BATTLE_LOG_SHELL_TYPES.ARMOR_PIERCING: INGAME_GUI.DAMAGEL
  BATTLE_LOG_SHELL_TYPES.HE_MODERN: INGAME_GUI.DAMAGELOG_SHELLTYPE_HIGH_EXPLOSIVE,
  BATTLE_LOG_SHELL_TYPES.HE_LEGACY_STUN: INGAME_GUI.DAMAGELOG_SHELLTYPE_HIGH_EXPLOSIVE,
  BATTLE_LOG_SHELL_TYPES.HE_LEGACY_NO_STUN: INGAME_GUI.DAMAGELOG_SHELLTYPE_HIGH_EXPLOSIVE}
-_DEATH_ZONES_STR = INGAME_GUI.DAMAGELOG_DEATH_ZONE
 HIDDEN_SHELL = ''
 
 def _formatTotalValue(value):
@@ -122,9 +128,9 @@ class _VehicleVOBuilder(_IVOBuilder):
         return vo
 
     def _populateVO(self, vehicleVO, info, arenaDP):
-        vTypeInfoVO = arenaDP.getVehicleInfo(info.getArenaVehicleID()).vehicleType
-        vehicleVO.vehicleTypeImg = _VEHICLE_CLASS_TAGS_ICONS.get(vTypeInfoVO.classTag, '')
-        vehicleVO.vehicleName = vTypeInfoVO.shortNameWithPrefix
+        vInfoVO = arenaDP.getVehicleInfo(info.getArenaVehicleID())
+        vehicleVO.vehicleTypeImg = _VEHICLE_CLASS_TAGS_ICONS.get(vInfoVO.getDisplayedClassTag(), '')
+        vehicleVO.vehicleName = vInfoVO.getDisplayedName()
 
 
 class _ReceivedHitVehicleVOBuilder(_VehicleVOBuilder):
@@ -134,7 +140,7 @@ class _ReceivedHitVehicleVOBuilder(_VehicleVOBuilder):
         if info.getArenaVehicleID() == arenaDP.getPlayerVehicleID() and info.isRam():
             vehicleVO.vehicleName = ''
             vehicleVO.vehicleTypeImg = ''
-        if info.isDeathZone():
+        if info.isDeathZone() or info.isStaticDeathZone():
             vehicleVO.vehicleName = ''
             vehicleVO.vehicleTypeImg = ''
         if info.isDamagingSmoke():
@@ -191,10 +197,13 @@ class _EmptyShellVOBuilder(_ShellVOBuilder):
         return DAMAGE_LOG_SHELL_BG_TYPES.EMPTY
 
 
-class _DeathZoneVOBuilder(_ShellVOBuilder):
+class _StaticDeathZoneVOBuilder(_ShellVOBuilder):
 
     def _getShellTypeStr(self, info):
-        return _DEATH_ZONES_STR
+        return HIDDEN_SHELL
+
+    def _getShellTypeBg(self, info, arenaDP=None):
+        return DAMAGE_LOG_SHELL_BG_TYPES.EMPTY
 
 
 class _EpicDeathZoneVOBuilder(_ShellVOBuilder):
@@ -211,8 +220,8 @@ class _DamageShellVOBuilder(_ShellVOBuilder):
     def buildVO(self, info, arenaDP):
         if info.isShot() or info.isFire():
             shellVOBuilder = _ShellVOBuilder()
-        elif info.isDeathZone():
-            shellVOBuilder = _DeathZoneVOBuilder()
+        elif info.isStaticDeathZone():
+            shellVOBuilder = _StaticDeathZoneVOBuilder()
         elif info.isProtectionZoneDamage() or info.isBombersDamage():
             shellVOBuilder = _EpicDeathZoneVOBuilder()
         else:
@@ -225,8 +234,8 @@ class _CritsShellVOBuilder(_ShellVOBuilder):
     def buildVO(self, info, arenaDP):
         if info.isShot() or info.isFire():
             shellVOBuilder = _ShellVOBuilder()
-        elif info.isDeathZone():
-            shellVOBuilder = _DeathZoneVOBuilder()
+        elif info.isStaticDeathZone():
+            shellVOBuilder = _StaticDeathZoneVOBuilder()
         elif info.isProtectionZoneDamage() or info.isBombersDamage():
             shellVOBuilder = _EpicDeathZoneVOBuilder()
         else:
@@ -309,7 +318,7 @@ class _DamageActionImgVOBuilder(_ActionImgVOBuilder):
     def _getImage(self, info):
         if info.isClingBrander():
             return self.__clingBranderDmgIcon
-        if info.isShot() or info.isDeathZone() or info.isFortArtilleryEqDamage():
+        if info.isShot() or info.isDeathZone() or info.isFortArtilleryEqDamage() or info.isStaticDeathZone():
             return self.__shotIcon
         if info.isProtectionZoneDamage():
             return self.__deathZoneIcon
@@ -367,7 +376,7 @@ class _LogViewComponent(object):
         self.__addToListProxy = None
         self.__efficiencyCtrl = None
         self.__arenaDP = None
-        self.__logViewMode = _VIEW_MODE.SHOW_ALWAYS
+        self._logViewMode = _VIEW_MODE.SHOW_ALWAYS
         self.__isVisible = True
         self.__contentMask = 0
         self.__recordStyle = _RECORD_STYLE.FULL
@@ -390,10 +399,10 @@ class _LogViewComponent(object):
         self.__setListProxy(self.__isVisible, bool(self.__recordStyle == _RECORD_STYLE.SHORT), [])
 
     def invalidate(self):
-        if self.__logViewMode == _VIEW_MODE.SHOW_ALWAYS:
+        if self._logViewMode == _VIEW_MODE.SHOW_ALWAYS:
             self.__isVisible = True
             messages = self._getLogMessages(self.__contentMask)
-        elif self.__logViewMode == _VIEW_MODE.SHOW_BY_ALT_PRESS:
+        elif self._logViewMode == _VIEW_MODE.SHOW_BY_ALT_PRESS:
             self.__isVisible = False
             messages = self._getLogMessages(self.__contentMask)
         else:
@@ -403,8 +412,8 @@ class _LogViewComponent(object):
 
     def updateLog(self, contentMask=None, viewMode=None, recordStyle=_RECORD_STYLE.FULL):
         needUpdate = False
-        if viewMode != self.__logViewMode:
-            self.__logViewMode = viewMode
+        if viewMode != self._logViewMode:
+            self._logViewMode = viewMode
             needUpdate = True
         if contentMask != self.__contentMask:
             self.__contentMask = contentMask
@@ -416,7 +425,7 @@ class _LogViewComponent(object):
             self.invalidate()
 
     def addToLog(self, events):
-        if self.__logViewMode == _VIEW_MODE.HIDE:
+        if self._logViewMode == _VIEW_MODE.HIDE:
             return
         else:
             for e in events:
@@ -430,7 +439,7 @@ class _LogViewComponent(object):
     def _getLogMessages(self, contentMask):
         if self.__efficiencyCtrl is not None:
             records = self.__efficiencyCtrl.getLoogedEfficiency(contentMask)
-            return [ self._buildLogMessageVO(r) for r in records ]
+            return [ res for res in map(self._buildLogMessageVO, records) if res is not None ]
         else:
             return []
 
@@ -449,14 +458,15 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
         self.__efficiencyCtrl = None
         self.__arenaDP = self.sessionProvider.getArenaDP()
         self.__vehStateCtrl = self.sessionProvider.shared.vehicleState
-        self.__isVisible = False
-        self.__isFullStatsShown = False
-        self.__logViewMode = _VIEW_MODE.SHOW_ALWAYS
+        self._isVisible = False
+        self._isFullStatsShown = False
+        self._isWinnerScreenShown = False
+        self._logViewMode = _VIEW_MODE.SHOW_ALWAYS
         self.__totalDamageContentMask = 0
         self.__totalValues = defaultdict(int)
         self._totalEvents = None
-        self.__topLog = _LogViewComponent()
-        self.__bottomLog = _LogViewComponent()
+        self._topLog = _LogViewComponent()
+        self._bottomLog = _LogViewComponent()
         return
 
     def isSwitchToVehicle(self):
@@ -467,8 +477,8 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
     def _populate(self):
         super(DamageLogPanel, self)._populate()
         self.__efficiencyCtrl = self.sessionProvider.shared.personalEfficiencyCtrl
-        self.__topLog.initialize(setListProxyMethod=self._updateTopLog, addToListProxyMethod=self._addToTopLog, efficiencyCtrl=self.__efficiencyCtrl, arenaDP=self.__arenaDP)
-        self.__bottomLog.initialize(setListProxyMethod=self._updateBottomLog, addToListProxyMethod=self._addToBottomLog, efficiencyCtrl=self.__efficiencyCtrl, arenaDP=self.__arenaDP)
+        self._topLog.initialize(setListProxyMethod=self._updateTopLog, addToListProxyMethod=self._addToTopLog, efficiencyCtrl=self.__efficiencyCtrl, arenaDP=self.__arenaDP)
+        self._bottomLog.initialize(setListProxyMethod=self._updateBottomLog, addToListProxyMethod=self._addToBottomLog, efficiencyCtrl=self.__efficiencyCtrl, arenaDP=self.__arenaDP)
         self._totalEvents = ((_ETYPE.DAMAGE, self._updateTotalDamageValue),
          (_ETYPE.BLOCKED_DAMAGE, self._updateTotalBlockedDamageValue),
          (_ETYPE.ASSIST_DAMAGE, self._updateTotalAssistValue),
@@ -483,6 +493,9 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
         if self.__vehStateCtrl is not None:
             self.__vehStateCtrl.onPostMortemSwitched += self._onPostMortemSwitched
             self.__vehStateCtrl.onVehicleControlling += self._onVehicleControlling
+        deathScreenCtrl = self.sessionProvider.dynamic.deathScreen
+        if deathScreenCtrl:
+            deathScreenCtrl.onWinnerScreen += self.__onWinnerScreen
         self.addListener(gui_events.GameEvent.SHOW_EXTENDED_INFO, self._handleShowExtendedInfo, scope=EVENT_BUS_SCOPE.BATTLE)
         self.addListener(gui_events.GameEvent.SHOW_CURSOR, self._handleShowCursor, EVENT_BUS_SCOPE.GLOBAL)
         self.addListener(gui_events.GameEvent.HIDE_CURSOR, self._handleHideCursor, EVENT_BUS_SCOPE.GLOBAL)
@@ -497,6 +510,9 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
         if self.__vehStateCtrl is not None:
             self.__vehStateCtrl.onPostMortemSwitched -= self._onPostMortemSwitched
             self.__vehStateCtrl.onVehicleControlling -= self._onVehicleControlling
+        deathScreenCtrl = self.sessionProvider.dynamic.deathScreen
+        if deathScreenCtrl:
+            deathScreenCtrl.onWinnerScreen -= self.__onWinnerScreen
         self.settingsCore.onSettingsChanged -= self._onSettingsChanged
         if self.__efficiencyCtrl is not None:
             self.__efficiencyCtrl.onTotalEfficiencyUpdated -= self._onTotalEfficiencyUpdated
@@ -505,8 +521,8 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
             self.__efficiencyCtrl = None
         self.__vehStateCtrl = None
         self.__arenaDP = None
-        self.__topLog.dispose()
-        self.__bottomLog.dispose()
+        self._topLog.dispose()
+        self._bottomLog.dispose()
         self._totalEvents = None
         super(DamageLogPanel, self)._dispose()
         return
@@ -517,7 +533,7 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
 
     def _invalidateLogs(self):
         settingGetter = self.settingsCore.getSetting
-        self.__logViewMode = settingGetter(DAMAGE_LOG.SHOW_DETAILS)
+        self._logViewMode = settingGetter(DAMAGE_LOG.SHOW_DETAILS)
         epos = settingGetter(DAMAGE_LOG.EVENT_POSITIONS)
         etype = settingGetter(DAMAGE_LOG.SHOW_EVENT_TYPES)
         topLogContentMask, bottomLogContentMask = _EVENT_POSITIONS_TO_CONTENT_MASK[epos]
@@ -525,8 +541,8 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
         displayedEventsContentMask = _DISPLAYED_EVENT_TYPES_TO_CONTENT_MASK[etype]
         topLogContentMask &= displayedEventsContentMask
         bottomLogContentMask &= displayedEventsContentMask
-        self.__topLog.updateLog(topLogContentMask, self.__logViewMode, topLogRecStyle)
-        self.__bottomLog.updateLog(bottomLogContentMask, self.__logViewMode, bottomLogRecStyle)
+        self._topLog.updateLog(topLogContentMask, self._logViewMode, topLogRecStyle)
+        self._bottomLog.updateLog(bottomLogContentMask, self._logViewMode, bottomLogRecStyle)
 
     def _invalidateTotalDamages(self):
         contentMask = 0
@@ -551,31 +567,31 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
 
     def _onPersonalEfficiencyLogSynced(self):
         if self.isSwitchToVehicle():
-            self.__topLog.invalidate()
-            self.__bottomLog.invalidate()
+            self._topLog.invalidate()
+            self._bottomLog.invalidate()
 
     def _onEfficiencyReceived(self, events):
         if self.isSwitchToVehicle():
-            self.__topLog.addToLog(events)
-            self.__bottomLog.addToLog(events)
+            self._topLog.addToLog(events)
+            self._bottomLog.addToLog(events)
 
     def _invalidatePanelVisibility(self):
-        if self.__isFullStatsShown:
+        if self._isFullStatsShown or self._isWinnerScreenShown:
             return
         else:
             isVisible = True
             if self.sessionProvider.getCtx().isPlayerObserver():
                 isVisible = True
             elif self.__vehStateCtrl is None:
-                isVisible = self.__isVisible
+                isVisible = self._isVisible
             elif self.__vehStateCtrl.isInPostmortem:
                 if self.__arenaDP is None:
-                    isVisible = self.__isVisible
+                    isVisible = self._isVisible
                 else:
                     isVisible = self.isSwitchToVehicle()
-            if self.__isVisible != isVisible:
-                self.__isVisible = isVisible
-                self._setSettings(self.__isVisible, bool(self.settingsCore.getSetting(GRAPHICS.COLOR_BLIND)))
+            if self._isVisible != isVisible:
+                self._isVisible = isVisible
+                self._setSettings(self._isVisible, bool(self.settingsCore.getSetting(GRAPHICS.COLOR_BLIND)))
             return
 
     def _onSettingsChanged(self, diff):
@@ -588,7 +604,7 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
                 self._invalidateLogs()
 
         if GRAPHICS.COLOR_BLIND in diff:
-            self._setSettings(self.__isVisible, bool(diff[GRAPHICS.COLOR_BLIND]))
+            self._setSettings(self._isVisible, bool(diff[GRAPHICS.COLOR_BLIND]))
 
     def _onPostMortemSwitched(self, noRespawnPossible, respawnAvailable):
         self._invalidatePanelVisibility()
@@ -598,7 +614,7 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
         self._invalidateTotalDamages()
 
     def _handleShowExtendedInfo(self, event):
-        if self.__logViewMode == _VIEW_MODE.SHOW_BY_ALT_PRESS:
+        if self._logViewMode == _VIEW_MODE.SHOW_BY_ALT_PRESS:
             self.as_isDownAltButtonS(event.ctx['isDown'])
 
     def _handleShowCursor(self, _):
@@ -608,9 +624,12 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
         self.as_isDownCtrlButtonS(False)
 
     def __handleShowFullStats(self, event):
-        self.__isFullStatsShown = event.ctx['isDown']
-        if not self.__isFullStatsShown:
+        self._isFullStatsShown = event.ctx['isDown']
+        if not self._isFullStatsShown:
             self._invalidatePanelVisibility()
+
+    def __onWinnerScreen(self):
+        self._isWinnerScreenShown = True
 
     def _setTotalValue(self, etype, value):
         if BitmaskHelper.hasAnyBitSet(self.__totalDamageContentMask, etype):
@@ -655,6 +674,6 @@ class DamageLogPanel(BattleDamageLogPanelMeta):
         if settingName == DAMAGE_LOG.ASSIST_STUN and result:
             isSPG = self.__arenaDP.getVehicleInfo(self.__vehStateCtrl.getControllingVehicleID()).isSPG()
             arenaVisitor = self.sessionProvider.arenaVisitor
-            isComp7Battle = arenaVisitor.gui.isComp7Battle
+            isComp7Battle = arenaVisitor.gui.isComp7Battle()
             result = (isSPG or isComp7Battle) and self.lobbyContext.getServerSettings().spgRedesignFeatures.isStunEnabled()
         return result

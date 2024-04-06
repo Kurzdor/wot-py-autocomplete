@@ -3,33 +3,54 @@
 from collections import namedtuple
 from itertools import imap
 import BigWorld
+from helpers.local_cache import FileLocalCache
+from typing import TYPE_CHECKING
 import Event
 from debug_utils import LOG_WARNING, LOG_DEBUG, LOG_ERROR, LOG_CURRENT_EXCEPTION
 from gui import SystemMessages
 from gui.SystemMessages import SM_TYPE
-from gui.shared.gui_items.Tankman import CrewTypes
-from gui.shared.items_cache import CACHE_SYNC_REASON
 from gui.shared.gui_items import GUI_ITEM_TYPE
+from gui.shared.gui_items.Tankman import CrewTypes
 from gui.shared.gui_items.Vehicle import Vehicle
+from gui.shared.items_cache import CACHE_SYNC_REASON
 from gui.shared.utils.requesters.ItemsRequester import REQ_CRITERIA
 from helpers import dependency
-from helpers.local_cache import FileLocalCache
 from items import ITEM_TYPE_NAMES, vehicles, EQUIPMENT_TYPES, ITEM_TYPES
 from items.vehicles import VehicleDescr
 from nation_change_helpers.client_nation_change_helper import getValidVehicleCDForNationChange
 from post_progression_common import VehicleState
-from skeletons.gui.game_control import IVehicleComparisonBasket, IBootcampController
+from skeletons.gui.game_control import IVehicleComparisonBasket
 from skeletons.gui.lobby_context import ILobbyContext
 from skeletons.gui.shared import IItemsCache
 from soft_exception import SoftException
-PARAMS_AFFECTED_TANKMEN_SKILLS = ('camouflage',
- 'brotherhood',
+if TYPE_CHECKING:
+    import typing
+    from typing import Optional, List
+PARAMS_AFFECTED_TANKMEN_SKILLS = ('brotherhood',
  'repair',
+ 'camouflage',
  'commander_eagleEye',
+ 'commander_universalist',
+ 'commander_tutor',
+ 'commander_expert',
+ 'commander_enemyShotPredictor',
+ 'gunner_smoothTurret',
+ 'gunner_sniper',
+ 'gunner_rancorous',
+ 'gunner_gunsmith',
  'driver_virtuoso',
+ 'driver_smoothDriving',
  'driver_badRoadsKing',
+ 'driver_tidyPerson',
+ 'driver_rammingMaster',
+ 'loader_desperado',
+ 'loader_pedant',
+ 'loader_intuition',
+ 'radioman_finder',
+ 'radioman_retransmitter',
+ 'radioman_lastEffort',
  'radioman_inventor',
- 'radioman_finder')
+ 'fireFighting')
 MAX_VEHICLES_TO_COMPARE_COUNT = 20
 _NO_CREW_SKILLS = set()
 _DEF_SHELL_INDEX = 0
@@ -169,6 +190,7 @@ class _VehCmpCache(FileLocalCache):
 
 
 class _VehCompareData(object):
+    itemsCache = dependency.descriptor(IItemsCache)
 
     def __init__(self, vehicleIntCD, vehicleStrCD, vehStockStrCD, isFromCache=False, rentalIsOver=False):
         super(_VehCompareData, self).__init__()
@@ -186,6 +208,7 @@ class _VehCompareData(object):
         self.__equipment = self.getNoEquipmentLayout()
         self.__battleBooster = None
         self.__invEquipment = self.getNoEquipmentLayout()
+        self.__invBattleBoost = None
         self.__selectedShellIndex = _DEF_SHELL_INDEX
         self.__invHasCamouflage = False
         self.__hasCamouflage = False
@@ -211,14 +234,12 @@ class _VehCompareData(object):
     def setCrewData(self, crewLvl, skills):
         if crewLvl not in CrewTypes.ALL:
             raise SoftException('Unsupported crew level type: {}'.format(crewLvl))
-        self.__crewLvl = crewLvl
         self.__crewSkills = skills
 
-    def setInventoryCrewData(self, crewLvl, value):
+    def setInventoryCrewData(self, crewLvl, skills):
         if crewLvl not in CrewTypes.ALL:
             raise SoftException('Unsupported crew level type: {}'.format(crewLvl))
-        self.__inventoryCrewSkills = value
-        self.__inventoryCrewLvl = crewLvl
+        self.__inventoryCrewSkills = skills
 
     def setVehicleStrCD(self, strCD):
         self.__strCD = strCD
@@ -231,6 +252,9 @@ class _VehCompareData(object):
 
     def setInvEquipment(self, equipment):
         self.__invEquipment = equipment
+
+    def setInvBattleBoost(self, battleBoost):
+        self.__invBattleBoost = battleBoost
 
     def setHasCamouflage(self, value):
         self.__hasCamouflage = value
@@ -268,6 +292,9 @@ class _VehCompareData(object):
     def getInvEquipment(self):
         return self.__invEquipment
 
+    def getInvBattleBoost(self):
+        return self.__invBattleBoost
+
     def getBattleBooster(self):
         return self.__battleBooster
 
@@ -289,19 +316,20 @@ class _VehCompareData(object):
         cType = CONFIGURATION_TYPES.CUSTOM
         if self.__selectedShellIndex != self.getInventoryShellIndex():
             return cType
-        if self.__hasCamouflage != self.__invHasCamouflage:
+        elif self.__hasCamouflage != self.__invHasCamouflage:
             return cType
-        if self.__dynSlotType != self.__invDynSlotType:
+        elif self.__dynSlotType != self.__invDynSlotType:
             return cType
-        if self.__postProgressionState != self.__invPostProgressionState:
+        elif self.__postProgressionState != self.__invPostProgressionState:
             return cType
-        if self.__strCD == self.__stockVehStrCD and self.getEquipment() == self.getStockEquipment() and self.__crewLvl == self.getStockCrewLvl():
-            if self.__crewSkills == self.getStockCrewSkills():
-                cType = CONFIGURATION_TYPES.BASIC
-        if self.__strCD == self.__invVehStrCD and self.__equipment == self.__invEquipment and self.__crewLvl == self.__inventoryCrewLvl:
-            if self.__crewSkills == self.__inventoryCrewSkills:
-                cType = CONFIGURATION_TYPES.CURRENT
-        return cType
+        else:
+            if self.__strCD == self.__stockVehStrCD and self.getEquipment() == self.getStockEquipment() and self.__crewLvl == self.getStockCrewLvl() and self.__crewSkills == self.getStockCrewSkills():
+                if self.__battleBooster is None:
+                    cType = CONFIGURATION_TYPES.BASIC
+            if self.__strCD == self.__invVehStrCD and self.__equipment == self.__invEquipment and self.__crewLvl == self.__inventoryCrewLvl and self.__crewSkills == self.__inventoryCrewSkills:
+                if self.__battleBooster == self.__invBattleBoost:
+                    cType = CONFIGURATION_TYPES.CURRENT
+            return cType
 
     def getVehicleStrCD(self):
         return self.__strCD
@@ -358,6 +386,7 @@ class _VehCompareData(object):
         dataClone.setInventoryCrewData(self.__inventoryCrewLvl, self.__inventoryCrewSkills)
         dataClone.setEquipment(self.getEquipment())
         dataClone.setInvEquipment(self.__invEquipment)
+        dataClone.setInvBattleBoost(self.getInvBattleBoost())
         dataClone.setHasCamouflage(self.__hasCamouflage)
         dataClone.setHasBattleBooster(self.__hasBattleBooster)
         dataClone.setBattleBooster(self.getBattleBooster())
@@ -375,7 +404,7 @@ class _VehCompareData(object):
         return [None] * eqCapacity
 
     def __addBuiltInEquipment(self, equipmentIDs):
-        if not self.__isInInventory:
+        if not self.__isInInventory and self.itemsCache.isSynced():
             vehicleType = self.__getVehicleType()
             builtInEquipmentIDs = vehicles.getBuiltinEqsForVehicle(vehicleType)
             for slotId, eqID in enumerate(builtInEquipmentIDs):
@@ -389,7 +418,6 @@ class _VehCompareData(object):
 class VehComparisonBasket(IVehicleComparisonBasket):
     itemsCache = dependency.descriptor(IItemsCache)
     lobbyContext = dependency.descriptor(ILobbyContext)
-    bootcampController = dependency.descriptor(IBootcampController)
 
     def __init__(self):
         super(VehComparisonBasket, self).__init__()
@@ -408,7 +436,9 @@ class VehComparisonBasket(IVehicleComparisonBasket):
         self.__vehicles = []
 
     def onLobbyStarted(self, ctx):
-        self.__isEnabled = self.lobbyContext.getServerSettings().isVehicleComparingEnabled() and not self.bootcampController.isInBootcamp()
+        self.__isEnabled = self.lobbyContext.getServerSettings().isVehicleComparingEnabled()
+        diff = {GUI_ITEM_TYPE.VEHICLE: [ vehicle.getVehicleCD() for vehicle in self.__vehicles ]}
+        self.__onCacheResync(CACHE_SYNC_REASON.CLIENT_UPDATE, diff)
 
     def onLobbyInited(self, event):
         if self.isEnabled() and self.isAvailable() and not self.isLocked:
@@ -521,6 +551,7 @@ class VehComparisonBasket(IVehicleComparisonBasket):
         vehicle.setSelectedShellIndex(_DEF_SHELL_INDEX)
         vehicle.setDynSlotType(vehicle.getInvDynSlotType())
         vehicle.setPostProgressionState(vehicle.getInvPostProgressionState())
+        vehicle.setBattleBooster(vehicle.getInvBattleBoost())
         self.onParametersChange((index,))
 
     @_operationLocked
@@ -758,6 +789,8 @@ class VehComparisonBasket(IVehicleComparisonBasket):
     def __updateInventoryEquipment(cls, vehCompareData, vehicle):
         if vehicle.isInInventory:
             vehCompareData.setInvEquipment(_getVehicleEquipment(vehicle))
+            if vehicle.battleBoosters.installed.getCapacity() > 0:
+                vehCompareData.setInvBattleBoost(vehicle.battleBoosters.installed[0])
         else:
             vehCompareData.setInvEquipment(vehCompareData.getNoEquipmentLayout())
 

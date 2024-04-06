@@ -25,7 +25,7 @@ _logger = logging.getLogger(__name__)
 class BaseAmmunitionPanelView(ViewImpl):
     _itemsCache = dependency.descriptor(IItemsCache)
     _hangarSpace = dependency.descriptor(IHangarSpace)
-    __slots__ = ('_ammunitionPanel', 'onSizeChanged', 'onPanelSectionResized', 'onVehicleChanged')
+    __slots__ = ('_ammunitionPanel', '_wasVehicleOnLoading', 'onPanelSectionResized', 'onVehicleChanged')
 
     def __init__(self, flags=ViewFlags.VIEW):
         settings = ViewSettings(R.views.lobby.tanksetup.AmmunitionPanel())
@@ -33,7 +33,7 @@ class BaseAmmunitionPanelView(ViewImpl):
         settings.model = AmmunitionPanelViewModel()
         super(BaseAmmunitionPanelView, self).__init__(settings)
         self._ammunitionPanel = None
-        self.onSizeChanged = Event()
+        self._wasVehicleOnLoading = False
         self.onPanelSectionResized = Event()
         self.onVehicleChanged = Event()
         return
@@ -95,14 +95,15 @@ class BaseAmmunitionPanelView(ViewImpl):
         self._ammunitionPanel.update(self.vehItem, fullUpdate=fullUpdate)
 
     def destroy(self):
-        self.onSizeChanged.clear()
         self.onPanelSectionResized.clear()
         super(BaseAmmunitionPanelView, self).destroy()
 
     def _onLoading(self, *args, **kwargs):
         super(BaseAmmunitionPanelView, self)._onLoading(*args, **kwargs)
+        self._wasVehicleOnLoading = self.vehItem is not None
         self._ammunitionPanel = self._createAmmunitionPanel()
         self._ammunitionPanel.onLoading()
+        return
 
     def _onLoaded(self, *args, **kwargs):
         super(BaseAmmunitionPanelView, self)._onLoaded(*args, **kwargs)
@@ -112,7 +113,7 @@ class BaseAmmunitionPanelView(ViewImpl):
         super(BaseAmmunitionPanelView, self)._initialize()
         self._addListeners()
         self._ammunitionPanel.initialize()
-        self.update(fullUpdate=False)
+        self._updateView()
 
     def _finalize(self):
         self._removeListeners()
@@ -123,7 +124,6 @@ class BaseAmmunitionPanelView(ViewImpl):
         return HangarAmmunitionPanel(self.viewModel.ammunitionPanel, self.vehItem)
 
     def _addListeners(self):
-        self.viewModel.onViewSizeInitialized += self.__onViewSizeInitialized
         self.viewModel.ammunitionPanel.onSectionSelect += self._onPanelSectionSelected
         self.viewModel.ammunitionPanel.onSectionResized += self._onPanelSectionResized
         g_currentVehicle.onChangeStarted += self.__onVehicleChangeStarted
@@ -131,7 +131,6 @@ class BaseAmmunitionPanelView(ViewImpl):
         self._itemsCache.onSyncCompleted += self.__itemCacheChanged
 
     def _removeListeners(self):
-        self.viewModel.onViewSizeInitialized -= self.__onViewSizeInitialized
         self.viewModel.ammunitionPanel.onSectionSelect -= self._onPanelSectionSelected
         self.viewModel.ammunitionPanel.onSectionResized -= self._onPanelSectionResized
         g_currentVehicle.onChangeStarted -= self.__onVehicleChangeStarted
@@ -166,12 +165,12 @@ class BaseAmmunitionPanelView(ViewImpl):
     def _getIsReady(self):
         return self.viewStatus == ViewStatus.LOADED
 
-    def __onViewSizeInitialized(self, args=None):
-        self.onSizeChanged(args.get('width', 0), args.get('height', 0), args.get('offsetY', 0))
-
     def __canChangeVehicle(self):
         if self.prbDispatcher is not None:
             permission = self.prbDispatcher.getGUIPermissions()
             if permission is not None:
                 return permission.canChangeVehicle()
         return True
+
+    def _updateView(self):
+        self.update(fullUpdate=False)

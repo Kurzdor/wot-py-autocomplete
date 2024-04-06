@@ -68,7 +68,7 @@ class EpicBattleTooltipLogger(EpicBattleLogger):
         if self._openedTooltip and self._openedTooltip == tooltip:
             self._openedTooltip = None
             itemName = self._overrideTooltipsId.get(tooltip, tooltip)
-            self.stopAction(EpicBattleLogActions.TOOLTIP_WATCHED.value, itemName, self._parentScreen, info=self._additionalInfo, timeLimit=self.TIME_LIMIT, itemState=EpicBattleLogItemStates.ADVANCED if self._isAdvancedTooltip else None)
+            self.stopAction(EpicBattleLogActions.TOOLTIP_WATCHED.value, itemName, self._parentScreen, info=None if self._additionalInfo is None else str(self._additionalInfo), timeLimit=self.TIME_LIMIT, itemState=EpicBattleLogItemStates.ADVANCED if self._isAdvancedTooltip else None)
             self._isAdvancedTooltip = False
         return
 
@@ -79,7 +79,14 @@ class EpicBattleTooltipLogger(EpicBattleLogger):
         else:
             self._isAdvancedTooltip = isAdvancedKeyPressed or self._isAdvancedTooltip
             self._openedTooltip = tooltip
-            isSkipped = self._skipAdditionalInfoTooltips is not None and tooltip in self._skipAdditionalInfoTooltips
-            self._additionalInfo = str(args[1 if tooltip == TOOLTIPS_CONSTANTS.NOT_ENOUGH_MONEY else 0]) if args and not isSkipped else None
+            self._additionalInfo = None
+            if self._skipAdditionalInfoTooltips is None or tooltip not in self._skipAdditionalInfoTooltips:
+                if tooltip == TOOLTIPS_CONSTANTS.EPIC_BATTLE_INSTRUCTION_TOOLTIP:
+                    self._additionalInfo = args[0]
+                elif args:
+                    if tooltip == TOOLTIPS_CONSTANTS.NOT_ENOUGH_MONEY:
+                        self._additionalInfo = args[1]
+                    elif tooltip not in (TOOLTIPS_CONSTANTS.EPIC_BATTLE_SELECTOR_INFO, TOOLTIPS_CONSTANTS.EPIC_BATTLE_WIDGET_INFO):
+                        self._additionalInfo = args[0]
             self.startAction(EpicBattleLogActions.TOOLTIP_WATCHED.value)
             return

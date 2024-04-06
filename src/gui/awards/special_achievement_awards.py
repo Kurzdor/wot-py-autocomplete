@@ -23,46 +23,6 @@ def _getNationName(nationID):
     return backport.text(R.strings.nations.dyn(NAMES[nationID]).genetiveCase())
 
 
-class ResearchAward(ExplosionBackAward):
-
-    def __init__(self, vehiclesCount, messageNumber):
-        super(ResearchAward, self).__init__()
-        self.vehiclesCount = vehiclesCount
-        self.messageNumber = messageNumber
-
-    def getWindowTitle(self):
-        return i18n.makeString(MENU.AWARDWINDOW_TITLE_SPECIALACHIEVEMENT)
-
-    def getAwardImage(self):
-        return RES_ICONS.MAPS_ICONS_AWARDS_VEHICLESRESEARCH
-
-    def getHeader(self):
-        return text_styles.highTitle(i18n.makeString(MENU.AWARDWINDOW_SPECIALACHIEVEMENT_HEADER))
-
-    def getDescription(self):
-        return text_styles.main(i18n.makeString('#menu:awardWindow/specialAchievement/research/description%d' % self.messageNumber, vehiclesCount=self.vehiclesCount))
-
-
-class VictoryAward(ExplosionBackAward):
-
-    def __init__(self, victoriesCount, messageNumber):
-        super(VictoryAward, self).__init__()
-        self.victoriesCount = victoriesCount
-        self.messageNumber = messageNumber
-
-    def getWindowTitle(self):
-        return i18n.makeString(MENU.AWARDWINDOW_TITLE_SPECIALACHIEVEMENT)
-
-    def getAwardImage(self):
-        return RES_ICONS.MAPS_ICONS_AWARDS_VICTORY
-
-    def getHeader(self):
-        return text_styles.highTitle(i18n.makeString(MENU.AWARDWINDOW_SPECIALACHIEVEMENT_HEADER))
-
-    def getDescription(self):
-        return text_styles.main(i18n.makeString('#menu:awardWindow/specialAchievement/victory/description%d' % self.messageNumber, victoriesCount=backport.getIntegralFormat(self.victoriesCount)))
-
-
 class VehicleCollectorAward(ExplosionBackAward):
 
     def __init__(self, nationID):
@@ -116,26 +76,6 @@ class VehicleCollectorOfEverythingAward(ExplosionBackAward):
         return backport.text(R.strings.menu.awardWindow.vehicleCollectorOfEverything.okButton())
 
 
-class BattleAward(ExplosionBackAward):
-
-    def __init__(self, battlesCount, messageNumber):
-        super(BattleAward, self).__init__()
-        self.battlesCount = battlesCount
-        self.messageNumber = messageNumber
-
-    def getWindowTitle(self):
-        return i18n.makeString(MENU.AWARDWINDOW_TITLE_SPECIALACHIEVEMENT)
-
-    def getAwardImage(self):
-        return RES_ICONS.MAPS_ICONS_AWARDS_BATTLESWORDS
-
-    def getHeader(self):
-        return text_styles.highTitle(i18n.makeString(MENU.AWARDWINDOW_SPECIALACHIEVEMENT_HEADER))
-
-    def getDescription(self):
-        return text_styles.main(i18n.makeString('#menu:awardWindow/specialAchievement/battle/description%d' % self.messageNumber, battlesCount=backport.getIntegralFormat(self.battlesCount)))
-
-
 class BoosterAward(ExplosionBackAward):
 
     def __init__(self, booster):
@@ -153,7 +93,7 @@ class BoosterAward(ExplosionBackAward):
 
     def getDescription(self):
         localKey = '#menu:awardWindow/boosterAward/description/timeValue/%s'
-        if self._booster.expiryTime:
+        if self._booster.useby:
             timeValue = text_styles.stats(i18n.makeString(localKey % 'defined', effectTime=self._booster.getEffectTimeStr(), tillTime=self._booster.getExpiryDate()))
         else:
             timeValue = text_styles.stats(i18n.makeString(localKey % 'undefined', effectTime=self._booster.getEffectTimeStr()))

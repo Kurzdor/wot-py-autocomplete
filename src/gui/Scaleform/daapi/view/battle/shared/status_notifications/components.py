@@ -87,12 +87,10 @@ class StatusNotificationItem(object):
         self.__updateCallback = None
         return
 
-    def _hide(self):
-        self._setVisible(False)
-
     def _setVisible(self, value):
-        if self._isVisible != value:
-            self._isVisible = value
+        wasVisible = self.isVisible()
+        self._isVisible = value
+        if wasVisible != self.isVisible():
             self._sendUpdate()
 
     def _sendUpdate(self):
@@ -115,6 +113,10 @@ class StatusNotificationsGroup(StatusNotificationItem):
     def start(self):
         for item in self.__items:
             item.start()
+
+    def updateItems(self, updater):
+        for item in self.__items:
+            updater(item)
 
     def getItemID(self):
         return self.GROUP_ITEM_ID

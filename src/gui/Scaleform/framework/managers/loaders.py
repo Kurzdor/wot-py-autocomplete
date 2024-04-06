@@ -11,6 +11,7 @@ from gui.Scaleform.framework.entities.abstract.LoaderManagerMeta import LoaderMa
 from gui.Scaleform.framework.entities.sf_window import SFWindow
 from gui.Scaleform.framework.entities.view_impl_adaptor import ViewImplAdaptor
 from gui.Scaleform.framework.settings import UIFrameworkImpl
+from gui.Scaleform.framework.view_overrider import ViewOverrider
 from helpers import dependency, uniprof
 from shared_utils import CONST_CONTAINER
 from skeletons.gui.impl import IGuiLoader
@@ -144,6 +145,10 @@ class LoaderManager(LoaderManagerMeta):
         return '{}[{}]=[loadingItems=[{}]]'.format(self.__class__.__name__, hex(id(self)), self.__loadingItems)
 
     def loadView(self, loadParams, *args, **kwargs):
+        override = g_viewOverrider.getOverrideData(loadParams, *args, **kwargs)
+        if override:
+            self.cancelLoading(loadParams.viewKey)
+            return self.__doLoadGuiImplView(override.loadParams, *override.args, **override.kwargs)
         if loadParams.uiImpl == UIFrameworkImpl.GUI_IMPL:
             return self.__doLoadGuiImplView(loadParams, *args, **kwargs)
         if loadParams.uiImpl == UIFrameworkImpl.SCALEFORM:
@@ -161,11 +166,11 @@ class LoaderManager(LoaderManagerMeta):
                 item.isCancelled = True
                 self.as_cancelLoadViewS(key.name)
                 self.onViewLoadCanceled(key, item)
-                if not item.pyEntity.isDisposed():
-                    item.pyEntity.destroy()
                 if item.uid != -1:
                     uniprof.exitFromRegion('Loading {} {}'.format(key.name, item.uid))
                     BigWorld.notify(BigWorld.EventType.VIEW_LOADED, key.alias, item.uid, key.name)
+                if not item.pyEntity.isDisposed():
+                    item.pyEntity.destroy()
             return
 
     def getViewLoadingItem(self, key):
@@ -340,3 +345,6 @@ class LoaderManager(LoaderManagerMeta):
         self.onViewLoadInit(adaptor)
         adaptor.loadView()
         return adaptor
+
+
+g_viewOverrider = ViewOverrider()

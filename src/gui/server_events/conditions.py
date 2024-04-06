@@ -10,14 +10,17 @@ from constants import ATTACK_REASON, ATTACK_REASONS
 from debug_utils import LOG_WARNING
 from gui import GUI_NATIONS_ORDER_INDICES
 from gui.Scaleform.locale.QUESTS import QUESTS
+from gui.impl.gen import R
+from gui.impl import backport
 from gui.server_events import formatters, events_constants
 from gui.server_events.formatters import getUniqueBonusTypes
+from gui.shared.system_factory import collectModeNameKwargsByBonusType
 from gui.shared.utils.requesters import REQ_CRITERIA
 from gui.shared.utils.requesters.ItemsRequester import RESEARCH_CRITERIA
 from helpers import i18n, dependency, getLocalizedData
 from items import vehicles
 from shared_utils import CONST_CONTAINER
-from skeletons.gui.game_control import IIGRController
+from skeletons.gui.game_control import IIGRController, IWotPlusController
 from skeletons.gui.server_events import IEventsCache
 from skeletons.gui.shared import IItemsCache
 from soft_exception import SoftException
@@ -26,7 +29,8 @@ if typing.TYPE_CHECKING:
 _logger = logging.getLogger(__name__)
 _AVAILABLE_GUI_TYPES_LABELS = {constants.ARENA_BONUS_TYPE.REGULAR: constants.ARENA_GUI_TYPE.RANDOM,
  constants.ARENA_BONUS_TYPE.TRAINING: constants.ARENA_GUI_TYPE.TRAINING,
- constants.ARENA_BONUS_TYPE.TOURNAMENT_REGULAR: constants.ARENA_GUI_TYPE.TRAINING}
+ constants.ARENA_BONUS_TYPE.TOURNAMENT_REGULAR: constants.ARENA_GUI_TYPE.TRAINING,
+ constants.ARENA_BONUS_TYPE.TOURNAMENT_COMP7: constants.ARENA_GUI_TYPE.COMP7}
 _AVAILABLE_BONUS_TYPES_LABELS = {constants.ARENA_BONUS_TYPE.CYBERSPORT: 'team7x7'}
 _RELATIONS = formatters.RELATIONS
 _RELATIONS_SCHEME = formatters.RELATIONS_SCHEME
@@ -561,6 +565,23 @@ class PremiumPlusAccount(_Requirement):
         return self.itemsCache.items.stats.isActivePremium(constants.PREMIUM_TYPE.PLUS) == self._needValue if self._needValue is not None else True
 
 
+class WotPlus(_Requirement):
+    wotPlusController = dependency.descriptor(IWotPlusController)
+
+    def __init__(self, path, data):
+        super(WotPlus, self).__init__('wotPlus', dict(data), path)
+        self._needValue = self._data.get('value')
+
+    def isWotPlusNeeded(self):
+        return self._needValue
+
+    def negate(self):
+        self._needValue = not self._needValue
+
+    def _isAvailable(self):
+        return self.wotPlusController.isEnabled() == self._needValue
+
+
 class InClan(_Requirement):
 
     def __init__(self, path, data):
@@ -866,7 +887,7 @@ class BattleBonusType(_Condition, _Negatable):
         self._types = self._data.get('value')
 
     def __repr__(self):
-        return 'BonusType<types=%r>' % self._types
+        return 'BattleBonusType<types=%r>' % self._types
 
     def negate(self):
         newTypes = []
@@ -971,6 +992,16 @@ class Win(_Condition, _Negatable):
 
     def getValue(self):
         return self._isWin
+
+
+class StaticMapsTrainingWin(Win):
+
+    def __init__(self, path, data, questID):
+        super(StaticMapsTrainingWin, self).__init__(path, data)
+        self.questID = questID
+
+    def getCustomDescription(self):
+        return backport.text(R.strings.static_quests.mt_battle_quests.dyn(self.questID).conditions.postBattle.description())
 
 
 class Survive(_Condition, _Negatable):
@@ -1150,7 +1181,8 @@ class BattlesCount(_Cumulativable):
     def getUserString(self):
         result = []
         for bType in self._bonusTypes:
-            result.append(unicode(i18n.makeString(QUESTS.getDetailsDossier(bType, self.getKey()))))
+            kwargs = collectModeNameKwargsByBonusType(bType) or {}
+            result.append(unicode(i18n.makeString(QUESTS.getDetailsDossier(bType, self.getKey()), **kwargs)))
 
         if not result:
             _logger.warning('There are no matching condition strings for selected arenaBonusTypes')
@@ -1472,9 +1504,6 @@ class VehicleDamage(_CountOrTotalEventsCondition):
             key += '/eventCount'
         return key
 
-    def _getKey(self):
-        pass
-
 
 class VehicleDamageCumulative(VehicleDamage, _Cumulativable):
 
@@ -1499,7 +1528,7 @@ class VehicleDamageCumulative(VehicleDamage, _Cumulativable):
         return self._bonus
 
     def getKey(self):
-        return self._name
+        pass
 
 
 class VehicleStun(_CountOrTotalEventsCondition):
@@ -1515,9 +1544,6 @@ class VehicleStun(_CountOrTotalEventsCondition):
 
     def getLabelKey(self):
         return QUESTS.DETAILS_CONDITIONS_VEHICLESTUNEVENTCOUNT if self.isEventCount() else QUESTS.DETAILS_CONDITIONS_VEHICLESTUN
-
-    def _getKey(self):
-        pass
 
 
 class VehicleStunCumulative(VehicleStun, _Cumulativable):
@@ -1546,7 +1572,7 @@ class VehicleStunCumulative(VehicleStun, _Cumulativable):
         return super(VehicleStunCumulative, self).getLabelKey() + '/cumulative'
 
     def getKey(self):
-        return self._name
+        pass
 
 
 class MultiStunEvent(_Condition, _Negatable):

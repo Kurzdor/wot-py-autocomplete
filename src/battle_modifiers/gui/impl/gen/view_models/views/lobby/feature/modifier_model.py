@@ -24,8 +24,6 @@ class ModType(Enum):
     DISP_FACTOR_WHILE_GUN_DAMAGED = 'dispFactorWhileGunDamaged'
     SHELL_GRAVITY = 'shellGravity'
     SHELL_SPEED = 'shellSpeed'
-    PIERCING_POWER_FIRST = 'piercingPowerFirst'
-    PIERCING_POWER_LAST = 'piercingPowerLast'
     DAMAGE_RANDOMIZATION = 'damageRandomization'
     PIERCING_POWER_RANDOMIZATION = 'piercingPowerRandomization'
     NORMALIZATION_ANGLE = 'normalizationAngle'
@@ -35,8 +33,6 @@ class ModType(Enum):
     BK_MAX_SPEED = 'bkMaxSpeed'
     ROTATION_SPEED_ON_STILL = 'rotationSpeedOnStill'
     ROTATION_SPEED_ON_MOVE = 'rotationSpeedOnMove'
-    ARMOR_DAMAGE = 'armorDamage'
-    DEVICE_DAMAGE = 'deviceDamage'
     INVISIBILITY_ON_STILL = 'invisibilityOnStill'
     INVISIBILITY_ON_MOVE = 'invisibilityOnMove'
     VISION_RADIUS = 'visionRadius'
@@ -54,6 +50,8 @@ class ModType(Enum):
     VISION_MIN_RADIUS = 'visionMinRadius'
     VISION_TIME = 'visionTime'
     EQUIPMENT_COOLDOWN = 'equipmentCooldown'
+    INVISIBILITY_FACTOR_AT_SHOT = 'invisibilityFactorAtShot'
+    VEHICLE_AOI_RADIUS = 'vehicleAoIRadius'
 
 
 class ModPhysType(Enum):

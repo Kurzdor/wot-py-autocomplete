@@ -22,7 +22,6 @@ DEPTH_OF_PlayerBonusesPanel = 0.2
 DEPTH_OF_Aim = 0.6
 DEPTH_OF_GunMarker = 0.56
 DEPTH_OF_VehicleMarker = 0.9
-CLIENT_ENCODING = '1251'
 TANKMEN_ROLES_ORDER_DICT = {'plain': ('commander', 'gunner', 'driver', 'radioman', 'loader'),
  'enum': ('commander', 'gunner1', 'gunner2', 'driver', 'radioman1', 'radioman2', 'loader1', 'loader2')}
 
@@ -134,8 +133,13 @@ def getGuiServicesConfig(manager):
     from gui import hangar_cameras
     from gui import impl
     from gui import offers
-    from gui.platform import wgnp, catalog_service, products_fetcher
+    from gui.platform import wgnp, catalog_service, products_fetcher, product_purchase
     from skeletons.gui.lobby_context import ILobbyContext
+    import gui.prebattle_hints
+    from skeletons.gui.battle_hints.battle_hints_overlap_controller import IBattleHintsOverlapController
+    from gui.battle_hints.battle_hints_overlap_controller import BattleHintsOverlapController
+    from skeletons.gui.battle_hints.newbie_battle_hints_controller import INewbieBattleHintsController
+    from gui.battle_hints.newbie_battle_hints_controller import NewbieBattleHintsController
     manager.addConfig(app_loader.getAppLoaderConfig)
     manager.addConfig(shared.getSharedServices)
     manager.addConfig(game_control.getGameControllersConfig)
@@ -158,7 +162,11 @@ def getGuiServicesConfig(manager):
     manager.addConfig(server_events.getBattleMattersController)
     manager.addConfig(wgnp.getWGNPRequestControllers)
     manager.addConfig(products_fetcher.getProductFetchControllers)
+    manager.addConfig(product_purchase.getProductPurchaseControllers)
     manager.addConfig(catalog_service.getPurchaseCache)
+    manager.addConfig(gui.prebattle_hints.controllersConfig)
+    manager.addInstance(IBattleHintsOverlapController, BattleHintsOverlapController(), finalizer='fini')
+    manager.addInstance(INewbieBattleHintsController, NewbieBattleHintsController(), finalizer='fini')
     if HAS_DEV_RESOURCES:
         try:
             from gui.development import getDevelopmentServicesConfig

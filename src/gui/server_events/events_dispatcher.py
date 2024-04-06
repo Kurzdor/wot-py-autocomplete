@@ -67,6 +67,16 @@ _EVENTS_REWARD_WINDOW = {recruit_helper.RecruitSourceID.TWITCH_0: TwitchRewardWi
  recruit_helper.RecruitSourceID.TWITCH_38: TwitchRewardWindow,
  recruit_helper.RecruitSourceID.TWITCH_39: TwitchRewardWindow,
  recruit_helper.RecruitSourceID.TWITCH_40: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_41: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_42: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_43: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_44: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_45: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_46: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_47: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_48: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_49: TwitchRewardWindow,
+ recruit_helper.RecruitSourceID.TWITCH_50: TwitchRewardWindow,
  recruit_helper.RecruitSourceID.COMMANDER_MARINA: TwitchRewardWindow,
  recruit_helper.RecruitSourceID.COMMANDER_PATRICK: TwitchRewardWindow,
  anniversary_helper.ANNIVERSARY_EVENT_PREFIX: GiveAwayRewardWindow}
@@ -282,25 +292,32 @@ def showMotiveAward(quest):
     shared_events.showAwardWindow(awards.MotiveQuestAward(quest, showMission))
 
 
-def showTankwomanAward(questID, tankmanData):
+def showTankwomanAward(questID, tankmanData, vehicleSlotToUnpack=-1, vehicle=None, parentViewKey=None):
     ctx = {'isFemale': tankmanData.isFemale,
-     'questID': questID}
-    shared_events.showTankwomanRecruitAwardDialog(ctx)
+     'questID': questID,
+     'slot': vehicleSlotToUnpack,
+     'vehicle': vehicle}
+    shared_events.showTankwomanRecruitAwardDialog(ctx, parentViewKey=parentViewKey)
 
 
 @dependency.replace_none_kwargs(eventsCache=IEventsCache)
-def showRecruitWindow(recruitID, eventsCache=None):
+def showRecruitWindow(recruitID, vehicleSlotToUnpack=-1, vehicle=None, eventsCache=None, parentViewKey=None):
     recruitData = recruit_helper.getRecruitInfo(recruitID)
-    if recruitData.getSourceID() == recruit_helper.RecruitSourceID.TANKWOMAN:
-        quest = eventsCache.getPersonalMissions().getAllQuests()[int(recruitID)]
-        bonus = quest.getTankmanBonus()
-        needToGetTankman = quest.needToGetAddReward() and not bonus.isMain or quest.needToGetMainReward() and bonus.isMain
-        if needToGetTankman and bonus.tankman is not None:
-            showTankwomanAward(quest.getID(), first(bonus.tankman.getTankmenData()))
+    if vehicleSlotToUnpack != -1 and recruitData.getRoles() and vehicle.descriptor.type.crewRoles[vehicleSlotToUnpack][0] not in recruitData.getRoles():
+        return
     else:
-        shared_events.showTokenRecruitDialog({'tokenName': recruitID,
-         'tokenData': recruitData})
-    return
+        if recruitData.getSourceID() == recruit_helper.RecruitSourceID.TANKWOMAN:
+            quest = eventsCache.getPersonalMissions().getAllQuests()[int(recruitID)]
+            bonus = quest.getTankmanBonus()
+            needToGetTankman = quest.needToGetAddReward() and not bonus.isMain or quest.needToGetMainReward() and bonus.isMain
+            if needToGetTankman and bonus.tankman is not None:
+                showTankwomanAward(quest.getID(), first(bonus.tankman.getTankmenData()), vehicleSlotToUnpack, vehicle, parentViewKey=parentViewKey)
+        else:
+            shared_events.showTokenRecruitDialog({'tokenName': recruitID,
+             'tokenData': recruitData,
+             'slot': vehicleSlotToUnpack,
+             'vehicle': vehicle}, parentViewKey=parentViewKey)
+        return
 
 
 def showMissionAward(quest, ctx):
@@ -364,6 +381,10 @@ def showSubscriptionAwardWindow(notificationMgr=None):
     notificationMgr.append(WindowNotificationCommand(SubscriptionAwardWindow()))
 
 
+def showSubscriptionScreen():
+    shared_events.showSubscriptionsPage()
+
+
 def showPersonalMissionAward(quest, ctx):
     shared_events.showPersonalMissionsQuestAwardScreen(quest, ctx, showPersonalMission)
 
@@ -393,3 +414,60 @@ def showActions(tab=None, anchor=None):
 
 def _showMissions(**kwargs):
     g_eventBus.handleEvent(events.LoadViewEvent(SFViewLoadParams(VIEW_ALIAS.LOBBY_MISSIONS), ctx=kwargs), scope=EVENT_BUS_SCOPE.LOBBY)
+
+
+def ifPrbNavigationEnabled(callback):
+
+    def wrapper(*args, **kwargs):
+        prbDispatcher = g_prbLoader.getDispatcher()
+        if prbDispatcher is not None and prbDispatcher.getFunctionalState().isNavigationDisabled():
+            SystemMessages.pushI18nMessage('#system_messages:queue/isInQueue', type=SystemMessages.SM_TYPE.Error)
+        else:
+            callback(*args, **kwargs)
+        return
+
+    return wrapper
+
+
+@ifPrbNavigationEnabled
+@dependency.replace_none_kwargs(notificationMgr=INotificationWindowController)
+def showWarningWindow(arenaTypeID, time, reason, isAFKViolation, notificationMgr=None, force=False):
+    from gui.impl.lobby.hangar.notifications.punishment_notification_view import WarningNotificationWindow
+    wnd = WarningNotificationWindow(arenaTypeID, time, reason, isAFKViolation)
+    if force:
+        wnd.load()
+    else:
+        notificationMgr.append(WindowNotificationCommand(wnd))
+
+
+@ifPrbNavigationEnabled
+@dependency.replace_none_kwargs(notificationMgr=INotificationWindowController)
+def showPenaltyWindow(arenaTypeID, time, reason, isAFKViolation, notificationMgr=None, force=False):
+    from gui.impl.lobby.hangar.notifications.punishment_notification_view import PenaltyNotificationWindow
+    wnd = PenaltyNotificationWindow(arenaTypeID, time, reason, isAFKViolation)
+    if force:
+        wnd.load()
+    else:
+        notificationMgr.append(WindowNotificationCommand(wnd))
+
+
+@ifPrbNavigationEnabled
+@dependency.replace_none_kwargs(notificationMgr=INotificationWindowController)
+def showBanWindow(arenaTypeID, time, duration, notificationMgr=None, force=False):
+    from gui.impl.lobby.hangar.notifications.punishment_notification_view import BanNotificationWindow
+    wnd = BanNotificationWindow(arenaTypeID, time, duration)
+    if force:
+        wnd.load()
+    else:
+        notificationMgr.append(WindowNotificationCommand(wnd))
+
+
+@ifPrbNavigationEnabled
+@dependency.replace_none_kwargs(notificationMgr=INotificationWindowController)
+def showComp7BanWindow(arenaTypeID, time, duration, penalty, isQualification, notificationMgr=None, force=False):
+    from gui.impl.lobby.hangar.notifications.punishment_notification_view import Comp7BanNotificationWindow
+    wnd = Comp7BanNotificationWindow(arenaTypeID, time, duration, penalty, isQualification)
+    if force:
+        wnd.load()
+    else:
+        notificationMgr.append(WindowNotificationCommand(wnd))

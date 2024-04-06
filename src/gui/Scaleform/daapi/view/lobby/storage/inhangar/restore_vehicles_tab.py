@@ -15,6 +15,8 @@ from gui.shared.utils.requesters import REQ_CRITERIA
 from helpers import dependency
 from skeletons.gui.game_control import IRestoreController
 from adisp import adisp_process
+from gui.impl import backport
+from gui.impl.gen import R
 
 class _RestoreStorageCarouselFilter(StorageCarouselFilter):
 
@@ -34,7 +36,7 @@ class _RestoreVehiclesDataProvider(StorageCarouselDataProvider):
         self._baseCriteria = REQ_CRITERIA.VEHICLE.IS_RESTORE_POSSIBLE | ~REQ_CRITERIA.INVENTORY ^ REQ_CRITERIA.VEHICLE.TELECOM_RENT
 
     def _addCriteria(self):
-        self._addVehicleItemsByCriteria(self._baseCriteria | REQ_CRITERIA.VEHICLE.ACTIVE_IN_NATION_GROUP | ~REQ_CRITERIA.VEHICLE.WOTPLUS_RENT)
+        self._addVehicleItemsByCriteria(self._baseCriteria | ~REQ_CRITERIA.VEHICLE.WOT_PLUS_VEHICLE | REQ_CRITERIA.VEHICLE.ACTIVE_IN_NATION_GROUP | ~REQ_CRITERIA.VEHICLE.IS_STORAGE_HIDDEN)
 
     def applyFilter(self, forceApply=False):
         pass
@@ -51,7 +53,8 @@ class _RestoreVehiclesDataProvider(StorageCarouselDataProvider):
          'description': description,
          'timerText': timerText,
          'timerIcon': timerIcon,
-         'contextMenuId': CONTEXT_MENU_HANDLER_TYPE.STORAGE_VEHICLES_RESTORE_ITEM})
+         'contextMenuId': CONTEXT_MENU_HANDLER_TYPE.STORAGE_VEHICLES_RESTORE_ITEM,
+         'sellButtonLabel': backport.text(R.strings.storage.buttonLabel.restore())})
         return vo
 
 

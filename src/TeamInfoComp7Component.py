@@ -2,16 +2,22 @@
 # Embedded file name: comp7/scripts/client/TeamInfoComp7Component.py
 import typing
 import VOIP
+from constants import REQUEST_COOLDOWN
 from gui.battle_control import avatar_getter
 from gui.battle_control.arena_info.arena_vos import Comp7Keys
 from helpers import dependency
-from script_component.ScriptComponent import ScriptComponent
+from helpers.CallbackDelayer import CallbackDelayer
+from script_component.DynamicScriptComponent import DynamicScriptComponent
 from skeletons.gui.battle_session import IBattleSessionProvider
 if typing.TYPE_CHECKING:
     from VOIP.VOIPManager import VOIPManager
 
-class TeamInfoComp7Component(ScriptComponent):
+class TeamInfoComp7Component(DynamicScriptComponent):
     __sessionProvider = dependency.descriptor(IBattleSessionProvider)
+
+    def __init__(self):
+        super(TeamInfoComp7Component, self).__init__()
+        self.__callbackDelayer = CallbackDelayer()
 
     def onEnterWorld(self, *args):
         super(TeamInfoComp7Component, self).onEnterWorld(*args)
@@ -24,6 +30,7 @@ class TeamInfoComp7Component(ScriptComponent):
         voipManager = VOIP.getVOIPManager()
         voipManager.onJoinedChannel -= self.__onJoinedVoipChannel
         voipManager.onLeftChannel -= self.__onLeftVoipChannel
+        self.__callbackDelayer.clearCallbacks()
         super(TeamInfoComp7Component, self).onLeaveWorld()
 
     def set_roleSkillLevels(self, prev):
@@ -35,6 +42,10 @@ class TeamInfoComp7Component(ScriptComponent):
             self.__invalidateTeamVivoxChannel()
 
     def _onAvatarReady(self):
+        voipManager = VOIP.getVOIPManager()
+        voipManager.onJoinedChannel += self.__onJoinedVoipChannel
+        voipManager.onLeftChannel += self.__onLeftVoipChannel
+        self.__updateVoipConnection()
         self.__invalidateRoleSkillLevels()
         self.__invalidateTeamVivoxChannel()
 
@@ -49,14 +60,14 @@ class TeamInfoComp7Component(ScriptComponent):
         if not arena:
             return
         gameModeStats = {vID:{Comp7Keys.ROLE_SKILL_LEVEL: level} for vID, level in self.roleSkillLevels.iteritems()}
-        arena.onGameModeSpecificStats(isStatic=True, stats=gameModeStats)
+        arena.updateGameModeSpecificStats(isStatic=True, stats=gameModeStats)
 
     def __invalidateTeamVivoxChannel(self):
         arena = avatar_getter.getArena()
         if not arena:
             return
         gameModeStats = {vID:{Comp7Keys.VOIP_CONNECTED: bool(connected)} for vID, connected in self.teamVivoxChannel.iteritems()}
-        arena.onGameModeSpecificStats(isStatic=True, stats=gameModeStats)
+        arena.updateGameModeSpecificStats(isStatic=True, stats=gameModeStats)
 
     def __updateVoipConnection(self):
         voipManager = VOIP.getVOIPManager()
@@ -67,5 +78,7 @@ class TeamInfoComp7Component(ScriptComponent):
             voipManager.enableCurrentChannel(isEnabled=True)
 
     def __updateVivoxPresence(self):
-        voipManager = VOIP.getVOIPManager()
-        self.cell.setVivoxPresence(voipManager.isCurrentChannelEnabled())
+        isVoipEnabled = VOIP.getVOIPManager().isCurrentChannelEnabled()
+        if self.teamVivoxChannel.get(avatar_getter.getPlayerVehicleID(), False) != isVoipEnabled:
+            self.cell.setVivoxPresence(isVoipEnabled)
+            self.__callbackDelayer.delayCallback(REQUEST_COOLDOWN.SET_VIVOX_PRESENCE + 1.0, self.__updateVivoxPresence)

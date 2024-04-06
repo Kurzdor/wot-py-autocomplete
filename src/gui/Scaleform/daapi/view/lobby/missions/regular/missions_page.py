@@ -9,6 +9,7 @@ from CurrentVehicle import g_currentVehicle
 from account_helpers import AccountSettings
 from account_helpers.AccountSettings import MISSIONS_PAGE
 from adisp import adisp_async as adispasync, adisp_process
+from gui.limited_ui.lui_rules_storage import LuiRules
 from wg_async import wg_async, wg_await
 from gui.ClientUpdateManager import g_clientUpdateManager
 from gui.Scaleform.daapi import LobbySubView
@@ -27,6 +28,7 @@ from gui.Scaleform.locale.BATTLE_PASS import BATTLE_PASS
 from gui.Scaleform.locale.QUESTS import QUESTS
 from gui.Scaleform.locale.RES_ICONS import RES_ICONS
 from gui.battle_pass.battle_pass_helpers import isBattlePassDailyQuestsIntroShown
+from gui.battle_pass.sounds import HOLIDAY_TASKS_SOUND_SPACE
 from gui.impl import backport
 from gui.impl.gen import R
 from gui.marathon.marathon_event_controller import getMarathons
@@ -44,7 +46,7 @@ from helpers import dependency
 from helpers.i18n import makeString as _ms
 from items import getTypeOfCompactDescr
 from skeletons.gui.event_boards_controllers import IEventBoardController
-from skeletons.gui.game_control import IBattlePassController, IHangarSpaceSwitchController, IGameSessionController, IMapboxController, IMarathonEventsController, IRankedBattlesController, IFunRandomController, IUISpamController
+from skeletons.gui.game_control import IBattlePassController, IHangarSpaceSwitchController, IGameSessionController, IMapboxController, IMarathonEventsController, IRankedBattlesController, IFunRandomController, ILimitedUIController, IWinbackController
 from skeletons.gui.app_loader import IAppLoader, GuiGlobalSpaceID
 from skeletons.gui.battle_matters import IBattleMattersController
 from skeletons.gui.lobby_context import ILobbyContext
@@ -92,9 +94,10 @@ class MissionsPage(LobbySubView, MissionsPageMeta):
     eventsController = dependency.descriptor(IEventBoardController)
     marathonsCtrl = dependency.descriptor(IMarathonEventsController)
     battlePass = dependency.descriptor(IBattlePassController)
-    uiSpamController = dependency.descriptor(IUISpamController)
     __mapboxCtrl = dependency.descriptor(IMapboxController)
     __battleMattersController = dependency.descriptor(IBattleMattersController)
+    __limitedUIController = dependency.descriptor(ILimitedUIController)
+    __winbackController = dependency.descriptor(IWinbackController)
 
     def __init__(self, ctx):
         super(MissionsPage, self).__init__(ctx)
@@ -112,6 +115,8 @@ class MissionsPage(LobbySubView, MissionsPageMeta):
         self.__currentTabAlias = None
         self.__subTab = None
         self.__ctx = ctx or {}
+        self.__soundSpace = self._COMMON_SOUND_SPACE
+        self.__changeSoundSpace()
         self._initialize(ctx)
         return
 
@@ -274,7 +279,7 @@ class MissionsPage(LobbySubView, MissionsPageMeta):
                     self.__currentTabAlias = QUESTS_ALIASES.MISSIONS_EVENT_BOARDS_VIEW_PY_ALIAS
                 elif self.marathonsCtrl.doesShowAnyMissionsTab():
                     enabledMarathon = self.marathonsCtrl.getFirstEnabledMarathon()
-                    if enabledMarathon is not None and not self.uiSpamController.shouldBeHidden(QUESTS_ALIASES.MISSIONS_MARATHON_VIEW_PY_ALIAS):
+                    if enabledMarathon is not None and self.__limitedUIController.isRuleCompleted(LuiRules.MISSIONS_MARATHON_VIEW):
                         self.__currentTabAlias = QUESTS_ALIASES.MISSIONS_MARATHON_VIEW_PY_ALIAS
                         self.__marathonPrefix = enabledMarathon.prefix
         self._eventID = ctx.get('eventID')
@@ -369,6 +374,13 @@ class MissionsPage(LobbySubView, MissionsPageMeta):
 
     def __updateBattlePassTab(self, *_):
         self.__updateHeader()
+        self.__changeSoundSpace()
+
+    def __changeSoundSpace(self):
+        newSoundSpace = HOLIDAY_TASKS_SOUND_SPACE if self.battlePass.isHoliday() and self.battlePass.isActive() else TASKS_SOUND_SPACE
+        if self.__soundSpace != newSoundSpace:
+            self.__soundSpace = newSoundSpace
+            self.initSoundManager(self.__soundSpace)
 
     def __updateHeader(self, updateTabsDataProvider=True):
         data = []
@@ -423,6 +435,9 @@ class MissionsPage(LobbySubView, MissionsPageMeta):
                 vehicle = g_currentVehicle.item
                 vehName = vehicle.shortUserName if vehicle else ''
                 tab['label'] = tabData.label % {'vehName': vehName}
+            if alias == QUESTS_ALIASES.MISSIONS_PREMIUM_VIEW_PY_ALIAS and self.__winbackController.isProgressionAvailable():
+                tab['label'] = backport.text(R.strings.winback.winbackTab())
+                headerTab['tooltip'] = QUESTS.MISSIONS_TAB_WINBACK
             if alias in (QUESTS_ALIASES.MISSIONS_MARATHON_VIEW_PY_ALIAS,
              QUESTS_ALIASES.MISSIONS_CATEGORIES_VIEW_PY_ALIAS,
              QUESTS_ALIASES.MISSIONS_PREMIUM_VIEW_PY_ALIAS,

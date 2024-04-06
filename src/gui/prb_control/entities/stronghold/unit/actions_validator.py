@@ -1,5 +1,6 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/gui/prb_control/entities/stronghold/unit/actions_validator.py
+from constants import BATTLE_MODE_VEH_TAGS_EXCEPT_CLAN
 from gui.prb_control import prb_getters
 from gui.prb_control.entities.base.squad.actions_validator import UnitActionsValidator
 from gui.prb_control.entities.base.unit.actions_validator import UnitVehiclesValidator, CommanderValidator, UnitStateValidator, UnitPlayerValidator
@@ -7,7 +8,7 @@ from gui.prb_control.items import ValidationResult
 from gui.prb_control.settings import UNIT_RESTRICTION
 
 class StrongholdVehiclesValidator(UnitVehiclesValidator):
-    pass
+    _BATTLE_MODE_VEHICLE_TAGS = BATTLE_MODE_VEH_TAGS_EXCEPT_CLAN
 
 
 class StrongholdUnitSlotsValidator(CommanderValidator):
@@ -16,6 +17,7 @@ class StrongholdUnitSlotsValidator(CommanderValidator):
         rosterSettings = self._entity.getRosterSettings()
         stats = self._entity.getStats()
         isPlayersMatchingAvailable = self._entity.isPlayersMatchingAvailable()
+        hasEventFrozenVehicles = self._entity.hasEventFrozenVehicles()
         allMembersReady = stats.readyCount == stats.occupiedSlotsCount
         if isPlayersMatchingAvailable:
             isClanMembersEnough = stats.clanMembersInRoster >= rosterSettings.getMinClanMembersCount()
@@ -30,7 +32,7 @@ class StrongholdUnitSlotsValidator(CommanderValidator):
                 return ValidationResult(False, UNIT_RESTRICTION.MIN_SLOTS)
             if not allMembersReady:
                 return ValidationResult(False, UNIT_RESTRICTION.NOT_READY_IN_SLOTS)
-        return super(StrongholdUnitSlotsValidator, self)._validate()
+        return ValidationResult(True, UNIT_RESTRICTION.HAS_FROZEN_VEHICLES) if hasEventFrozenVehicles else super(StrongholdUnitSlotsValidator, self)._validate()
 
 
 class StrongholdUnitStateValidator(UnitStateValidator):

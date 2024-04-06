@@ -1,11 +1,12 @@
 # Python bytecode 2.7 (decompiled from Python 2.7)
 # Embedded file name: scripts/client/frameworks/wulf/view/submodel_presenter.py
 import typing
+from helpers.events_handler import EventsHandler
 if typing.TYPE_CHECKING:
-    from Event import Event
+    from typing import Optional
     from frameworks.wulf import View, ViewEvent, Window
 
-class SubModelPresenter(object):
+class SubModelPresenter(EventsHandler):
     __slots__ = ('__viewModel', '__isLoaded', '__parentView')
 
     def __init__(self, viewModel, parentView):
@@ -21,16 +22,19 @@ class SubModelPresenter(object):
     def parentView(self):
         return self.__parentView
 
+    def getParentWindow(self):
+        return self.parentView.getParentWindow()
+
     def getViewModel(self):
         return self.__viewModel
 
     def initialize(self, *args, **kwargs):
-        self.__subscribe()
+        self._subscribe()
         self.__isLoaded = True
 
     def finalize(self):
         self.__isLoaded = False
-        self.__unsubscribe()
+        self._unsubscribe()
 
     def clear(self):
         self.__viewModel = None
@@ -53,14 +57,3 @@ class SubModelPresenter(object):
 
     def createContextMenu(self, event):
         return None
-
-    def _getEvents(self):
-        pass
-
-    def __subscribe(self):
-        for event, handler in self._getEvents():
-            event += handler
-
-    def __unsubscribe(self):
-        for event, handler in self._getEvents():
-            event -= handler
